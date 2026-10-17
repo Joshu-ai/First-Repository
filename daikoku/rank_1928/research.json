@@ -1,0 +1,1965 @@
+{
+ "citations": {
+  "sp500_100": [
+   {
+    "id": "sp500_100",
+    "value_text": "$1,157,599",
+    "value_number": 1157599,
+    "period": "1928-2025",
+    "source_name": "The College Investor, 'Investing For Dummies' (table cites NYU Stern / Damodaran, 1928-2025)",
+    "source_url": "https://thecollegeinvestor.com/22975/investing-for-dummies/",
+    "quote": "Its table shows S&P 500 Stocks at 10.0% growing $100 to $1,157,599, Corporate Bonds (Baa) at 6.6% to $53,952, 10-Year Treasury Bonds at 4.5% to $7,753, and 3-Month Treasury Bills at 3.4% to $2,578.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "approximately $1,157,600",
+    "value_number": 1157600,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk, Average Stock Market Return reference (cites NYU Stern / Damodaran 1928-2025)",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "Reinvested in the S&P 500, that $100 would be worth approximately $1,157,600 by end of 2025.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "$1,157,009",
+    "value_number": 1157009,
+    "period": "1928-2025",
+    "source_name": "economics.mba, 'Stock Market Returns: History, Risk and Reward' (cites Damodaran January 2026 dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The same dataset's $100 ending values are given for the S&P 500, dividends included, at $1,157,009.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "over $787,000",
+    "value_number": 787000,
+    "period": "1928-2023",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad. Here's Why.' (Damodaran data, Jan 2024 vintage)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "would have turned $100 in 1928 to over $787,000 through 2023 according to Professor Damodaran's data.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "787,018",
+    "value_number": 787018,
+    "period": "1928-2023",
+    "source_name": "QuantifiedStrategies, Historical Returns For Stocks, Bonds, Gold, Real Estate, And Cash (Damodaran data; end year matches Lyn Alden's through-2023 figures)",
+    "source_url": "https://www.quantifiedstrategies.com/historical-returns-asset-classes/",
+    "quote": "100 in 1928 is worth today \u00b7 787,018 \u00b7 10,041 \u00b7 2,249 \u00b7 5,360 \u00b7 7,278",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "$1,157,009",
+    "value_number": 1157009,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward' (cites Damodaran's January 2026 NYU Stern U.S. returns dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "S&P 500, dividends included: $1,157,009 (11,570\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "sp500_100",
+    "value_text": "approximately $1,157,600",
+    "value_number": 1157600,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk, 'Average Stock Market Return: S&P 500 Historical Data (1928\u20132026)' (cites NYU Stern / Damodaran)",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "Reinvested in the S&P 500, that $100 would be worth approximately $1,157,600 by end of 2025.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "smallcap_100": [
+   {
+    "id": "smallcap_100",
+    "value_text": "$6,462,599",
+    "value_number": 6462599,
+    "period": "1928-2025",
+    "source_name": "Investment Returns Explorer, aguerrevere.com (built on Damodaran NYU data)",
+    "source_url": "https://aguerrevere.com/Investments/",
+    "quote": "It shows $6,462,599 as the value of $100 invested in U.S. small-cap stocks in 1928, by end of 2025, with dividends reinvested and no withdrawals.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "smallcap_100",
+    "value_text": "$6,462,599",
+    "value_number": 6462599,
+    "period": "1928-2025",
+    "source_name": "aguerrevere.com Investment Returns Explorer (says its data is Prof. Aswath Damodaran's NYU Stern histretSP.xls, 1928-2025)",
+    "source_url": "https://aguerrevere.com/Investments/",
+    "quote": "$100 invested in 1928 in that category would be worth $6,462,599 by end of 2025, with dividends reinvested",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbill_100": [
+   {
+    "id": "tbill_100",
+    "value_text": "$2,578",
+    "value_number": 2578,
+    "period": "1928-2025",
+    "source_name": "The College Investor, 'Investing For Dummies' (NYU Stern / Damodaran)",
+    "source_url": "https://thecollegeinvestor.com/22975/investing-for-dummies/",
+    "quote": "3-Month Treasury Bills at 3.4% to $2,578",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "$2,578",
+    "value_number": 2578,
+    "period": "1928-2025",
+    "source_name": "Capital Group PDF MFGEOS-473-1091938 (hypothetical $100, Jan 1 1928 - Dec 31 2025)",
+    "source_url": "https://www.capitalgroup.com/advisor/pdf/shareholder/MFGEOS-473-1091938.pdf",
+    "quote": "A hypothetical $100 investment in U.S. stocks in 1928 would have grown to nearly $1.2 million compared to just $2,578 in cash-like investments.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "~$2,578",
+    "value_number": 2578,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk (cites NYU Stern / Damodaran)",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The same $100 in 10-year Treasuries: ~$7,750. In T-bills: ~$2,578.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "$2,249",
+    "value_number": 2249,
+    "period": "1928-2023",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad' (Damodaran data)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "If you had invested $100 in T-bills starting in 1928 and compounded them through 2023, you would have $2,249 by the end of 2023.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "$2,578",
+    "value_number": 2578,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "3-month Treasury bills: $2,578 (26\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "~$2,578",
+    "value_number": 2578,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "In T-bills: ~$2,578",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbill_100",
+    "value_text": "$2,578",
+    "value_number": 2578,
+    "period": "1928-2025",
+    "source_name": "aguerrevere.com Investment Returns Explorer",
+    "source_url": "https://aguerrevere.com/Investments/",
+    "quote": "The same $100 in short-term Treasury bills would be worth $2,578.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbond_100": [
+   {
+    "id": "tbond_100",
+    "value_text": "$7,753",
+    "value_number": 7753,
+    "period": "1928-2025",
+    "source_name": "The College Investor, 'Investing For Dummies' (NYU Stern / Damodaran)",
+    "source_url": "https://thecollegeinvestor.com/22975/investing-for-dummies/",
+    "quote": "10-Year Treasury Bonds at 4.5% to $7,753",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbond_100",
+    "value_text": "~$7,750",
+    "value_number": 7750,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk (cites NYU Stern / Damodaran)",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The same $100 in 10-year Treasuries: ~$7,750.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbond_100",
+    "value_text": "$7,278",
+    "value_number": 7278,
+    "period": "1928-2023",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad' (Damodaran data)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "you would have turned $100 into $7,278. That seems great at first, except for the fact that this is entirely due to dollar debasement along the way.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "tbond_100",
+    "value_text": "$7,718",
+    "value_number": 7718,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "10-year U.S. Treasury bonds: $7,718 (77\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbond_100",
+    "value_text": "~$7,750",
+    "value_number": 7750,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The same page gives about $7,750 for 10-year Treasuries and about $2,578 for T-bills over the same period (~$7,750; ~$2,578).",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "baa_100": [
+   {
+    "id": "baa_100",
+    "value_text": "$53,952",
+    "value_number": 53952,
+    "period": "1928-2025",
+    "source_name": "The College Investor, 'Investing For Dummies' (NYU Stern / Damodaran)",
+    "source_url": "https://thecollegeinvestor.com/22975/investing-for-dummies/",
+    "quote": "Corporate Bonds (Baa) | 6.6% | $53,952",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "baa_100",
+    "value_text": "$53,952",
+    "value_number": 53952,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Baa corporate bonds: $53,952 (540\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "realestate_100": [
+   {
+    "id": "realestate_100",
+    "value_text": "$5,626",
+    "value_number": 5626,
+    "period": "1928-2025",
+    "source_name": "economics.mba, 'Stock Market Returns: History, Risk and Reward' (Damodaran January 2026 dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "the ending value of $100 in the residential real-estate price index was $5,626, with a compound annual growth rate of 4.20%",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "realestate_100",
+    "value_text": "$5,626",
+    "value_number": 5626,
+    "period": "1928-2025",
+    "source_name": "The College Investor, 'Investing For Dummies' (NYU Stern / Damodaran)",
+    "source_url": "https://thecollegeinvestor.com/22975/investing-for-dummies/",
+    "quote": "real estate (home prices) at a 4.2% average return and $100 grew to $5,626, citing NYU Stern (Damodaran)",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "realestate_100",
+    "value_text": "$5,360",
+    "value_number": 5360,
+    "period": "1928-2023",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad' (Damodaran data)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "$100 invested into U.S. real estate in 1928 would have turned into $5,360 by 2023. That's better than T-bills, but worse than T-bonds and worse than gold.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "realestate_100",
+    "value_text": "$5,626",
+    "value_number": 5626,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Residential real-estate price index: $5,626 (56\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "realestate_100",
+    "value_text": "$5,360",
+    "value_number": 5360,
+    "period": "1928-2023 (OLDER vintage, not through 2025)",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad. Here's Why.' (cites Damodaran)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "$100 invested into U.S. real estate in 1928 would have turned into $5,360 by 2023, and $100 in gold would have turned into $10,042",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "gold_100": [
+   {
+    "id": "gold_100",
+    "value_text": "$21,025",
+    "value_number": 21025,
+    "period": "1928-2025",
+    "source_name": "economics.mba, 'Stock Market Returns: History, Risk and Reward' (Damodaran January 2026 dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "$100 invested at the beginning of 1928 reached the following nominal values by the end of 2025 of $21,025 for gold, about 210\u00d7",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "gold_100",
+    "value_text": "$10,042",
+    "value_number": 10042,
+    "period": "1928-2023",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad' (Damodaran data)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "If you had simply put $100 into gold, you would have turned $100 into $10,042.",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "gold_100",
+    "value_text": "$8,866.76",
+    "value_number": 8866.76,
+    "period": "1928-2022",
+    "source_name": "JWealth, 'Not Everything that Glitters is Gold: 100 Years of Gold Vs. Stocks' (Damodaran data)",
+    "source_url": "https://www.jwealth.co/blog/not-everything-that-glitters-is-gold-100-years-of-gold-vs-stocks",
+    "quote": "if you started investing in gold in 1928 with $100, your gold would be $8,866.76 at the end of 2022",
+    "primary": false,
+    "finder": "values"
+   },
+   {
+    "id": "gold_100",
+    "value_text": "$21,025",
+    "value_number": 21025,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Gold: $21,025 (210\u00d7)",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "gold_100",
+    "value_text": "$10,042",
+    "value_number": 10042,
+    "period": "1928-2023 (OLDER vintage, not through 2025)",
+    "source_name": "Lyn Alden, 'Most Investments are Actually Bad. Here's Why.' (cites Damodaran)",
+    "source_url": "https://www.lynalden.com/most-investments-are-bad/",
+    "quote": "$100 invested into U.S. real estate in 1928 would have turned into $5,360 by 2023, and $100 in gold would have turned into $10,042",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "sp500_geo": [
+   {
+    "id": "sp500_geo",
+    "value_text": "10.02%",
+    "value_number": 10.02,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "S&P 500 with dividends: arithmetic average 11.85%, compound annual growth 10.02%, volatility 19.40%, 26 losing years out of 98 (worst year -43.84%, best year 52.56%).",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "10.02%",
+    "value_number": 10.02,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "The page lists the S&P 500 at 11.85% average yearly return and a 10.02% compound yearly return.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "+9.94%",
+    "value_number": 9.94,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Historical Returns For Stocks, Bonds, Cash, Real Estate and Gold, Jan 2025 (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "10.02%",
+    "value_number": 10.02,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The S&P 500's compound return was 10.02%, with volatility of 19.40%.",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "10.02%",
+    "value_number": 10.02,
+    "period": "1928-2025",
+    "source_name": "Eco3min, 'S&P 500 Annual Returns 1928-2025: CSV (Damodaran Data)'",
+    "source_url": "https://eco3min.fr/en/sp500-historical-returns-dataset/",
+    "quote": "10.02%: Compound annual total return of the S&P 500 with dividends reinvested, before inflation for 1928\u20132025",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "~10.0%",
+    "value_number": 10,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference (table labeled 'Annualized geometric averages')",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The page's 10-year Treasury average is about 4.9% nominal, T-bills about 3.3%, and gold about 5.6%, with the S&P 500 near 10.0%. ... The table is labeled annualized geometric averages, sourced to NYU Stern for 1928\u20132025.",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "sp500_geo",
+    "value_text": "10.0%",
+    "value_number": 10,
+    "period": "1928-2025",
+    "source_name": "PennyCalc, 'S&P 500 Return History + $1,000 Time Machine'",
+    "source_url": "https://pennycalc.com/sp500-returns/history/",
+    "quote": "long-run compound rate is 10.0%, with dividends reinvested",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "sp500_arith": [
+   {
+    "id": "sp500_arith",
+    "value_text": "11.85%",
+    "value_number": 11.85,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "S&P 500 with dividends: arithmetic average 11.85%, compound annual growth 10.02%, volatility 19.40%",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "sp500_arith",
+    "value_text": "11.85%",
+    "value_number": 11.85,
+    "period": "1928-2025",
+    "source_name": "Damodaran, Equity Risk Premiums (ERP): Determinants, Estimation and Implications - The 2026 Edition (copy filed with Rhode Island PUC, Docket 25-45-GE)",
+    "source_url": "https://ripuc.ri.gov/sites/g/files/xkgbur841/files/2026-05/DPUC%20Attachment%202%20to%20RIE%202-1(e).pdf",
+    "quote": "Damodaran's 2026 ERP paper reports mean annual returns of 11.85% for stocks, 3.41% for T-bills, and 4.82% for T-bonds.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "smallcap_geo": [
+   {
+    "id": "smallcap_geo",
+    "value_text": "11.98%",
+    "value_number": 11.98,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "U.S. small-cap stocks (bottom decile): arithmetic average 17.78%, compound growth 11.98%, volatility 37.95%, 34 losing years.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "smallcap_geo",
+    "value_text": "+11.74%",
+    "value_number": 11.74,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Jan 2025 post (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "smallcap_geo",
+    "value_text": "11.98%",
+    "value_number": 11.98,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward' (U.S. small-cap bottom decile)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "compound annual growth rate: 11.98% and annual volatility: 37.95%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "smallcap_arith": [
+   {
+    "id": "smallcap_arith",
+    "value_text": "17.78%",
+    "value_number": 17.78,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "U.S. small-cap stocks (bottom decile): arithmetic average 17.78%, compound growth 11.98%, volatility 37.95%, 34 losing years.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "tbill_geo": [
+   {
+    "id": "tbill_geo",
+    "value_text": "3.37%",
+    "value_number": 3.37,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "3-month T-bills: arithmetic average 3.41%, compound growth 3.37%, volatility 3.04%, no losing years.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbill_geo",
+    "value_text": "3.37%",
+    "value_number": 3.37,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "For the 3-month T-bill, it shows a 3.42% average yearly return, or 3.37% compounded.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbill_geo",
+    "value_text": "+3.31%",
+    "value_number": 3.31,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Jan 2025 post (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbill_geo",
+    "value_text": "~3.3%",
+    "value_number": 3.3,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference (table labeled 'Annualized geometric averages')",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The page's 10-year Treasury average is about 4.9% nominal, T-bills about 3.3%, and gold about 5.6%, with the S&P 500 near 10.0%.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbill_arith": [
+   {
+    "id": "tbill_arith",
+    "value_text": "3.41%",
+    "value_number": 3.41,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "3-month T-bills: arithmetic average 3.41%, compound growth 3.37%, volatility 3.04%, no losing years.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbill_arith",
+    "value_text": "3.41%",
+    "value_number": 3.41,
+    "period": "1928-2025",
+    "source_name": "Damodaran, Equity Risk Premiums (ERP) - The 2026 Edition (copy filed with Rhode Island PUC)",
+    "source_url": "https://ripuc.ri.gov/sites/g/files/xkgbur841/files/2026-05/DPUC%20Attachment%202%20to%20RIE%202-1(e).pdf",
+    "quote": "Damodaran's 2026 ERP paper reports mean annual returns of 11.85% for stocks, 3.41% for T-bills, and 4.82% for T-bonds.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "tbond_geo": [
+   {
+    "id": "tbond_geo",
+    "value_text": "4.53%",
+    "value_number": 4.53,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "10-year Treasury bonds: arithmetic average 4.82%, compound growth 4.53%, volatility 7.90%, 20 losing years.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbond_geo",
+    "value_text": "4.53%",
+    "value_number": 4.53,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "For 1928\u20132025, the 10-year Treasury bond compounded at 4.53% a year, and the 3-month Treasury bill compounded at 3.37%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbond_geo",
+    "value_text": "+4.50%",
+    "value_number": 4.5,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Jan 2025 post (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbond_geo",
+    "value_text": "4.53%",
+    "value_number": 4.53,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The article reports a compound annual growth rate of 4.53% and annual volatility of 7.90%.",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbond_geo",
+    "value_text": "~4.9%",
+    "value_number": 4.9,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference (table labeled 'Annualized geometric averages')",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The page's 10-year Treasury average is about 4.9% nominal, T-bills about 3.3%, and gold about 5.6%, with the S&P 500 near 10.0%.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbond_arith": [
+   {
+    "id": "tbond_arith",
+    "value_text": "4.82%",
+    "value_number": 4.82,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "10-year Treasury bonds: arithmetic average 4.82%, compound growth 4.53%, volatility 7.90%, 20 losing years.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "tbond_arith",
+    "value_text": "4.82%",
+    "value_number": 4.82,
+    "period": "1928-2025",
+    "source_name": "Damodaran, Equity Risk Premiums (ERP) - The 2026 Edition (copy filed with Rhode Island PUC)",
+    "source_url": "https://ripuc.ri.gov/sites/g/files/xkgbur841/files/2026-05/DPUC%20Attachment%202%20to%20RIE%202-1(e).pdf",
+    "quote": "7.03% for stocks over Ten-year treasury bonds (11.85% minus 4.82%)",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "baa_geo": [
+   {
+    "id": "baa_geo",
+    "value_text": "6.63%",
+    "value_number": 6.63,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The same table gives compound annual growth rates of 6.63% for Baa bonds, 4.20% for real estate, and 5.61% for gold.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "baa_geo",
+    "value_text": "6.63%",
+    "value_number": 6.63,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "It gives a compound annual growth rate of 6.63% and annual volatility of 7.65% for the 1928\u20132025 period.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "baa_arith": [
+   {
+    "id": "baa_arith",
+    "value_text": "6.90%",
+    "value_number": 6.9,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Baa corporate bonds 6.90%; U.S. residential real estate* 4.38%; Gold 7.36%",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "realestate_geo": [
+   {
+    "id": "realestate_geo",
+    "value_text": "4.20%",
+    "value_number": 4.2,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The same table gives compound annual growth rates of 6.63% for Baa bonds, 4.20% for real estate, and 5.61% for gold.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "realestate_geo",
+    "value_text": "+4.2%",
+    "value_number": 4.2,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X, citing Damodaran data",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "realestate_geo",
+    "value_text": "+4.23%",
+    "value_number": 4.23,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Jan 2025 post (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "realestate_geo",
+    "value_text": "4.20%",
+    "value_number": 4.2,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward' (residential real-estate price index)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The table lists a compound rate of 4.20% and volatility of 6.18%.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "realestate_arith": [
+   {
+    "id": "realestate_arith",
+    "value_text": "4.38%",
+    "value_number": 4.38,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Baa corporate bonds 6.90%; U.S. residential real estate* 4.38%; Gold 7.36%",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "gold_geo": [
+   {
+    "id": "gold_geo",
+    "value_text": "5.61%",
+    "value_number": 5.61,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "The same table gives compound annual growth rates of 6.63% for Baa bonds, 4.20% for real estate, and 5.61% for gold.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "gold_geo",
+    "value_text": "+5.6%",
+    "value_number": 5.6,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X, citing Damodaran data",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "gold_geo",
+    "value_text": "+5.12%",
+    "value_number": 5.12,
+    "period": "1928-2024",
+    "source_name": "A Wealth of Common Sense (Ben Carlson), Jan 2025 post (Damodaran Jan 2025 vintage)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "A January 2025 post lists stocks at +9.94%, small caps at +11.74%, bonds at +4.50%, cash at +3.31%, real estate at +4.23%, and gold at +5.12%.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "gold_geo",
+    "value_text": "5.61%",
+    "value_number": 5.61,
+    "period": "1928-2025 (Damodaran Jan 2026 vintage)",
+    "source_name": "Economics.MBA, 'Stock Market Returns: History, Risk and Reward'",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Gold's compound return was 5.61%, with volatility of 21.51%.",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "gold_geo",
+    "value_text": "~5.6%",
+    "value_number": 5.6,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference (table labeled 'Annualized geometric averages')",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The page's 10-year Treasury average is about 4.9% nominal, T-bills about 3.3%, and gold about 5.6%, with the S&P 500 near 10.0%.",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "gold_arith": [
+   {
+    "id": "gold_arith",
+    "value_text": "7.36%",
+    "value_number": 7.36,
+    "period": "1928-2025",
+    "source_name": "economics.mba, Stock Market Returns: History, Risk and Reward (cites Damodaran January 2026 NYU Stern dataset)",
+    "source_url": "https://economics.mba/finance/stock-market-returns-history-risk-and-reward/",
+    "quote": "Baa corporate bonds 6.90%; U.S. residential real estate* 4.38%; Gold 7.36%",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "sp500_real_geo": [
+   {
+    "id": "sp500_real_geo",
+    "value_text": "6.78%",
+    "value_number": 6.78,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "Its 1928\u20132025 summary shows S&P 500 total return compounding at 10.02% a year, or 6.78% after inflation, and CPI-U compounding at 3.04% a year.",
+    "primary": false,
+    "finder": "averages"
+   },
+   {
+    "id": "sp500_real_geo",
+    "value_text": "6.78%",
+    "value_number": 6.78,
+    "period": "1928-2025",
+    "source_name": "eco3min.fr, S&P 500 Annual Returns 1928-2025: CSV (Damodaran Data)",
+    "source_url": "https://eco3min.fr/en/sp500-historical-returns-dataset/",
+    "quote": "Another gives 10.02% nominal and 6.78% after inflation, with 98 calendar years of data.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "tbond_real_geo": [
+   {
+    "id": "tbond_real_geo",
+    "value_text": "1.45%",
+    "value_number": 1.45,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "After inflation, the bond's compound real return was 1.45% and the bill's was 0.33%. Inflation (CPI-U) compounded at 3.04%.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "tbill_real_geo": [
+   {
+    "id": "tbill_real_geo",
+    "value_text": "0.33%",
+    "value_number": 0.33,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "After inflation, the bond's compound real return was 1.45% and the bill's was 0.33%. Inflation (CPI-U) compounded at 3.04%.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "realestate_real_geo": [
+   {
+    "id": "realestate_real_geo",
+    "value_text": "about 1.1%",
+    "value_number": 1.1,
+    "period": "1928-2025",
+    "source_name": "The College Investor, Historical Average Investment Return By Asset Class (cites Damodaran data)",
+    "source_url": "https://thecollegeinvestor.com/40246/average-return-by-asset-class/",
+    "quote": "The College Investor lists home prices at about 1.1% real.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "gold_real_geo": [
+   {
+    "id": "gold_real_geo",
+    "value_text": "~2.5%",
+    "value_number": 2.5,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk, Average Stock Market Return: S&P 500 Historical Data (cites NYU Stern, 1928-2025)",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "gold at about 5.6% nominal and 2.5% real. Annualized geometric averages. Source: NYU Stern, 1928\u20132025.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "inflation_geo": [
+   {
+    "id": "inflation_geo",
+    "value_text": "3.04%",
+    "value_number": 3.04,
+    "period": "1928-2025",
+    "source_name": "Century Tested, S&P 500, Bond & Inflation Returns by Year, 1928-2025",
+    "source_url": "https://centurytested.com/historical-returns/",
+    "quote": "After inflation, the bond's compound real return was 1.45% and the bill's was 0.33%. Inflation (CPI-U) compounded at 3.04%.",
+    "primary": false,
+    "finder": "averages"
+   }
+  ],
+  "cpi_2025_avg": [
+   {
+    "id": "cpi_2025_avg",
+    "value_text": "321.943",
+    "value_number": 321.943,
+    "period": "2025 annual average (CPI-U, U.S. city average, NSA, 1982-84=100; published Jan 2026, the through-2025 vintage)",
+    "source_name": "U.S. Bureau of Labor Statistics, Mid-Atlantic Information Office: Summary of annual and semi-annual indexes",
+    "source_url": "https://www.bls.gov/regions/mid-atlantic/data/consumerpriceindexannualandsemiannual_table.htm",
+    "quote": "The table's 2025 row shows 321.943 for the U.S. city average annual average and 2.6 for the percent change.",
+    "primary": true,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_2025_avg",
+    "value_text": "321.943",
+    "value_number": 321.943,
+    "period": "2025 annual average",
+    "source_name": "U.S. Bureau of Labor Statistics, Consumer Price Index Overview Table (regional xg-table)",
+    "source_url": "https://www.bls.gov/regions/mid-atlantic/data/xg-tables/ro3xg01.htm",
+    "quote": "U.S. City Average with an annual average 2025 value of 321.943",
+    "primary": true,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_2025_avg",
+    "value_text": "321.943",
+    "value_number": 321.943,
+    "period": "2025 annual average",
+    "source_name": "CPI Chart (cpichart.com), CPI 2025 page",
+    "source_url": "https://cpichart.com/historical-cpi/2025/",
+    "quote": "CPI 2025: CPI-U Annual Average 321.943, Monthly Values & Inflation Rate",
+    "primary": false,
+    "finder": "cpi"
+   }
+  ],
+  "cpi_1928_avg": [
+   {
+    "id": "cpi_1928_avg",
+    "value_text": "17.1",
+    "value_number": 17.1,
+    "period": "1928 annual average (CPI-U, U.S. city average, 1982-84=100)",
+    "source_name": "U.S. Bureau of Labor Statistics, Historical CPI-U table (Table 24), Dec 2017 file",
+    "source_url": "https://www.bls.gov/cpi/tables/historical-cpi-u-201712.pdf",
+    "quote": "1927 \u00b7 17.4 \u00b7 -2.3 \u00b7 -1.7 \u2026 1928 \u00b7 17.1 \u00b7 -1.2 \u00b7 -1.7",
+    "primary": true,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_1928_avg",
+    "value_text": "17.1",
+    "value_number": 17.1,
+    "period": "1928 annual average",
+    "source_name": "CPI Chart (cpichart.com), Historical CPI Data, Annual U.S. Index 1913 to Present",
+    "source_url": "https://cpichart.com/historical-cpi/",
+    "quote": "The cpichart.com historical CPI page lists the 1928 annual average CPI-U as 17.1, with a year-over-year change of -1.7%.",
+    "primary": false,
+    "finder": "cpi"
+   }
+  ],
+  "cpi_2025_dec": [
+   {
+    "id": "cpi_2025_dec",
+    "value_text": "324.054",
+    "value_number": 324.054,
+    "period": "December 2025 (CPI-U, NSA, U.S. city average, 1982-84=100)",
+    "source_name": "U.S. Bureau of Labor Statistics, Consumer Price Index News Release, 2025 M12 Results (Jan 13, 2026)",
+    "source_url": "https://www.bls.gov/news.release/archives/cpi_01132026.htm",
+    "quote": "Unadjusted indexes / Dec. 2025 for All items: 324.054",
+    "primary": true,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_2025_dec",
+    "value_text": "324.054",
+    "value_number": 324.054,
+    "period": "December 2025",
+    "source_name": "FRED, St. Louis Fed, series CPIAUCNS",
+    "source_url": "https://fred.stlouisfed.org/series/cpiaucns",
+    "quote": "Dec 2025: 324.054",
+    "primary": false,
+    "finder": "cpi"
+   }
+  ],
+  "cpi_equiv_100_1928_in_2025": [
+   {
+    "id": "cpi_equiv_100_1928_in_2025",
+    "value_text": "$1,884.10",
+    "value_number": 1884.1,
+    "period": "1928 to 2025 (site uses a 2025 CPI of 322.182 and a 1928 CPI of 17.100; 322.182 is not BLS's final 2025 annual average of 321.943, so it was likely computed from partial-year 2025 data)",
+    "source_name": "in2013dollars.com (Official Data Foundation), $100 in 1928 to 2025",
+    "source_url": "https://www.in2013dollars.com/1928-dollars-in-2025?amount=100",
+    "quote": "The in2013dollars page for $100 in 1928 gives a 2025 value of $1,884.10, based on a 3.07% inflation rate. The page lists CPI in 2025 of 322.182.",
+    "primary": false,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_equiv_100_1928_in_2025",
+    "value_text": "$1,877.49",
+    "value_number": 1877.49,
+    "period": "1928 to 2025 (site uses a 1928 CPI of 17.100 and a 2025 CPI of 321.051, which is not the final BLS 2025 average of 321.943)",
+    "source_name": "officialdata.org, $100 in 1928 to 2025",
+    "source_url": "https://www.officialdata.org/1928-dollars-in-2025?amount=100",
+    "quote": "The officialdata.org 2025 page puts $100 from 1928 at about $1,877.49 in 2025 dollars. That figure uses the US CPI, with 1928 at 17.100 and 2025 at 321.051.",
+    "primary": false,
+    "finder": "cpi"
+   }
+  ],
+  "cpi_cum_pct": [
+   {
+    "id": "cpi_cum_pct",
+    "value_text": "1,784.10%",
+    "value_number": 1784.1,
+    "period": "1928 to 2025 (in2013dollars; same 322.182 basis as its $1,884.10)",
+    "source_name": "in2013dollars.com, $100 in 1928 to 2025",
+    "source_url": "https://www.in2013dollars.com/1928-dollars-in-2025?amount=100",
+    "quote": "One calculator puts cumulative inflation from 1928 to 2025 at 1,784.10%, which makes $100 in 1928 worth about $1,884.10 in 2025.",
+    "primary": false,
+    "finder": "cpi"
+   },
+   {
+    "id": "cpi_cum_pct",
+    "value_text": "1,777.49%",
+    "value_number": 1777.49,
+    "period": "1928 to 2025 (officialdata.org; 321.051 basis)",
+    "source_name": "officialdata.org, $100 in 1928 to 2025",
+    "source_url": "https://www.officialdata.org/1928-dollars-in-2025?amount=100",
+    "quote": "The 2025 page works out to a cumulative increase of 1,777.49%, or an average of 3.07% a year.",
+    "primary": false,
+    "finder": "cpi"
+   }
+  ],
+  "sp500_ret_1929": [
+   {
+    "id": "sp500_ret_1929",
+    "value_text": "-8.30%",
+    "value_number": -8.3,
+    "period": "calendar year 1929. Page as indexed is titled 1928-2024 but carries a January 2026 date; this value is the same in every vintage seen, including a 2017-era copy",
+    "source_name": "Damodaran, NYU Stern: Historical Returns on Stocks, Bonds and Bills (histretSP.html)",
+    "source_url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+    "quote": "The search turned up the NYU Stern (Damodaran) historical returns dataset, which lists the 1929 S&P 500 return, including dividends, as -8.30%. ... The 1929 row also shows a 3-month T.Bill return of 3.16% and a 10-year T. Bond return of 4.20%.",
+    "primary": true,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_ret_1930": [
+   {
+    "id": "sp500_ret_1930",
+    "value_text": "-25.12%",
+    "value_number": -25.12,
+    "period": "calendar year 1930. Same histretSP.html page (titled 1928-2024, dated January 2026); the value is stable across vintages",
+    "source_name": "Damodaran, NYU Stern: Historical Returns on Stocks, Bonds and Bills (histretSP.html)",
+    "source_url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+    "quote": "Damodaran's histretSP table lists this value directly. S&P 500 (includes dividends) is the column heading, and the 1930 row shows -25.12%.",
+    "primary": true,
+    "finder": "crashes"
+   },
+   {
+    "id": "sp500_ret_1930",
+    "value_text": "-25.12%",
+    "value_number": -25.12,
+    "period": "calendar year 1930 (secondary page says its source is the histretSP dataset for 1928-2025)",
+    "source_name": "PennyCalc: S&P 500 Return History",
+    "source_url": "https://pennycalc.com/sp500-returns/history/",
+    "quote": "PennyCalc (1928\u20132025, dividends reinvested): 1929 -8.30%, 1930 -25.12%, 1931 -43.84%, 1932 -8.64%.",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_ret_1931": [
+   {
+    "id": "sp500_ret_1931",
+    "value_text": "-43.84%",
+    "value_number": -43.84,
+    "period": "calendar year 1931. Same histretSP.html page (titled 1928-2024, dated January 2026)",
+    "source_name": "Damodaran, NYU Stern: Historical Returns on Stocks, Bonds and Bills (histretSP.html)",
+    "source_url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+    "quote": "1931 \u00b7 -43.84% \u00b7 -43.62% \u00b7 2.31% \u00b7 -2.56%",
+    "primary": true,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_ret_1932": [
+   {
+    "id": "sp500_ret_1932",
+    "value_text": "-8.64%",
+    "value_number": -8.64,
+    "period": "calendar year 1932. Same histretSP.html page (titled 1928-2024, dated January 2026); an older 2017-era page shows the same figure",
+    "source_name": "Damodaran, NYU Stern: Historical Returns on Stocks, Bonds and Bills (histretSP.html)",
+    "source_url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+    "quote": "The 1932 row is S&P 500 (includes dividends) at -8.64%, with a 3-month T-bill at 1.07% and a 10-year T-bond at 8.79%, per the January 2026 version covering 1928-2024. The older 2017-era page shows the same S&P, T-bill, and T-bond figures for 1932 (-8.64%, 1.07%, 8.79%).",
+    "primary": true,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_ret_2008": [
+   {
+    "id": "sp500_ret_2008",
+    "value_text": "-36.55%",
+    "value_number": -36.55,
+    "period": "calendar year 2008. Older Damodaran page 'Annual Returns on Stock, T.Bonds and T.Bills: 1928 - Current' (histretSPX.html), vintage not stated. The stock figure is the same on the current histretSP page and in a 1928-2022 reprint",
+    "source_name": "Damodaran, NYU Stern: Annual Returns on Stock, T.Bonds and T.Bills: 1928 - Current (histretSPX.html)",
+    "source_url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSPX.html",
+    "quote": "Damodaran's own page: The annual table lists 2008 at -36.55% for the S&P 500 with dividends included, alongside a 10-year Treasury bond return of 20.10% for that year.",
+    "primary": true,
+    "finder": "crashes"
+   },
+   {
+    "id": "sp500_ret_2008",
+    "value_text": "-36.55%",
+    "value_number": -36.55,
+    "period": "calendar year 2008, from the 1928-2022 vintage (January 2023 update) reprinted by REAP",
+    "source_name": "REAP: Historical Returns on Stocks, Bonds and Bills: 1928-2022 (reprint of Damodaran)",
+    "source_url": "https://retirementestateplan.com/2023/05/historical-returns-on-stocks-bonds-and-bills-1928-2022/",
+    "quote": "2008 \u00b7 -36.55% \u00b7 1.37% \u00b7 20.10%",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_ret_2025": [
+   {
+    "id": "sp500_ret_2025",
+    "value_text": "17.78%",
+    "value_number": 17.78,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), from a secondary copy of the histretSP row",
+    "source_name": "Barbara Friedberg Personal Finance: Historical Stock and Bond Returns (cites Damodaran NYU Stern data)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/historical-stock-and-bond-returns/",
+    "quote": "Its table lists 2025 returns of 17.78% (S&P 500 with dividends), 4.21% (3-month T-Bill), 7.80% (10-year T-Bond) and 6.96% (Baa Corporate Bond).",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "sp500_ret_2025",
+    "value_text": "17.72%",
+    "value_number": 17.72,
+    "period": "calendar year 2025, Damodaran's January 2026 blog post (Data Update 2 for 2026)",
+    "source_name": "Aswath Damodaran, Substack: Data Update 2 for 2026: A Testing Year (2025) for US Equities",
+    "source_url": "https://aswathdamodaran.substack.com/p/data-update-2-for-2026-a-testing",
+    "quote": "The S&P 500's return in 2025 of 17.72% was a solid year",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "tbond_ret_2022": [
+   {
+    "id": "tbond_ret_2022",
+    "value_text": "-17.83%",
+    "value_number": -17.83,
+    "period": "calendar year 2022, January 2023 vintage (1928-2022)",
+    "source_name": "Aswath Damodaran, Substack: Data Update 3 for 2023: Interest Rates and Bond Returns",
+    "source_url": "https://aswathdamodaran.substack.com/p/data-update-3-for-2023-interest-rates",
+    "quote": "The total return on a ten-year T.Bond in 2022 was -17.83%, putting it almost on par with the negative returns on stocks in 2022 (-18.01%).",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "tbond_ret_2022",
+    "value_text": "-17.83%",
+    "value_number": -17.83,
+    "period": "calendar year 2022, 1928-2022 vintage (January 2023 update) reprinted by REAP",
+    "source_name": "REAP: Historical Returns on Stocks, Bonds and Bills: 1928-2022 (reprint of Damodaran)",
+    "source_url": "https://retirementestateplan.com/2023/05/historical-returns-on-stocks-bonds-and-bills-1928-2022/",
+    "quote": "2022 \u00b7 -18.01% \u00b7 2.02% \u00b7 -17.83% \u00b7 -14.49%",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "tbond_ret_2022",
+    "value_text": "-17.8%",
+    "value_number": -17.8,
+    "period": "calendar year 2022, rounded, in a secondary table that also has 2025 rows, so probably the January 2026 vintage (not confirmed)",
+    "source_name": "Barbara Friedberg Personal Finance: Historical Stock and Bond Returns",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/historical-stock-and-bond-returns/",
+    "quote": "Year \u00b7 S&P 500 (with dividends) \u00b7 3-Month T Bill (Cash) \u00b7 10-Year T Bond \u00b7 Baa Corporate Bond; 2022 \u00b7 -18.0% \u00b7 2.0% \u00b7 -17.8% \u00b7 -15.1%",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "tbond_ret_2025": [
+   {
+    "id": "tbond_ret_2025",
+    "value_text": "7.80%",
+    "value_number": 7.8,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), secondary copy",
+    "source_name": "Barbara Friedberg Personal Finance: Historical Stock and Bond Returns (cites Damodaran NYU Stern data)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/historical-stock-and-bond-returns/",
+    "quote": "Its table lists 2025 returns of 17.78% (S&P 500 with dividends), 4.21% (3-month T-Bill), 7.80% (10-year T-Bond) and 6.96% (Baa Corporate Bond).",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "tbond_ret_2025",
+    "value_text": "+7.8%",
+    "value_number": 7.8,
+    "period": "calendar year 2025 (page lists its source as NYU Stern, 1928-2025)",
+    "source_name": "FinanceWonk: Average Stock Market Return: S&P 500 Historical Data",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "The page shows the S&P 500 at +17.8%, small caps at +16.5%, and the 10-year Treasury at +7.8% for 2025. Its source is listed as NYU Stern, 1928\u20132025.",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "tbill_ret_2025": [
+   {
+    "id": "tbill_ret_2025",
+    "value_text": "4.21%",
+    "value_number": 4.21,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), secondary copy. This vintage uses the year's average T-bill rate, not the end-of-period rate",
+    "source_name": "Barbara Friedberg Personal Finance: Historical Stock and Bond Returns (cites Damodaran NYU Stern data)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/historical-stock-and-bond-returns/",
+    "quote": "Its table lists 2025 returns of 17.78% (S&P 500 with dividends), 4.21% (3-month T-Bill), 7.80% (10-year T-Bond) and 6.96% (Baa Corporate Bond).",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "baa_ret_2025": [
+   {
+    "id": "baa_ret_2025",
+    "value_text": "6.96%",
+    "value_number": 6.96,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), secondary copy",
+    "source_name": "Barbara Friedberg Personal Finance: Historical Stock and Bond Returns (cites Damodaran NYU Stern data)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/historical-stock-and-bond-returns/",
+    "quote": "Its table lists 2025 returns of 17.78% (S&P 500 with dividends), 4.21% (3-month T-Bill), 7.80% (10-year T-Bond) and 6.96% (Baa Corporate Bond).",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "realestate_ret_2025": [
+   {
+    "id": "realestate_ret_2025",
+    "value_text": "1.58%",
+    "value_number": 1.58,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), secondary copy. No column header was visible; the column is inferred from the row's position",
+    "source_name": "Barbara Friedberg Personal Finance (site feed; cites Damodaran NYU page)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/feed/",
+    "quote": "2025 \u00b7 17.78% \u00b7 16.53% \u00b7 4.21% \u00b7 7.80% \u00b7 6.96% \u00b7 1.58% \u00b7 66.22%",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "gold_ret_2025": [
+   {
+    "id": "gold_ret_2025",
+    "value_text": "66.22%",
+    "value_number": 66.22,
+    "period": "calendar year 2025, January 2026 vintage (1928-2025), secondary copy. Column inferred from position (last of 7, matching Damodaran's Gold column)",
+    "source_name": "Barbara Friedberg Personal Finance (site feed; cites Damodaran NYU page)",
+    "source_url": "https://barbarafriedbergpersonalfinance.com/feed/",
+    "quote": "2025 \u00b7 17.78% \u00b7 16.53% \u00b7 4.21% \u00b7 7.80% \u00b7 6.96% \u00b7 1.58% \u00b7 66.22%",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "gold_ret_2025",
+    "value_text": "66.2%",
+    "value_number": 66.2,
+    "period": "calendar year 2025 (says it uses NYU Stern data, i.e. the January 2026 vintage)",
+    "source_name": "The College Investor: Historical Average Investment Return By Asset Class",
+    "source_url": "https://thecollegeinvestor.com/40246/average-return-by-asset-class/",
+    "quote": "Gold rose 66.2% in 2025, its best year since 1979 in NYU Stern's data.",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_drawdown_1929_32": [
+   {
+    "id": "sp500_drawdown_1929_32",
+    "value_text": "-86.2%",
+    "value_number": -86.2,
+    "period": "Sept 1929 peak to June 1, 1932 trough. Price index only (no dividends), daily closes. Peak date given as 9/7/1929 by S&P DJI/Silverblatt and as Sep 16, 1929 by historyofmarket.com",
+    "source_name": "S&P Dow Jones Indices (Howard Silverblatt) bear-market table, as reported in search results; also historyofmarket.com",
+    "source_url": "https://historyofmarket.com/articles/sp500-maximum-drawdowns",
+    "quote": "S&P Dow Jones Indices' senior index analyst Howard Silverblatt's table lists a 9/7/1929 to 6/1/1932 move from 31.92 to 4.40, a -86.2% change over 32.8 months.",
+    "primary": false,
+    "finder": "crashes"
+   },
+   {
+    "id": "sp500_drawdown_1929_32",
+    "value_text": "-81.76%",
+    "value_number": -81.76,
+    "period": "Sep 1929 to Jun 1932. Total return with dividends reinvested, nominal, monthly data (Shiller dataset)",
+    "source_name": "DQYDJ: S&P 500 Drawdown History",
+    "source_url": "https://dqydj.com/sp-500-drawdown-history/",
+    "quote": "Its top-10 table lists the Sep 1929 to Jun 1932 drawdown at -81.76% with dividends reinvested, and the page says the total-return series reinvests each month's dividend at that month's price.",
+    "primary": false,
+    "finder": "crashes"
+   }
+  ],
+  "sp500_unspecified": [
+   {
+    "id": "sp500_unspecified",
+    "value_text": "+10.0%",
+    "value_number": 10,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X, promoting the Jan 2026 post 'Historical Returns For Stocks, Bonds, Cash, Housing & Gold (2025)'",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "sp500_unspecified",
+    "value_text": "+9.94%",
+    "value_number": 9.94,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, 'Historical Returns For Stocks, Bonds, Cash, Real Estate and Gold' (Jan 2025; reposted by metalsmine.com)",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbond_unspecified": [
+   {
+    "id": "tbond_unspecified",
+    "value_text": "+4.5%",
+    "value_number": 4.5,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbond_unspecified",
+    "value_text": "+4.50%",
+    "value_number": 4.5,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, Jan 2025 post",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "tbill_unspecified": [
+   {
+    "id": "tbill_unspecified",
+    "value_text": "+3.4%",
+    "value_number": 3.4,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "tbill_unspecified",
+    "value_text": "+3.31%",
+    "value_number": 3.31,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, Jan 2025 post",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "baa_unspecified": [
+   {
+    "id": "baa_unspecified",
+    "value_text": "6.5%",
+    "value_number": 6.5,
+    "period": "1928-2025",
+    "source_name": "FinanceWonk historical returns reference",
+    "source_url": "https://www.financewonk.com/references/historical-returns",
+    "quote": "Baa Corporate average return (1928\u20132025) of 6.5% with standard deviation of 8.3%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "realestate_unspecified": [
+   {
+    "id": "realestate_unspecified",
+    "value_text": "+4.2%",
+    "value_number": 4.2,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "realestate_unspecified",
+    "value_text": "+4.23%",
+    "value_number": 4.23,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, Jan 2025 post",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "gold_unspecified": [
+   {
+    "id": "gold_unspecified",
+    "value_text": "+5.6%",
+    "value_number": 5.6,
+    "period": "1928-2025",
+    "source_name": "Ben Carlson (A Wealth of Common Sense) on X",
+    "source_url": "https://x.com/awealthofcs/status/2010834736952877238",
+    "quote": "Historical annual returns 1928-2025: Stocks +10.0% Gold +5.6% Bonds +4.5% Housing +4.2% Cash +3.4%",
+    "primary": false,
+    "finder": "mirrors"
+   },
+   {
+    "id": "gold_unspecified",
+    "value_text": "+5.12%",
+    "value_number": 5.12,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, Jan 2025 post",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ],
+  "smallcap_unspecified": [
+   {
+    "id": "smallcap_unspecified",
+    "value_text": "+11.74%",
+    "value_number": 11.74,
+    "period": "1928-2024 (OLDER Jan 2025 vintage, not through 2025)",
+    "source_name": "A Wealth of Common Sense, Jan 2025 post",
+    "source_url": "https://awealthofcommonsense.com/2025/01/historical-returns-for-stocks-bonds-cash-real-estate-and-gold/",
+    "quote": "stocks +9.94%, small caps +11.74%, bonds +4.50%, cash +3.31%, real estate +4.23%, and gold +5.12%",
+    "primary": false,
+    "finder": "mirrors"
+   }
+  ]
+ },
+ "finderNotes": [
+  {
+   "key": "values",
+   "missing": [
+    "sp500_100_2024",
+    "smallcap_100_2024",
+    "tbill_100_2024",
+    "tbond_100_2024",
+    "baa_100_2024",
+    "realestate_100_2024",
+    "gold_100_2024",
+    "Primary (Damodaran NYU page/xls) confirmation of any end-2025 value: no search result showed the 2025 row of histretSP; all end-2025 figures above are secondary (primary=false)"
+   ],
+   "notes": "VINTAGE: Every figure labeled 1928-2025 comes from a secondary site that says it uses Damodaran's January 2026 update (1928-2025). Figures labeled 1928-2023 belong to the January 2024 vintage. Figures labeled 1928-2022 belong to the January 2023 vintage. QuantifiedStrategies does not state its end year, and one search summary wrongly called its numbers \"end of 2024\". Lyn Alden's article gives the same numbers and says \"through 2023\", so they are 1928-2023. I found no source with end-2024 (January 2025 vintage) dollar values for $100. The closest was PennyCalc's 2024 value of $9,828,416 for $1,000 (not $100), so I did not report it. Damodaran's own histretSP.html shows up in search under the title \"1928-2024\", but its snippets only showed the 1928 row (e.g. S&P $143.81, small cap $159.91, T-bill $103.08, T-bond $100.84, Baa $103.22, real estate $101.49, gold $100.10). As a result, no end-2025 figure is primary.\n\nCONFLICTS / CONFIDENCE:\n(1) S&P 500, end-2025: the sources disagree. The College Investor says $1,157,599 and FinanceWonk says \"approximately $1,157,600\". PennyCalc ($1,000 to $11,575,908 by 2025) and Wealthsim (~$1,157,000) roughly match that. economics.mba says $1,157,009. The two values are about $590 apart. One possible cause, which is my own inference and not sourced: the 2025 S&P total return used. Damodaran's own blog (Data Update 2 for 2026) reportedly gives 17.72%, while another site gives 17.78%. Capital Group says only \"nearly $1.2 million\". For the video, \"$1.16 million\" or \"about $1.157 million\" is safe under either value. Check histretSP.xls before showing the exact dollar figure.\n(2) T-bills $2,578: well corroborated by four sources (College Investor, FinanceWonk, Capital Group, aguerrevere).\n(3) T-bond: $7,753 from the College Investor, ~$7,750 from FinanceWonk. These agree.\n(4) Baa $53,952: from the College Investor. A second search result said another source (probably economics.mba) gives the same ending value with a 6.63% CAGR, but I did not see that page's exact text. An older Damodaran-based blog gave about $46,000 through 2022.\n(5) Real estate $5,626: economics.mba and the College Investor both give it. One conflicting snippet from the College Investor's asset-class page (\"$10,000 Grew To $563,685\" for home prices) would imply about $5,637 per $100, but its period and base are unclear. I treat $5,626 as the Damodaran figure.\n(6) Small cap $6,462,599: one source only (aguerrevere.com explorer). Searching for the exact number found no other page. economics.mba gives small caps (bottom decile) an 11.98% CAGR for 1928-2025 (arithmetic 17.78%, 34 losing years of 98, worst -53.94%, best +146.60%) but no ending value appeared. Medium confidence.\n(7) Gold $21,025 (about 210x): one source only (economics.mba). That page's gold block reportedly repeats the stock CAGR and average (10.02% and 11.85%) by mistake, though the ending value itself is plausible (Capital Group and FinanceWonk give gold about 5.6% a year for 1928-2025). Medium confidence.\n\nRANKING implied by end-2025 values (best to worst): small cap ~$6.46M > S&P 500 ~$1.157M > Baa $53,952 > gold $21,025 > T-bond $7,753 > real estate $5,626 > T-bill $2,578. The T-bill series method changed (Damodaran now uses the average bill rate during each year), so T-bill values across vintages are not strictly comparable.\n\nREAL ESTATE SERIES: Damodaran's real estate column is a US residential home-price index: Robert Shiller's historical home price data, now the S&P/Case-Shiller index. It is price appreciation only and does NOT include rental income. Evidence: aguerrevere says \"real estate (price appreciation only \u2014 total returns including rent would be higher)\". economics.mba calls it a \"residential real-estate price index\" that \"omits rent, ownership costs, maintenance, taxes, leverage, and transaction expenses. It should not be treated as a complete return on owning rental property.\" Damodaran's own 2021 blog post (Inflation and Investing: False Alarm or Fair Warning?, aswathdamodaran.blogspot.com/2021/05) says he measured real estate returns using \"Robert Shiller's database on home prices\". Sarwa says Damodaran used \"home price data provided by Robert Shiller\". Capital Group's comparable 1928-2025 chart uses the S&P Case-Shiller Home Price Index. One unofficial GitHub mirror README (QMeshPy/distributed-quantum) describes the column as \"REITs\". That conflicts with every other source and is probably wrong. I could not see Damodaran's own column note on histretSP.\n\nOther context: Damodaran's 2025 S&P 500 return is 17.72% (price 16.39% plus dividend yield 1.34%, per his Data Update 2 for 2026). Ben Carlson's 1928-2025 annual returns (X post): Stocks +10.0%, Gold +5.6%, Bonds +4.5%, Housing +4.2%, Cash +3.4%. I could not read the GitHub mirror of histretSP.csv because that repo is not authorized in this session, and I did not add it."
+  },
+  {
+   "key": "averages",
+   "missing": [
+    "Any primary (Damodaran NYU page/file) confirmation of the 1928-2025 figures: the indexed histretSP.html page is still titled 1928-2024 and its averages table never appeared in search results",
+    "smallcap_real_geo",
+    "baa_real_geo",
+    "inflation_geo from a source that clearly states it uses Damodaran's CPI series (the 3.04% comes from Century Tested, whose Damodaran attribution is unconfirmed)",
+    "1928-2024 (Jan 2025 vintage) arithmetic averages and Baa geometric average"
+   ],
+   "notes": "VINTAGE: every figure labeled 1928-2025 is from sites that describe their data as Damodaran's January 2026 update (98 years). The 1928-2024 entries are the older January 2025 vintage, and the period field labels them. Do not mix the two.\n\nPRIMARY STATUS: no figure is primary=true. pages.stern.nyu.edu never showed the averages rows in search results, and the indexed histretSP.html is still titled \"1928-2024\". The arithmetic figures 11.85% / 3.41% / 4.82% come from Damodaran's own ERP 2026 paper (dated March 5, 2026). The copy I found is filed with the Rhode Island PUC (ripuc.ri.gov), not on his NYU site, so it is marked primary=false. It is still the strongest confirmation for those three arithmetic figures. It also gives real geometric equity risk premiums of 6.45% (stocks minus T-bills) and 5.32% (stocks minus T-bonds) for 1928-2025.\n\nMAIN SOURCE: economics.mba is the only source that gave all 7 asset classes with both averages for 1928-2025. Geometric: S&P 10.02, small cap (bottom decile) 11.98, T-bill 3.37, T-bond 4.53, Baa 6.63, real estate 4.20, gold 5.61. Arithmetic: 11.85, 17.78, 3.41, 4.82, 6.90, 4.38, 7.36. These agree with Century Tested (10.02 / 3.37 / 4.53, arithmetic 11.85 and 4.82), with Ben Carlson's rounded 1928-2025 X post (10.0 / 5.6 / 4.5 / 4.2 / 3.4), and with the ERP paper's arithmetic figures. One small conflict: Century Tested gives T-bill arithmetic as 3.42% where the others give 3.41%.\n\nOTHER CONFLICTS: FinanceWonk lists the 10-year Treasury at ~4.9% nominal and ~1.8% real, which conflicts with 4.53% / 1.45%. Treat its gold real figure (~2.5%) as low confidence. Some sites give Baa as 6.62% or ~6.5%. The real estate series is a home-price index with no rent (economics.mba marks it with an asterisk), so it understates the total return on housing. The College Investor's ~1.1% real for home prices is rounded.\n\nQUOTE CAVEAT: the WebSearch tool returns LLM-summarized result text, not raw page HTML. The \"quote\" fields are copied exactly from the search output, but they may be paraphrased renderings of the page tables. Check them on the page before putting them on screen.\n\nUSEFUL EXTRAS (not requested ids):\n- economics.mba says $100 in the S&P 500 from 1928 through 2025 \"grew to about $1.16 million\".\n- One search summary, source not identified, gave $100 growing to about $1,157,600 in stocks, about $7,750 in 10-year Treasuries and about $2,578 in T-bills by end-2025. This is unverified.\n- Damodaran's Substack (Data Update 2 for 2026) puts the S&P 500's 2025 return at 17.72%. Other sites give 17.78% or 17.88%.\n- eco3min gives an S&P real arithmetic mean of 8.61%.\n- Century Tested gives CPI arithmetic as 3.11%.\n- S&P stdev for 1928-2025 is 19.40%."
+  },
+  {
+   "key": "cpi",
+   "missing": [
+    "cpi_equiv_100_1928_in_2025 (final through-2025 vintage): no source shows a $100-in-1928 figure computed from BLS's final 2025 annual average of 321.943 and the 1928 average of 17.1. Every calculator figure found uses a provisional or partial-year 2025 CPI (322.182 or 321.051) or a different 1928 base. The BLS CPI Inflation Calculator itself compares months, not annual averages, and no search result showed its output for 1928 to 2025.",
+    "cpi_1928_dec: not confirmed from a primary page with a labelled column."
+   ],
+   "notes": "The search tool returns summarized page text, so the quotes are the closest verbatim snippets it showed, not raw page captures.\n\nVINTAGES: The 2025 CPI-U annual average of 321.943 is the final BLS figure, published January 2026 (the through-2025 vintage). Three BLS-hosted pages show it, each with a 2.6% change from 2024's 313.689. BLS published no October 2025 data because of the 2025 lapse in appropriations, so the 2025 average is BLS's own published average without that month. The Minneapolis Fed rounds it to 321.9.\n\n1928 BASE IS NOT UNIQUE: BLS's published 1928 annual average is 17.1 (the 1928 row reads 17.1, -1.2 Dec-Dec, -1.7 avg-avg; 1927 is 17.4). Other sources differ. The Minneapolis Fed table shows 17.2. in2013dollars and ryanoconnellfinance use 17.158 or 17.16, which looks like a mean of the twelve rounded monthly values. A secondary table showed 1928 monthly values as 17.3, 17.1, 17.1, 17.1, 17.2, 17.1, 17.1, 17.1, 17.3, 17.2, 17.2, 17.1, followed by 17.1. If that row is right, December 1928 was 17.1, which fits BLS's -1.2% Dec-Dec change from December 1927. That source was not identified clearly, so cpi_1928_dec is listed as missing.\n\n$100 EQUIVALENT: Every calculator figure found for 1928 to 2025 is based on a non-final 2025 CPI:\n- in2013dollars: $1,884.10 / 1,784.10%, using 322.182. Another cached copy showed $1,894.60 / 1,794.60%.\n- officialdata.org: $1,877.49 / 1,777.49%, using 321.051.\n- ryanoconnellfinance: lists $18.76 per $1 for 2025 using 321.943 and 17.158, so about $1,876 per $100. That per-$100 number is derived, not shown.\n- Pages updated for 2026 give about $1,952 to $1,970 (for example, $1,970.41 using the July 2026 CPI of 333.918). Those are NOT 2025 figures.\n\nFor reference only, and NOT sourced: 321.943 / 17.1 x $100 = about $1,882.71 (about 1,782.7% cumulative). That is the straight ratio of the two official BLS annual averages. Any on-screen figure should either cite one of the calculator values above with its caveat, or be labelled as a calculation from BLS annual averages.\n\nDecember 2025 CPI-U NSA is 324.054 (BLS release of Jan 13, 2026; FRED CPIAUCNS agrees). December 2024 was 315.605, a 2.7% change."
+  },
+  {
+   "key": "crashes",
+   "missing": [
+    "Primary (NYU page/file) confirmation of every 2025 figure: sp500_ret_2025, tbond_ret_2025, tbill_ret_2025, baa_ret_2025, realestate_ret_2025, gold_ret_2025. The indexed histretSP.html snippets never showed the 2025 row; all 2025 dataset values come from secondary copies",
+    "Primary (NYU page) confirmation of tbond_ret_2022 in the January 2026 vintage. -17.83% comes from Damodaran's own January 2023 post and a 1928-2022 reprint; the only copy with 2025 rows shows it rounded to -17.8%",
+    "Independent check of realestate_ret_2025 = 1.58%. Only one secondary row shows it, with no column header visible"
+   ],
+   "notes": "The web search budget (200 per turn) ran out partway through this task. The last two searches did not run, so nothing more could be checked. All value_number figures are in percent (-8.3 means -8.30%). Quotes are copied exactly from the search tool's output. That output is often the tool's summary of the page rather than raw page text. The rawest snippets are the table rows shown with '\u00b7' separators.\n\nVINTAGE: In search results the NYU histretSP.html page carries the title '1928-2024' but a January 2026 date (a snippet mentions an update note dated January 5, 2026). That update replaced end-of-period T-bill rates with the average T-bill rate during the year. Its S&P values for 1929-1932 match older vintages exactly, so those four figures do not depend on vintage. I never saw the page's 2025 row.\n\nS&P 500 2025 DISCREPANCY: Damodaran's own blog post (Data Update 2 for 2026) says 17.72%. It splits this into price appreciation of 16.39% (5881.6 to 6845.5) plus a 1.34% dividend yield. Secondary copies of the January 2026 histretSP data row show 17.78% (Friedberg, QuantFlowLab; FinanceWonk rounds it to +17.8%). For a $100-growth calculation from histretSP, 17.78% is probably the spreadsheet value, but it is not confirmed from the NYU file.\n\n2025 ROW: Friedberg's feed shows '2025 \u00b7 17.78% \u00b7 16.53% \u00b7 4.21% \u00b7 7.80% \u00b7 6.96% \u00b7 1.58% \u00b7 66.22%'. Seven values match Damodaran's column order (S&P 500, US small cap bottom decile, 3-month T-bill, 10-year T-bond, Baa corporate, real estate, gold). Her separate page table explicitly labels 17.78 S&P, 4.21 T-bill, 7.80 10-year T-bond and 6.96 Baa. One search summary mislabeled 7.80% as Baa, but the labeled table and the column order support T-bond = 7.80%. The real estate (1.58%) and gold (66.22%) columns are inferred from position. Gold is backed up by The College Investor's 66.2% 'in NYU Stern's data'. Real estate is not backed up: S&P DJI says the Case-Shiller national index rose 1.3% in 2025, a related but different measure. Damodaran's real estate series is price-only Case-Shiller with no rent. Damodaran's November 2025 gold post said gold was up 57% through October 24, 2025; that is not a full-year figure.\n\n2022: the 2022 T-bond figure of -17.83% comes from the January 2023 vintage. In that vintage S&P 2022 was -18.01% and Baa was -14.49%. Friedberg's apparently newer table shows Baa 2022 at -15.1%, which suggests the Baa series was revised in later vintages; the T-bond value looks unchanged (-17.8% rounded).\n\n2008: S&P -36.55% and T-bond 20.10% appear on both of Damodaran's pages. T-bill 2008 is 1.59% on the older histretSPX page and 1.37% on the current histretSP page and the 1928-2022 reprint.\n\nDRAWDOWN: the commonly cited -86% (exactly -86.2%, Fox Business rounds to -86.1%) is the price index only, from September 1929 to June 1, 1932, on daily closes. The 'S&P 500' that far back is S&P's back-calculated composite index. On a monthly total-return basis (dividends reinvested, Shiller data) the peak-to-trough fall is -81.76% (DQYDJ; Eco3min gives -81.8%). Price-only on monthly averages it is about -84.76% (StatOasis). Inflation-adjusted with dividends it is about -76.8%. Yardeni instead splits the fall into two bear markets: -44.7% (9/7/1929 to 11/13/1929) and -83.0% (4/10/1930 to 6/1/1932).\n\nPrimary flags: the 1929-1932 and 2008 values are marked primary because search results attribute them directly to Damodaran's NYU pages. Damodaran's Substack and Blogspot posts are marked primary=false under the rule, even though he wrote them. An NYU PDF of the 2026 post exists (pages.stern.nyu.edu/~adamodar/pdfiles/blog/DataUpdate2for2026.pdf), but I did not see the 17.72% figure quoted from that file itself. The best next step is to open histretSP.xls directly and confirm the 2025 row."
+  },
+  {
+   "key": "mirrors",
+   "missing": [
+    "Primary confirmation of any figure: none was seen on Damodaran's own NYU page or file (the cached histretSP.html in results was still titled 1928-2024)",
+    "smallcap_100: only one source (aguerrevere.com); Economics.MBA's ending-value table had no small-cap row in what the search returned",
+    "tbill_geo from Economics.MBA (the search budget ran out before I could retrieve it)",
+    "Exact table values in the A Wealth of Common Sense January 2026 post (the tables are images; only the X headline figures were found)",
+    "Any end-2025 $100 values from eco3min, pennycalc or metalsmine (eco3min gives only rates; pennycalc uses $1,000; metalsmine reposts the 1928-2024 vintage)"
+   ],
+   "notes": "The web search limit of 200 calls per turn, shared by all agents, ran out before I finished, so I stopped searching. All figures are secondary (primary=false). The quotes are copied from the WebSearch tool's result text. That text is produced by a summarizer: some quotes look like verbatim page text (the Economics.MBA table rows, the FinanceWonk \"approximately $1,157,600\" sentence, the eco3min \"10.02%: Compound annual total return...\" line, the Ben Carlson X post title), but others may be lightly paraphrased. The Economics.MBA rows, the X post title and the eco3min line look like the most faithful copies. Re-check exact wording on the live pages before showing any figure on screen.\n\nBEST THROUGH-2025 SET (Economics.MBA says it uses Damodaran's January 2026 dataset; it is the only site found with all six non-small-cap ending values): S&P 500 $1,157,009; Baa $53,952; Gold $21,025; 10y T-bond $7,718; residential real estate $5,626; 3m T-bill $2,578. Small caps $6,462,599 comes from aguerrevere.com (Damodaran data, 1928-2025). Ranking best to worst by $100 value: Small caps > S&P 500 > Baa > Gold > T-bonds > Real estate > T-bills. Compound (geometric) rates on Economics.MBA: small cap 11.98%, S&P 10.02%, Baa 6.63%, gold 5.61%, T-bond 4.53%, real estate 4.20%. These agree with the ending values; my own back-of-envelope check, not sourced, found them consistent to within rounding.\n\nDISCREPANCIES: (1) FinanceWonk's S&P figure, \"approximately $1,157,600\", is about $600 above Economics.MBA's $1,157,009. It is described as approximate, so it is probably rounded. Its \"~$7,750\" for T-bonds is also above $7,718. (2) FinanceWonk lists 10-year Treasuries at ~4.9% in a table labeled geometric. That conflicts with its own ~$7,750 ending value, which implies about 4.5%, and with Economics.MBA's 4.53% and Carlson's 4.5%. The 4.9% may really be an arithmetic average or a mislabel. (3) FinanceWonk's Baa \"average return\" of 6.5% (SD 8.3%) does not say which kind of average and differs from Economics.MBA's 6.63% compound rate. (4) Ben Carlson's X post gives Cash +3.4% while FinanceWonk gives ~3.3%. A $2,578 ending value implies about 3.37%, so the two are a rounding difference. (5) Eco3min shows a 'Historical Average' of 8.61% and a 2025 'Latest Value' of 14.59%. Neither is the nominal compound rate: 14.59% does not match the roughly 17.8% nominal 2025 S&P return that PennyCalc and FinanceWonk report, so it may be a real return. Do not use these two numbers. Eco3min also gives a real CAGR of 6.78%. (6) journeyadvisory.group cites Carlson's January 11, 2026 post for \"1928-2025\" figures (stocks ~10.2%, small caps 11.7%, gold 5.1%, etc.). Its gold and small-cap numbers match the older 1928-2024 vintage, so it looks unreliable and I did not include it. (7) officialdata.org gives about $1.26M for S&P since 1928, but that runs to 2026 and is a projection. Excluded.\n\nCarlson's averages are marked _unspecified because his X post just says 'Historical annual returns'. His earlier 1928-2024 figures (9.94%, 11.74%, and so on) match Damodaran's geometric averages for that vintage. PennyCalc says $1,000 in 1928 grew to about $11.6M (1928-2025); that is a $1,000 base, so it is not recorded under sp500_100. The older-vintage entries are labeled with their periods: Carlson/metalsmine 1928-2024, and Lyn Alden 1928-2023 (real estate $5,360, gold $10,042)."
+  }
+ ],
+ "verdicts": [
+  {
+   "group": "values",
+   "verdicts": [
+    {
+     "id": "sp500_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. Best-supported candidate is $1,157,599 (about $1,157,600). Two secondary sources agree on it; economics.mba's $1,157,009 conflicts with it, which points to a transcription error on one side.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget for this turn (200 calls, shared across agents) was used up before my first query ran, and network fetches are not allowed.",
+     "reason": "I could not run any fresh search, so I cannot confirm or refute this. The candidates themselves conflict for the through-2025 vintage: The College Investor has $1,157,599, FinanceWonk has about $1,157,600, and economics.mba has $1,157,009. They differ by $590, so at least one is mistyped, and the economics.mba figure is the outlier. $787,018 (QuantifiedStrategies) and 'over $787,000' (Lyn Alden) are the 1928-2023 vintage (Jan 2024 file), not through 2025. Before publishing, check the exact value against Damodaran's histretSP.xls (Jan 2026). Rounding to about $1.16 million on screen avoids the conflict."
+    },
+    {
+     "id": "smallcap_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. $6,462,599 is reported only by aguerrevere.com, a secondary explorer built on Damodaran's data.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "Both candidate entries trace back to the same single secondary site (aguerrevere.com), so they are not independent of each other. No Damodaran page and no second source corroborates the figure. I could not search for one, so it stays unverifiable. The site also needs a check on whether 'small-cap' means Damodaran's own small-cap column in the Jan 2026 histretSP rather than a series it built itself."
+    },
+    {
+     "id": "tbill_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. $2,578 is the value several secondary sources report for 1928-2025.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "I could not run a fresh search. Many sources agree on $2,578 (College Investor, economics.mba, FinanceWonk, aguerrevere, Capital Group PDF), but the first four may be copying one another. Capital Group is not a Damodaran source. One warning sign (a rough check of my own, not sourced): Lyn Alden's through-2023 figure is $2,249. Going from $2,249 to $2,578 needs about 14.6% total growth over 2024-2025, roughly 7% a year, which is well above T-bill yields in those years (about 5% and about 4%). Either the T-bill series was revised between vintages or one of the figures is off. $2,249 is the 1928-2023 vintage. Check against the Jan 2026 histretSP.xls."
+    },
+    {
+     "id": "tbond_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. Candidates for 1928-2025 conflict: $7,753 (College Investor) and about $7,750 (FinanceWonk), against $7,718 (economics.mba).",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "I could not search. The through-2025 candidates disagree by $35: $7,753 and about $7,750 versus $7,718. That suggests a transcription error, or a different series (for example, a different bond return calculation) in one source. $7,278 (Lyn Alden) is the 1928-2023 vintage. The ranking position is not affected, since bonds sit below Baa and gold and above real estate either way. The exact figure needs checking against the Jan 2026 histretSP.xls, or should be rounded to about $7,700."
+    },
+    {
+     "id": "baa_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. $53,952 is reported by The College Investor and economics.mba for 1928-2025.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "I could not run an independent search. Two secondary sites agree on $53,952, but neither is Damodaran's own page and they may share an upstream source. No older-vintage figure was offered for comparison. It stays unverifiable until checked against the Jan 2026 histretSP.xls."
+    },
+    {
+     "id": "realestate_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. $5,626 is reported for 1928-2025 by economics.mba and The College Investor, with a 4.20% CAGR.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "I could not search. Two secondary sites agree on $5,626. As a rough check (my own, not sourced), it fits the stated 4.20% CAGR over 98 years, which gives about $5,630, and it fits moderate home-price gains on top of the 1928-2023 figure of $5,360 from Lyn Alden. $5,360 is the older through-2023 vintage. Note for the script: this series is a home price index with no rental income, so it understates real estate as an investment. Primary confirmation is still missing."
+    },
+    {
+     "id": "gold_100",
+     "status": "unverifiable",
+     "value_text": "Unconfirmed. $21,025 is reported for 1928-2025 by economics.mba only (two entries from the same site).",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence gathered. The WebSearch budget was used up before any query ran.",
+     "reason": "I could not search. Both $21,025 entries come from the same site (economics.mba), so the through-2025 value has only one source. As a rough check (my own, not sourced), the rise from the 1928-2023 figure of $10,042 (Lyn Alden) fits gold's large gains in 2024 and 2025. $10,042 (QuantifiedStrategies shows $10,041) is the 1928-2023 vintage. $8,866.76 (JWealth) is 1928-2022. Neither is through 2025. It needs a primary check against the Jan 2026 histretSP.xls."
+    }
+   ]
+  },
+  {
+   "group": "averages",
+   "verdicts": [
+    {
+     "id": "sp500_geo",
+     "status": "unverifiable",
+     "value_text": "10.02% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Could not search: the shared web-search budget for this turn was already used up (200-call limit), so my fresh queries returned nothing. Network workarounds are not allowed. The candidates agree with each other: economics.mba, Century Tested and eco3min all give 10.02%, and Carlson's X post gives +10.0%. All of them are secondary sources (primary=false). Damodaran's own page was not seen. The 9.94% figure is the older Jan 2025 vintage (1928-2024) and must not be used."
+    },
+    {
+     "id": "sp500_arith",
+     "status": "unverifiable",
+     "value_text": "11.85% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. Two candidate sources agree: economics.mba and the RI PUC filing of Damodaran's ERP 2026 edition. The RI PUC copy is the strongest lead because it is Damodaran's own paper, but it is hosted on a third-party site (ripuc.ri.gov), so it stays primary=false."
+    },
+    {
+     "id": "smallcap_geo",
+     "status": "unverifiable",
+     "value_text": "11.98% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only through-2025 source is economics.mba, a single secondary site. 11.74% is the Jan 2025 vintage (1928-2024). Because this rests on one secondary source, treat it as weak."
+    },
+    {
+     "id": "smallcap_arith",
+     "status": "unverifiable",
+     "value_text": "17.78% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is economics.mba (secondary, one site)."
+    },
+    {
+     "id": "tbill_geo",
+     "status": "unverifiable",
+     "value_text": "3.37% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. economics.mba and Century Tested both give 3.37%, and Carlson's X post gives +3.4%, which matches after rounding. FinanceWonk's ~3.3% is coarse rounding. 3.31% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "tbill_arith",
+     "status": "unverifiable",
+     "value_text": "3.41% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The candidate sources do not fully agree. economics.mba and the RI PUC ERP 2026 copy say 3.41%, but the Century Tested quote for the same 1928-2025 period says '3.42% average yearly return'. This 0.01-point gap may be a rounding or transcription difference, and I could not resolve it."
+    },
+    {
+     "id": "tbond_geo",
+     "status": "unverifiable",
+     "value_text": "4.53% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. economics.mba and Century Tested both give 4.53%, and Carlson's X post gives +4.5%, which matches. Do NOT use FinanceWonk's '~4.9%' even though its table is labeled geometric. It does not match 4.53% and is closer to the arithmetic 4.82%, so it is likely the wrong series or a transcription error. 4.50% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "tbond_arith",
+     "status": "unverifiable",
+     "value_text": "4.82% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. economics.mba and the RI PUC ERP 2026 copy both give 4.82%, and the ERP quote (11.85% minus 4.82% = 7.03%) is consistent with it."
+    },
+    {
+     "id": "baa_geo",
+     "status": "unverifiable",
+     "value_text": "6.63% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is economics.mba (secondary). It conflicts with FinanceWonk's 'Baa Corporate average return (1928-2025) of 6.5%', which matches neither 6.63% (geometric) nor 6.90% (arithmetic). One of the two sources may be wrong or using a different vintage, so treat this as weak."
+    },
+    {
+     "id": "baa_arith",
+     "status": "unverifiable",
+     "value_text": "6.90% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is economics.mba (secondary, one site)."
+    },
+    {
+     "id": "realestate_geo",
+     "status": "unverifiable",
+     "value_text": "4.20% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. economics.mba gives 4.20% and Carlson's X post gives +4.2%; both are secondary. 4.23% is the Jan 2025 vintage (1928-2024). Note that Damodaran's real estate series is a home-price index, not a total return with rent included."
+    },
+    {
+     "id": "realestate_arith",
+     "status": "unverifiable",
+     "value_text": "4.38% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is economics.mba (secondary, one site)."
+    },
+    {
+     "id": "gold_geo",
+     "status": "unverifiable",
+     "value_text": "5.61% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. economics.mba gives 5.61%, and Carlson's X post and FinanceWonk both give about 5.6%. 5.12% is the Jan 2025 vintage (1928-2024); the big jump reflects gold's strong 2025."
+    },
+    {
+     "id": "gold_arith",
+     "status": "unverifiable",
+     "value_text": "7.36% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is economics.mba (secondary, one site)."
+    },
+    {
+     "id": "sp500_real_geo",
+     "status": "unverifiable",
+     "value_text": "6.78% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. Century Tested and eco3min both give 6.78%; both are secondary. I could not confirm whether this is Damodaran's own inflation-adjusted series or a figure computed by the sites."
+    },
+    {
+     "id": "tbond_real_geo",
+     "status": "unverifiable",
+     "value_text": "1.45% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is Century Tested (secondary, one site). It may be the site's own calculation rather than a number from Damodaran's file."
+    },
+    {
+     "id": "tbill_real_geo",
+     "status": "unverifiable",
+     "value_text": "0.33% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is Century Tested (secondary, one site), and it may be the site's own calculation."
+    },
+    {
+     "id": "realestate_real_geo",
+     "status": "unverifiable",
+     "value_text": "about 1.1% (vintage unconfirmed; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The College Investor quote does not say which vintage or period it covers; the 1928-2025 label came from the researcher, not the quote. Treat it as weak and possibly an older vintage."
+    },
+    {
+     "id": "gold_real_geo",
+     "status": "unverifiable",
+     "value_text": "~2.5% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only source is FinanceWonk, which rounds coarsely and has a questionable T-bond figure (~4.9% labeled geometric), so it is unreliable."
+    },
+    {
+     "id": "inflation_geo",
+     "status": "unverifiable",
+     "value_text": "3.04% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence, including from bls.gov or Damodaran's page. The only source is Century Tested (secondary). The quote calls it CPI-U."
+    },
+    {
+     "id": "sp500_unspecified",
+     "status": "unverifiable",
+     "value_text": "+10.0% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. Carlson's X post gives +10.0%, which matches 10.02% after rounding. +9.94% is correctly labeled as the older Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "tbond_unspecified",
+     "status": "unverifiable",
+     "value_text": "+4.5% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. +4.5% matches the geometric 4.53% after rounding. +4.50% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "tbill_unspecified",
+     "status": "unverifiable",
+     "value_text": "+3.4% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. +3.4% matches the geometric 3.37% after rounding. +3.31% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "baa_unspecified",
+     "status": "unverifiable",
+     "value_text": "unresolved; 6.5% is suspect against 6.63% geometric and 6.90% arithmetic reported elsewhere",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. FinanceWonk's 6.5% (std dev 8.3%) does not match either Baa figure on economics.mba for the same period: geometric 6.63% (volatility 7.65%) or arithmetic 6.90%. The volatility differs too, which points to a different vintage or series, or an error. I cannot refute it without fresh evidence, but it should not be used."
+    },
+    {
+     "id": "realestate_unspecified",
+     "status": "unverifiable",
+     "value_text": "+4.2% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. +4.2% matches the geometric 4.20%. +4.23% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "gold_unspecified",
+     "status": "unverifiable",
+     "value_text": "+5.6% (1928-2025, candidate value; not independently verified)",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. +5.6% matches the geometric 5.61%. +5.12% is the Jan 2025 vintage (1928-2024)."
+    },
+    {
+     "id": "smallcap_unspecified",
+     "status": "unverifiable",
+     "value_text": "+11.74% is 1928-2024 only; the through-2025 candidate is 11.98% (geometric), not independently verified",
+     "evidence_url": "",
+     "evidence_quote": "",
+     "reason": "Search budget used up, so I found no independent evidence. The only candidate here, +11.74%, is correctly labeled as the older Jan 2025 vintage (1928-2024) and should not be used for the through-2025 video."
+    }
+   ]
+  },
+  {
+   "group": "cpi",
+   "verdicts": [
+    {
+     "id": "cpi_2025_avg",
+     "status": "unverifiable",
+     "value_text": "321.943 (candidate value; not independently re-verified in this pass)",
+     "evidence_url": "https://www.bls.gov/regions/mid-atlantic/data/consumerpriceindexannualandsemiannual_table.htm",
+     "evidence_quote": "No independent quote obtained: WebSearch returned 'Web search was not performed: this turn's web search budget is used up (limit: 200 WebSearch calls per turn, shared by every agent in it).'",
+     "reason": "I could not run any fresh search because the workflow-wide WebSearch budget was used up before my first query, and network fetches are not allowed. The URL above is the candidate's source, which I could not open. Three finders independently reported 321.943, two of them on bls.gov pages, so it is plausible. Under the default-to-unverifiable rule I cannot mark it confirmed. Re-check it on BLS series CUUR0000SA0, annual average 2025."
+    },
+    {
+     "id": "cpi_1928_avg",
+     "status": "unverifiable",
+     "value_text": "17.1 (candidate value; not independently re-verified in this pass)",
+     "evidence_url": "https://www.bls.gov/cpi/tables/historical-cpi-u-201712.pdf",
+     "evidence_quote": "No independent quote obtained: WebSearch budget for this turn was used up (limit 200 calls shared by all agents).",
+     "reason": "No fresh search was possible. The 1928 annual average is a historical figure, not tied to any vintage, so the Dec 2017 BLS table would still apply to the through-2025 run. The candidate quote's '1928 \u00b7 17.1 \u00b7 -1.2 \u00b7 -1.7' fits the Dec-Dec and annual-average change columns in BLS's historical table. I could not see it independently, so it stays unverifiable."
+    },
+    {
+     "id": "cpi_2025_dec",
+     "status": "unverifiable",
+     "value_text": "324.054 (candidate value; not independently re-verified in this pass)",
+     "evidence_url": "https://www.bls.gov/news.release/archives/cpi_01132026.htm",
+     "evidence_quote": "No independent quote obtained: WebSearch budget for this turn was used up (limit 200 calls shared by all agents).",
+     "reason": "No fresh search was possible. Two finders reported the same NSA December 2025 value, from the BLS Jan 13, 2026 release and from FRED CPIAUCNS. I did not see it myself, so it is unverifiable. Note that this is the December index. The annual average (321.943) is the matching series if the video compares annual averages (1928 avg 17.1 vs 2025 avg)."
+    },
+    {
+     "id": "cpi_equiv_100_1928_in_2025",
+     "status": "unverifiable",
+     "value_text": "No sourced figure on the final through-2025 basis. Both candidates ($1,884.10 at CPI 322.182; $1,877.49 at CPI 321.051) are calculator outputs built on non-final 2025 CPI values, so neither matches BLS's final 2025 annual average of 321.943.",
+     "evidence_url": "https://www.in2013dollars.com/1928-dollars-in-2025?amount=100",
+     "evidence_quote": "No independent quote obtained: WebSearch budget for this turn was used up (limit 200 calls shared by all agents).",
+     "reason": "I could not re-search this. The candidates are secondary calculators (primary=false), and their own descriptions show 2025 CPI inputs (322.182, 321.051) that differ from the final BLS 2025 average. They are therefore stale or partial-year figures, not the final through-2025 number. Internal check only, not sourced: 100 x 322.182/17.1 = about 1,884.1 and 100 x 321.051/17.1 = about 1,877.5, so each site matches its own inputs. On the final 321.943 basis the same arithmetic gives about $1,882.71. That number is computed, not sourced, and must not be presented as sourced. Do not use either calculator figure as the through-2025 value."
+    },
+    {
+     "id": "cpi_cum_pct",
+     "status": "unverifiable",
+     "value_text": "No sourced figure on the final through-2025 basis. Candidates 1,784.10% (322.182 basis) and 1,777.49% (321.051 basis) both rest on non-final 2025 CPI inputs.",
+     "evidence_url": "https://www.officialdata.org/1928-dollars-in-2025?amount=100",
+     "evidence_quote": "No independent quote obtained: WebSearch budget for this turn was used up (limit 200 calls shared by all agents).",
+     "reason": "No fresh search was possible. Both percentages come from secondary calculators and follow directly from the dollar figures above (1,884.10 - 100 and 1,877.49 - 100). They carry the same problem: neither uses BLS's final 2025 annual average of 321.943. On that basis the cumulative change would be about 1,782.7%. That is my arithmetic, not a sourced figure. Treat both candidates as non-final and do not quote them as the through-2025 number."
+    }
+   ]
+  },
+  {
+   "group": "crashes",
+   "verdicts": [
+    {
+     "id": "sp500_ret_1929",
+     "status": "unverifiable",
+     "value_text": "-8.30% (candidate value, not checked independently; through-2025 vintage not confirmed)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up (limit: 200 WebSearch calls per turn, shared by every agent in it).'",
+     "reason": "Search budget ran out before any fresh search could run, so I could not check this independently. Vintage concern to note: the cited histretSP.html page is described as titled 1928-2024 but dated January 2026, so the finder did not clearly see the through-2025 vintage. The finder also says -8.30% appears in every vintage seen, which makes a vintage error unlikely, but I did not check that."
+    },
+    {
+     "id": "sp500_ret_1930",
+     "status": "unverifiable",
+     "value_text": "-25.12% (candidate value, not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out, so no independent check was possible. Two candidate sources agree: the Damodaran page (with the same 1928-2024 title vs January 2026 date ambiguity) and PennyCalc, a secondary site that says it covers 1928-2025. Agreement between two sources is not my own independent confirmation."
+    },
+    {
+     "id": "sp500_ret_1931",
+     "status": "unverifiable",
+     "value_text": "-43.84% (candidate value, not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out, so no independent check was possible. Caution: the candidate quote '1931 \u00b7 -43.84% \u00b7 -43.62% \u00b7 2.31% \u00b7 -2.56%' has no column headers. The second column (-43.62%) is unexplained, so column assignment rests on the finder's reading. The page vintage is ambiguous (titled 1928-2024, dated January 2026). PennyCalc's secondary copy also lists -43.84%, but that is still not my own check."
+    },
+    {
+     "id": "sp500_ret_1932",
+     "status": "unverifiable",
+     "value_text": "-8.64% (candidate value, not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out, so no independent check was possible. The finder's own quote calls the page 'the January 2026 version covering 1928-2024', which is a through-2024 label, not a clear through-2025 vintage. The finder reports the same value in a 2017-era copy, but I did not check that."
+    },
+    {
+     "id": "sp500_ret_2008",
+     "status": "unverifiable",
+     "value_text": "-36.55% (candidate value, not checked independently; seen only in an unstated vintage (histretSPX) and the 1928-2022 vintage)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. Both candidate sources are non-current vintages: histretSPX.html (vintage not stated) and a REAP reprint of the 1928-2022 (January 2023) data. Neither shows the through-2025 vintage, and I could not check the claim that the current histretSP page has the same value."
+    },
+    {
+     "id": "sp500_ret_2025",
+     "status": "unverifiable",
+     "value_text": "Unresolved: 17.78% (secondary copy of histretSP Jan 2026 row, Barbara Friedberg) vs 17.72% (Damodaran's own Substack text). Neither is primary histretSP evidence, and neither was checked independently.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. The two candidates conflict: 17.78% vs 17.72%, a 0.06-point gap, so at least one is either a transcription error or a different calculation (e.g. blog-text return vs spreadsheet total return with dividends). Neither is from Damodaran's histretSP page or file (primary=false for both). Do not publish either as the sourced histretSP figure until the January 2026 histretSP.xls row is seen directly."
+    },
+    {
+     "id": "tbond_ret_2022",
+     "status": "unverifiable",
+     "value_text": "-17.83% (1928-2022 vintage; through-2025 vintage value not independently seen. A secondary 2025-era table shows -17.8% rounded)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. The exact -17.83% comes only from January 2023 vintage sources: Damodaran's 2023 Substack post and the REAP 1928-2022 reprint. The only probable through-2025 source (Friedberg) shows -17.8%, rounded to one decimal and of unconfirmed vintage. It is consistent with -17.83% but cannot confirm the second decimal for the through-2025 vintage."
+    },
+    {
+     "id": "tbond_ret_2025",
+     "status": "unverifiable",
+     "value_text": "7.80% (candidate value from secondary copies only; not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. Both candidate sources (Barbara Friedberg 7.80%; FinanceWonk +7.8%) are secondary sites citing NYU Stern. They may not be independent of each other, and no primary Damodaran evidence was shown."
+    },
+    {
+     "id": "tbill_ret_2025",
+     "status": "unverifiable",
+     "value_text": "4.21% (candidate value from a single secondary copy; not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. There is one secondary source (Barbara Friedberg), and no primary or second independent source. The candidate's note that this vintage uses the year's average T-bill rate is also unverified, and a methodology note like that is exactly where vintage differences can arise."
+    },
+    {
+     "id": "baa_ret_2025",
+     "status": "unverifiable",
+     "value_text": "6.96% (candidate value from a single secondary copy; not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. There is one secondary source (Barbara Friedberg) and no primary Damodaran evidence."
+    },
+    {
+     "id": "realestate_ret_2025",
+     "status": "unverifiable",
+     "value_text": "1.58% (candidate value; column assignment inferred, not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. The candidate came from a site RSS feed with no visible column header. Labelling 1.58% as Real Estate relies on the row having 7 columns in Damodaran's order (S&P, small cap, T-bill, T-bond, Baa, Real Estate, Gold). That order is plausible but unconfirmed, so this has a high risk of a column error."
+    },
+    {
+     "id": "gold_ret_2025",
+     "status": "unverifiable",
+     "value_text": "66.22% (candidate value from secondary copies; not checked independently)",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. One candidate infers the column from its position in a headerless feed row. The other (The College Investor, 66.2%) is secondary and rounded. The two are consistent to the rounding shown, but neither is primary and I checked neither."
+    },
+    {
+     "id": "sp500_drawdown_1929_32",
+     "status": "unverifiable",
+     "value_text": "No single correct value. -86.2% is the S&P price index (no dividends, daily closes, S&P DJI/Silverblatt). -81.76% is total return with dividends reinvested (monthly Shiller data, DQYDJ). Neither is a Damodaran/BLS figure, and neither was checked independently.",
+     "evidence_url": "",
+     "evidence_quote": "No independent evidence. WebSearch returned: 'Web search was not performed: this turn's web search budget is used up.'",
+     "reason": "Search budget ran out. The two candidates are different series (price-only daily vs total-return monthly), not a conflict, and must not be mixed. Neither comes from Damodaran's annual histretSP data, which has no intra-year peak-to-trough figures. The S&P DJI figure arrives only through search-result summaries and historyofmarket.com, and the two disagree on the peak date (9/7/1929 vs 9/16/1929)."
+    }
+   ]
+  }
+ ]
+}
