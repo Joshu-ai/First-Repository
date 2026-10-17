@@ -1,4 +1,4 @@
-// Daikoku · $100 invested in 1928, ranked best to worst by its value at the end of 2025.
+// Sage Finance · $100 invested in 1928, ranked best to worst by its value at the end of 2025.
 // Values: Damodaran, "Historical Returns on Stocks, Bonds, Bills, Real Estate and Gold" (NYU Stern, Jan 2026 update, 1928-2025),
 // as copied by economics.mba, The College Investor and FinanceWonk (the NYU file was unreachable from the studio).
 // Inflation: BLS CPI-U annual averages, 1928 (17.1) and 2025 (321.943). Crash years: Damodaran annual S&P 500 returns incl. dividends.

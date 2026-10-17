@@ -1,6 +1,8 @@
-# Daikoku Short — $100 invested in 1928, ranked
+# Sage Finance Short — $100 invested in 1928, ranked
 
-**File:** `Daikoku_Rank1928.mp4` (1080×1920, 30 fps, HEVC + AAC, 32.4 s, 9,704,721 bytes)
+Channel: Sage Finance (formerly Daikoku), channel id UCRNhcEHHnMRTpBKYR3zgQyw
+
+**File:** `SageFinance_Rank1928.mp4` (1080×1920, 30 fps, HEVC + AAC, 32.4 s, 9,704,721 bytes)
 
 **QA:** −14.2 LUFS · peak −1.4 dB (upload copy) · loop seam 2.22 · 85 spoken words · all 10 lines force-aligned · 12-frame QA sheet read frame by frame
 
@@ -41,7 +43,7 @@ Would you have held on through 1929–1932, or sold? Pick one 👇
 - Pin the comment above after posting
 
 ## Proposed slot
-Sunday, Oct 18, 2026, 11:00 AM CT. It's an evergreen ranking, and the station queue has no other Daikoku Short that day. The mortgage-rates Money Watch is queued for Mon Oct 19, 11 AM CT, so the two are a day apart, inside the Oct 7 cadence rule (up to 3 Shorts per day, at least 4 hours apart). It posts only after you say yes.
+Sunday, Oct 18, 2026, 11:00 AM CT. It's an evergreen ranking, and the station queue has no other Sage Finance Short that day. The mortgage-rates Money Watch is queued for Mon Oct 19, 11 AM CT, so the two are a day apart, inside the Oct 7 cadence rule (up to 3 Shorts per day, at least 4 hours apart). It posts only after you say yes.
 
 ## Script (VO, am_michael at 1.05)
 1. $100 in stocks in 1928 became $1.16 million by 2025.
