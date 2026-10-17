@@ -41,7 +41,7 @@ Would you have held on through 1929–1932, or sold? Pick one 👇
 - Pin the comment above after posting
 
 ## Proposed slot
-Sunday, Oct 18, 2026, 11:00 AM ET. It's an evergreen ranking, so it stays clear of the weekday Money Watch and the Monday This Week in Money post. Under the Oct 7 cadence rule (up to 3 Shorts per day, at least 4 hours apart), move it if anything else is already queued within 4 hours of that time. It posts only after you say yes.
+Sunday, Oct 18, 2026, 11:00 AM CT. It's an evergreen ranking, and the station queue has no other Daikoku Short that day. The mortgage-rates Money Watch is queued for Mon Oct 19, 11 AM CT, so the two are a day apart, inside the Oct 7 cadence rule (up to 3 Shorts per day, at least 4 hours apart). It posts only after you say yes.
 
 ## Script (VO, am_michael at 1.05)
 1. $100 in stocks in 1928 became $1.16 million by 2025.
