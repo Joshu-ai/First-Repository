@@ -344,6 +344,8 @@ export interface LoadDetailResponse {
   myBooking: Booking | null;
   /** The assigned driver. Visible to the owning shipper and to that driver. */
   bookedDriver: DriverSummary | null;
+  /** The shipper's phone, sent only to the driver booked on the load so they can call about the pickup. */
+  shipperPhone: string | null;
 }
 
 export interface BookLoadResponse {

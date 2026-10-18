@@ -27,10 +27,20 @@ export const filtersSchema = z.object({
   sort: z.enum(LOAD_SORTS).optional(),
 }) satisfies z.ZodType<LoadSearchFilters>;
 
-const list = (v: unknown) =>
-  typeof v === 'string' && v.trim() ? v.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+/** Comma-separated list; a repeated param (`?equipment=A&equipment=B`) arrives as an array. */
+const list = (v: unknown) => {
+  const joined = Array.isArray(v) ? v.filter((s) => typeof s === 'string').join(',') : v;
+  if (typeof joined !== 'string') return undefined;
+  const items = joined.split(',').map((s) => s.trim()).filter(Boolean);
+  return items.length ? items : undefined;
+};
 const number = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? Number(v) : undefined);
-const boolean = (v: unknown) => (v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : undefined);
+/** Unrecognised text passes through unchanged so z.boolean() rejects it with a 400 instead of ignoring it. */
+const boolean = (v: unknown) => {
+  if (v === 'true' || v === '1') return true;
+  if (v === 'false' || v === '0') return false;
+  return typeof v === 'string' && v.trim() !== '' ? v : undefined;
+};
 const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
 
 /** Parse LoadSearchFilters from a query string (`?equipment=A,B&minRatePerMile=2&hazmat=false`). */
@@ -67,8 +77,9 @@ export function loadPassesFilters(load: Load, filters: LoadSearchFilters): boole
       load.commodity,
       load.notes,
       load.referenceNumber ?? '',
-      `${load.origin.city}, ${load.origin.state}`,
-      `${load.destination.city}, ${load.destination.state}`,
+      // Both "Houston, TX" and "Houston TX" should find a Houston load.
+      `${load.origin.city}, ${load.origin.state} ${load.origin.city} ${load.origin.state}`,
+      `${load.destination.city}, ${load.destination.state} ${load.destination.city} ${load.destination.state}`,
       load.shipperCompany ?? load.shipperName,
     ]
       .join(' ')

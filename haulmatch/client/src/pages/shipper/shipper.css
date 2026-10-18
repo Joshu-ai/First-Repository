@@ -1,0 +1,255 @@
+/* Shipper pages. Only what the shared design system has no class for; everything uses its tokens. */
+
+/* ------------------------------------------------------------------------------------------
+   Dashboard: requests panel first on phones (it is the call to action), in the sidebar on desktop
+   ------------------------------------------------------------------------------------------ */
+
+.sh-dash {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+/* The pending-requests tile spans the row on two-column phone grids. */
+.sh-stat-cta {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+  .sh-stat-cta {
+    grid-column: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sh-dash {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .sh-dash__aside {
+    order: 2;
+  }
+}
+
+/* Nothing to review: phones skip the empty panel, desktop keeps it as a calm placeholder. */
+@media (max-width: 1023.98px) {
+  .sh-dash__aside--empty {
+    display: none;
+  }
+}
+
+.sh-load-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Request rows (dashboard panel)
+   ------------------------------------------------------------------------------------------ */
+
+.sh-requests {
+  margin: 0 calc(var(--space-4) * -1);
+}
+
+.sh-request {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.sh-request__lane {
+  align-self: flex-start;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sh-request__money {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  text-align: right;
+}
+
+.sh-request__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sh-request__actions > .btn {
+  flex: 1 1 96px;
+}
+
+@media (min-width: 768px) {
+  .sh-requests {
+    margin: 0 -20px;
+  }
+
+  .sh-request {
+    padding-inline: 20px;
+  }
+}
+
+.sh-quote {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-2);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Load status timeline
+   ------------------------------------------------------------------------------------------ */
+
+.sh-timeline {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-timeline__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.sh-timeline__step:last-child {
+  padding-bottom: 0;
+}
+
+/* The rail joining one marker to the next. */
+.sh-timeline__step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.sh-timeline__step--done:not(:last-child)::before {
+  background: var(--ok);
+}
+
+.sh-timeline__marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.sh-timeline__step--done .sh-timeline__marker {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.sh-timeline__step--current .sh-timeline__marker {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.sh-timeline__step--cancelled .sh-timeline__marker {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.sh-timeline__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.sh-timeline__title {
+  font-weight: 800;
+}
+
+.sh-timeline__step--upcoming .sh-timeline__title {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sh-timeline__time {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Post load form
+   ------------------------------------------------------------------------------------------ */
+
+.sh-hotshot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.sh-hotshot--on {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.sh-hotshot .switch__title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+}
+
+.sh-rate {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .sh-rate {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+}
+
+.sh-lane-miles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+/* Desktop summary under the top bar while the form scrolls. */
+.sh-summary-lane {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+
+.sh-self-start {
+  align-self: flex-start;
+}

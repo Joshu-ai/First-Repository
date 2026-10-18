@@ -1,0 +1,896 @@
+/* Pages both roles share (messages, notifications, account). Only what the shared design system
+   has no class for; built from the tokens in styles.css so it follows the light and dark themes.
+   Every class is cm- prefixed. */
+
+/* ------------------------------------------------------------------------------------------
+   Messages: page frame
+   ------------------------------------------------------------------------------------------ */
+
+.cm-messages {
+  /* Space the shell puts around the page, so the chat can fill exactly one screen. */
+  --cm-page-top: var(--space-5);
+  --cm-gap-top: var(--cm-page-top);
+  --cm-gap-bottom: var(--space-4);
+  --cm-tabbar: 0px;
+  min-width: 0;
+}
+
+.app--tabbed .cm-messages {
+  --cm-tabbar: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+.cm-messages__header .page-header {
+  margin-bottom: var(--space-4);
+}
+
+/* One screen tall with the log scrolling inside, so the composer stays put above the tab bar. */
+.cm-messages--fixed {
+  display: flex;
+  flex-direction: column;
+  height: calc(
+    100dvh - var(--topbar-h) - env(safe-area-inset-top) - var(--cm-gap-top) - var(--cm-gap-bottom) - var(--cm-tabbar)
+  );
+  min-height: 420px;
+  margin-top: calc(var(--cm-gap-top) - var(--cm-page-top));
+  /* Pull the page's bottom padding in; the gap below the panes is --cm-gap-bottom. */
+  margin-bottom: calc(var(--cm-gap-bottom) - var(--space-7));
+}
+
+.cm-panes {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.cm-messages--fixed .cm-panes {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.cm-pane {
+  min-width: 0;
+}
+
+.cm-messages--fixed .cm-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cm-messages--fixed .cm-pane--list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cm-pane__pad {
+  padding: var(--space-3);
+}
+
+.cm-pane__note {
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+/* Phones and small tablets: an open conversation runs edge to edge under the top bar. */
+@media (max-width: 899.98px) {
+  .cm-messages--open {
+    --cm-gap-top: 0px;
+    --cm-gap-bottom: 0px;
+    margin-inline: calc(var(--gutter) * -1);
+  }
+
+  .cm-messages--open .cm-pane--convo {
+    border-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .cm-messages {
+    --cm-page-top: var(--space-6);
+  }
+}
+
+@media (min-width: 900px) {
+  .cm-panes--two {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .app--tabbed .cm-messages {
+    --cm-tabbar: 0px;
+  }
+
+  .cm-messages {
+    --cm-gap-bottom: var(--space-5);
+  }
+
+  .cm-panes--two {
+    grid-template-columns: 360px minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+   Messages: thread list
+   ------------------------------------------------------------------------------------------ */
+
+.cm-threads > li {
+  min-width: 0;
+}
+
+.cm-thread {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 76px;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+a.cm-thread:hover {
+  background: var(--surface-2);
+}
+
+a.cm-thread:focus-visible {
+  outline-offset: -3px;
+}
+
+.cm-thread.is-active {
+  background: var(--brand-soft);
+}
+
+/* A bar on the left edge, so the open thread does not rely on the tint alone. */
+.cm-thread.is-active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--brand);
+}
+
+.cm-thread__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cm-thread__top,
+.cm-thread__bottom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cm-thread__who {
+  flex: 1;
+}
+
+.cm-thread__name {
+  font-weight: 700;
+}
+
+.cm-thread__company {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.cm-thread__time {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.cm-thread__lane {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cm-thread__arrow {
+  margin: -2px 4px 0;
+  color: var(--brand-text);
+}
+
+.cm-thread__preview {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.cm-thread.is-unread .cm-thread__name,
+.cm-thread.is-unread .cm-thread__preview {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.cm-thread.is-unread .cm-thread__time {
+  color: var(--brand-text);
+  font-weight: 700;
+}
+
+.cm-thread--skeleton {
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Messages: conversation
+   ------------------------------------------------------------------------------------------ */
+
+.cm-convo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.cm-convo__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cm-convo__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.cm-convo__back {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin-left: calc(var(--space-2) * -1);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+}
+
+.cm-convo__back:hover {
+  background: var(--surface-2);
+}
+
+.cm-convo__who-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cm-convo__name {
+  font-size: 1.0625rem;
+}
+
+.cm-convo__sub {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.cm-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.cm-context__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.cm-context__lane {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.cm-context__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
+.cm-context__commodity {
+  max-width: 100%;
+}
+
+.cm-context__link {
+  flex: none;
+}
+
+.cm-convo__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.cm-convo__state {
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.cm-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--bg);
+}
+
+/* Without the fixed frame (never in practice) the log still needs a sensible height. */
+.cm-messages:not(.cm-messages--fixed) .cm-log {
+  max-height: 60vh;
+}
+
+.cm-log:focus-visible {
+  outline-offset: -3px;
+}
+
+.cm-log--skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cm-log--skeleton .cm-skel--mine {
+  align-self: flex-end;
+}
+
+.cm-log__list,
+.cm-day__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cm-day + .cm-day {
+  margin-top: var(--space-3);
+}
+
+.cm-day__label {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 var(--space-2);
+  padding-top: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cm-day__label span {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.cm-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: var(--space-3);
+}
+
+.cm-msg--follow {
+  margin-top: var(--space-1);
+}
+
+.cm-day__list > .cm-msg:first-child {
+  margin-top: 0;
+}
+
+.cm-msg--mine {
+  align-items: flex-end;
+}
+
+.cm-msg__bubble {
+  max-width: min(85%, 560px);
+  padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-msg--mine .cm-msg__bubble {
+  border-radius: 16px 16px 4px 16px;
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
+}
+
+.cm-msg--follow.cm-msg--theirs .cm-msg__bubble {
+  border-top-left-radius: 4px;
+}
+
+.cm-msg--follow.cm-msg--mine .cm-msg__bubble {
+  border-top-right-radius: 4px;
+}
+
+.cm-msg__time {
+  padding-inline: 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* "2 new messages" pill over the log when the person has scrolled up. */
+.cm-jump {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--nav-bg);
+  color: var(--nav-ink);
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+}
+
+.cm-start,
+.cm-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 100%;
+  padding: var(--space-5) var(--space-2);
+  text-align: center;
+}
+
+.cm-start__title,
+.cm-pick__title {
+  font-size: 1.125rem;
+}
+
+.cm-start__body {
+  max-width: 40ch;
+}
+
+.cm-start__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  max-width: 520px;
+}
+
+.cm-start__chips .chip {
+  white-space: normal;
+  text-align: left;
+}
+
+.cm-pick {
+  flex: 1;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* Composer */
+.cm-composer {
+  flex: none;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cm-composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.cm-composer__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  max-height: 160px;
+  padding-block: 13px;
+  resize: none;
+  line-height: 1.4;
+}
+
+.cm-composer__input[readonly] {
+  color: var(--muted);
+}
+
+.cm-composer__send {
+  flex: none;
+  width: 52px;
+  padding: 0;
+}
+
+.cm-composer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px var(--space-3);
+  min-height: 4px;
+}
+
+.cm-composer__error {
+  margin-top: var(--space-1);
+}
+
+.cm-composer__hint {
+  margin-left: auto;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 599.98px) {
+  .cm-convo__head {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .cm-log {
+    padding-inline: var(--space-3);
+  }
+
+  .cm-composer {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (min-width: 900px) {
+  .cm-convo__head {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .cm-log {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .cm-composer {
+    padding: var(--space-3) var(--space-5) var(--space-2);
+  }
+
+  .cm-msg__bubble {
+    max-width: min(75%, 560px);
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+   Notifications
+   ------------------------------------------------------------------------------------------ */
+
+.cm-notes-day + .cm-notes-day {
+  margin-top: var(--space-5);
+}
+
+.cm-notes-day__title {
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cm-note {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+a.cm-note:hover,
+button.cm-note:hover {
+  background: var(--surface-2);
+}
+
+a.cm-note:focus-visible,
+button.cm-note:focus-visible {
+  outline-offset: -3px;
+}
+
+.cm-note.is-unread {
+  background: color-mix(in srgb, var(--brand-soft) 60%, var(--surface));
+}
+
+a.cm-note.is-unread:hover,
+button.cm-note.is-unread:hover {
+  background: var(--brand-soft);
+}
+
+.cm-note__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+
+.cm-note__icon--brand {
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.cm-note__icon--ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.cm-note__icon--bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.cm-note__icon--warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.cm-note__icon--info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cm-note__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cm-note__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cm-note.is-unread .cm-note__title {
+  font-weight: 800;
+}
+
+.cm-note__body {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cm-note__meta {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.cm-note__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex: none;
+  align-self: center;
+  color: var(--muted);
+}
+
+/* Unread marker: a dot plus the word, so it is not color alone. */
+.cm-note__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand-text);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cm-note__new::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.cm-note--skeleton {
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Account
+   ------------------------------------------------------------------------------------------ */
+
+.cm-account {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.cm-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.cm-identity__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cm-identity__name {
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.cm-identity__line {
+  color: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* The sidebar is too narrow for the default auto-fit columns; keep the two tiles side by side. */
+.cm-account .stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cm-static-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cm-static-field__value {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cm-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cm-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Big tappable rows: icon, label and a hint, chevron on the right. */
+.cm-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.cm-link:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.cm-link__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.cm-link__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.cm-link__title {
+  font-weight: 700;
+}
+
+.cm-link__hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.cm-link__chevron {
+  color: var(--muted);
+}
+
+/* Username for password managers on the change-password form. */
+.cm-hidden-username {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .cm-form-actions .btn {
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .cm-form-actions .btn--primary {
+    flex: 1 1 100%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .cm-account {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .cm-account__aside {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--space-4));
+  }
+}

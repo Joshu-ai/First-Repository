@@ -37,7 +37,9 @@ export type MatchableDriver = Pick<
   | 'avoidStates'
   | 'mpg'
   | 'fuelPricePerGallon'
->;
+> &
+  /** Omitted or null with hasCdl counts as Class A, the common case, so older callers keep working. */
+  Partial<Pick<DriverProfile, 'cdlClass'>>;
 
 export interface MatchOptions {
   now?: Date;
@@ -54,6 +56,16 @@ export const SCORE_WEIGHTS: Record<keyof MatchBreakdown, number> = {
 };
 
 const HOUR_MS = 3_600_000;
+
+const CLOSED_STATUS_LABELS: Record<Exclude<Load['status'], 'open'>, string> = {
+  booked: 'Load is already booked',
+  in_transit: 'Load is already on the road',
+  delivered: 'Load was already delivered',
+  cancelled: 'Load was cancelled',
+};
+
+/** A load only "heads toward home" when it closes at least this share of the distance home. */
+const TOWARD_HOME_MIN_GAIN = 0.25;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -77,7 +89,7 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
   const pickupEnd = new Date(load.pickupEnd).getTime();
   const pickupStart = new Date(load.pickupStart).getTime();
   if (load.status !== 'open') {
-    add('status', false, true, load.status === 'cancelled' ? 'Load was cancelled' : 'Load is already booked');
+    add('status', false, true, CLOSED_STATUS_LABELS[load.status]);
   } else if (pickupEnd < now.getTime()) {
     add('status', false, true, 'Pickup window has passed');
   } else {
@@ -105,14 +117,19 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
     add('length', false, true, `Too long: ${load.lengthFt} ft on a ${driver.trailerLengthFt} ft deck`);
   }
 
-  // Licensing. Semi equipment always needs a CDL; a non-CDL hotshot is capped by weight.
+  // Licensing. Semi equipment always needs a Class A CDL; a non-CDL hotshot is capped by weight.
+  // Every rig here is a combination (truck + trailer), and a Class B CDL does not cover a
+  // combination over 26,000 lbs, so a Class B holder is held to the same limits as no CDL.
   const usableEquipment = matchedEquipment.length > 0 ? matchedEquipment : load.equipmentTypes;
   const onlySemi = usableEquipment.length > 0 && usableEquipment.every((e) => EQUIPMENT[e].driverClass === 'semi');
-  if (!driver.hasCdl) {
+  const classB = driver.hasCdl && driver.cdlClass === 'B';
+  if (!driver.hasCdl || classB) {
+    const yours = classB ? ' (yours is Class B)' : '';
     if (onlySemi) {
-      add('cdl', false, true, 'Requires a Class A CDL');
+      add('cdl', false, true, `Requires a Class A CDL${yours}`);
     } else if (load.weightLbs > NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS) {
-      add('cdl', false, true, `Over ${fmtLbs(NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS)} lbs: needs a CDL (26,001+ lbs combination)`);
+      const needs = classB ? `a Class A CDL${yours}` : 'a CDL (26,001+ lbs combination)';
+      add('cdl', false, true, `Over ${fmtLbs(NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS)} lbs: needs ${needs}`);
     }
   }
   if (load.hazmat) {
@@ -155,8 +172,11 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
     add('timing', false, true, `Can't reach pickup in time (about ${Math.max(1, late)}h late)`);
     timingScore = 0;
   } else {
+    // Score the wait from when the driver is ready, not from arrival: hours spent deadheading are
+    // not productive either, and counting them would let a farther driver outscore a closer one.
+    const idleHours = Math.max(0, (pickupStart - readyAt) / HOUR_MS);
+    timingScore = idleHours <= 12 ? 100 : Math.round(100 - 80 * clamp01((idleHours - 12) / 84));
     const waitHours = Math.max(0, (pickupStart - arriveAt) / HOUR_MS);
-    timingScore = waitHours <= 12 ? 100 : Math.round(100 - 80 * clamp01((waitHours - 12) / 84));
     const label = arriveAt >= pickupStart ? 'You can make the pickup window' : `Pickup opens ${formatWait(waitHours)} after you arrive`;
     add('timing', true, true, label);
   }
@@ -240,9 +260,9 @@ function scoreLane(load: MatchableLoad, driver: MatchableDriver): { score: numbe
   if (driver.homeBase) {
     const fromHomeAtPickup = roadMiles(load.origin, driver.homeBase);
     const fromHomeAtDrop = roadMiles(load.destination, driver.homeBase);
-    if (fromHomeAtPickup > 50 && fromHomeAtDrop < fromHomeAtPickup) {
+    const improvement = fromHomeAtPickup > 0 ? clamp01((fromHomeAtPickup - fromHomeAtDrop) / fromHomeAtPickup) : 0;
+    if (fromHomeAtPickup > 50 && improvement >= TOWARD_HOME_MIN_GAIN) {
       towardHome = true;
-      const improvement = clamp01((fromHomeAtPickup - fromHomeAtDrop) / fromHomeAtPickup);
       score = Math.max(score, Math.round(60 + 40 * improvement));
     } else if (!preferred) {
       score = 40;

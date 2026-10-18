@@ -1,0 +1,16 @@
+{
+  "name": "HaulMatch",
+  "short_name": "HaulMatch",
+  "description": "Loads that fit your rig. Hotshot and semi drivers matched to freight they can haul.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1b2d",
+  "theme_color": "#0f1b2d",
+  "categories": ["business", "productivity", "travel"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

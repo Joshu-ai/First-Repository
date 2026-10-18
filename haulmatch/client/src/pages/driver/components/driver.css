@@ -1,0 +1,501 @@
+/* Driver pages: the few pieces the shared design system does not cover (setup progress,
+   load board header and toolbar, load detail hero, profile save bar). Built only from the
+   tokens in styles.css so it follows the light and dark themes. Every class is drv- prefixed. */
+
+/* ------------------------------------------------------------------------------------------
+   Setup progress
+   ------------------------------------------------------------------------------------------ */
+
+.drv-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.drv-progress__count {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.drv-progress__count strong {
+  color: var(--ink);
+}
+
+.drv-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drv-steps__item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.drv-steps__step {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+
+button.drv-steps__step {
+  cursor: pointer;
+}
+
+button.drv-steps__step:hover .drv-steps__label {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.drv-steps__bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.drv-steps__item.is-done .drv-steps__bar {
+  background: var(--brand);
+}
+
+.drv-steps__item.is-current .drv-steps__bar {
+  background: linear-gradient(90deg, var(--brand) 0 50%, color-mix(in srgb, var(--brand) 35%, var(--surface-3)) 50%);
+}
+
+.drv-steps__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.drv-steps__item.is-current .drv-steps__label {
+  color: var(--ink);
+}
+
+.drv-steps__item.is-done .drv-steps__label .icon {
+  color: var(--ok);
+}
+
+@media (max-width: 599.98px) {
+  .drv-steps__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.drv-step-heading:focus {
+  outline: none;
+}
+
+/* Phones: Back shrinks to an arrow so Back and Next share one thumb row. */
+.action-bar > .drv-back {
+  flex: 0 0 auto;
+}
+
+.drv-back__sr {
+  display: none;
+}
+
+@media (max-width: 599.98px) {
+  .drv-back {
+    width: 52px;
+    padding: 0;
+  }
+
+  .drv-back .btn__label {
+    display: contents;
+  }
+
+  .drv-back__label {
+    display: none;
+  }
+
+  .drv-back__sr {
+    display: inline;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+   Load board
+   ------------------------------------------------------------------------------------------ */
+
+.drv-board-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--space-4);
+}
+
+.drv-board-head__title {
+  font-size: 1.375rem;
+}
+
+@media (min-width: 768px) {
+  .drv-board-head .drv-avail {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .drv-board-head .drv-where {
+    grid-column: 1;
+  }
+}
+
+.drv-where {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.drv-where > .icon {
+  color: var(--brand-text);
+}
+
+.drv-where strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.drv-where .link-button {
+  padding-inline: 2px;
+}
+
+.drv-avail {
+  min-height: var(--tap);
+  gap: var(--space-3);
+}
+
+.drv-avail .switch__title {
+  font-size: 0.9375rem;
+}
+
+.drv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.drv-toolbar__sort {
+  flex: 1 1 170px;
+  min-width: 0;
+  max-width: 280px;
+}
+
+.drv-toolbar__view {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.drv-icon-chip {
+  justify-content: center;
+  width: var(--tap);
+  padding: 0;
+}
+
+.drv-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.drv-results {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.drv-results__count {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.drv-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.drv-filter-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.drv-filter-panel__actions > .btn {
+  flex: 1 1 120px;
+}
+
+.drv-map-hint {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Load detail
+   ------------------------------------------------------------------------------------------ */
+
+.drv-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.drv-hero__facts {
+  display: grid;
+  flex: 1 1 200px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.drv-hero__facts > div {
+  min-width: 0;
+}
+
+.drv-hero__facts dt {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drv-hero__facts dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.drv-hero__facts .drv-hero__sub {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+@media (min-width: 600px) {
+  .drv-hero__facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.drv-notes {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.drv-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drv-failed {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.1em;
+}
+
+.drv-failed + p {
+  margin-top: var(--space-2);
+}
+
+.drv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Trips and alerts
+   ------------------------------------------------------------------------------------------ */
+
+.drv-trip__when {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.drv-trip__when .icon {
+  color: var(--muted);
+}
+
+.drv-alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.drv-alert__summary {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.drv-alert__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.drv-alert__actions > :first-child {
+  grid-column: 1 / -1;
+}
+
+.drv-alert__actions .drv-alert__danger {
+  color: var(--bad);
+}
+
+@media (min-width: 600px) {
+  .drv-alert__actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .drv-alert__actions .drv-alert__danger {
+    margin-left: auto;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+   Profile
+   ------------------------------------------------------------------------------------------ */
+
+.drv-section-nav {
+  margin-bottom: var(--space-2);
+}
+
+.drv-section-nav .chip {
+  min-height: 40px;
+}
+
+@media (pointer: coarse) {
+  .drv-section-nav .chip {
+    min-height: var(--tap);
+  }
+}
+
+/* Unlike .action-bar, this stays pinned on desktop too: the save button must be in reach on a long form. */
+.drv-savebar {
+  position: sticky;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-2));
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.drv-savebar__text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 180px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.drv-savebar__text .icon {
+  color: var(--warn);
+}
+
+.drv-savebar__actions {
+  display: flex;
+  flex: 1 1 240px;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.drv-savebar__actions > .btn {
+  flex: 1 1 0;
+}
+
+@media (min-width: 768px) {
+  .drv-savebar__actions > .btn {
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .drv-savebar {
+    bottom: var(--space-4);
+  }
+}
+
+.drv-fuel-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.drv-fuel-note .icon {
+  margin-top: 1px;
+}
+
+.drv-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+
+.drv-summary__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.drv-summary__name {
+  font-size: 1.125rem;
+  font-weight: 800;
+}

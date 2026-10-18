@@ -20,7 +20,7 @@ shared/      types.ts (DTOs) · equipment.ts · geo.ts · cities.ts (+ data/*.js
 server/      index.ts · app.ts (router wiring) · db.ts (schema) · context.ts · auth.ts · events.ts (SSE + notify)
              http.ts (errors, zod parse, CSRF) · mappers.ts (rows -> DTOs) · filters.ts (search filters) · alerts.ts · seed.ts · routes/*.ts
 client/      index.html · src/main.tsx · src/App.tsx · src/styles.css · src/lib/* · src/components/* · src/pages/**
-tests/       helpers.ts · shared/*.test.ts · server/*.test.ts
+tests/       helpers.ts · shared/*.test.ts · server/*.test.ts · client/*.test.ts (pure client lib + form helpers)
 e2e/         *.spec.ts (Playwright)
 ```
 
@@ -104,8 +104,8 @@ Both: `maxDeadheadMiles`, `minRatePerMile`, `mpg` from `DRIVER_CLASSES`, fuel `D
 ### Loads — `routes/loads.ts` (`/api/loads`)
 | Method | Path | Who | Notes |
 |---|---|---|---|
-| GET | `/` | signed in | Query = `LoadSearchFilters` as strings (`equipment` and `destinationStates` comma-separated, booleans `true/false/1/0`) + `limit` (default 50, max 200) + `offset`. Only `status='open'` and `pickup_end >= now`. Drivers: each load gets `match = matchLoad(load, profile, {now})`; ineligible loads dropped unless `includeIneligible`; `originCityId+originRadiusMiles` filters by road miles from that city; `minRatePerMile` compares the posted `ratePerMile`; `q` matches commodity/city/notes/reference case-insensitively. Sorts: `best` (default for drivers, `compareMatches`), `rate` (ratePerMile desc), `deadhead` (asc, nulls last), `pickup` (pickupStart asc), `newest` (default for shippers), `profit` (estimatedProfitUsd desc). If the driver profile is incomplete, matches are null and `driverProfileComplete=false`. Response `LoadListResponse`. |
-| GET | `/:id` | signed in | `LoadDetailResponse`. Open loads are visible to everyone signed in. Non-open loads only to the owning shipper, the booked driver, and drivers who have a booking row on it; otherwise 404. Drivers get `match` (with `ignoreDeadheadLimit: true`) and `myBooking`. |
+| GET | `/` | signed in | Query = `LoadSearchFilters` as strings (`equipment` and `destinationStates` comma-separated, booleans `true/false/1/0`) + `limit` (default 50, max 200) + `offset`. Only `status='open'` and `pickup_end >= now`. Drivers: each load gets `match = matchLoad(load, profile, {now})`; ineligible loads dropped unless `includeIneligible`; `originCityId+originRadiusMiles` filters by road miles from that city (and then the deadhead limit is soft, `ignoreDeadheadLimit: true`, because the driver is planning a run from there); `minRatePerMile` compares the posted `ratePerMile`; `q` matches commodity/city/notes/reference case-insensitively. Sorts: `best` (default for drivers, `compareMatches`), `rate` (ratePerMile desc), `deadhead` (asc, nulls last), `pickup` (pickupStart asc), `newest` (default for shippers), `profit` (estimatedProfitUsd desc). If the driver profile is incomplete, matches are null and `driverProfileComplete=false`. Response `LoadListResponse`. |
+| GET | `/:id` | signed in | `LoadDetailResponse`. Open loads are visible to everyone signed in. Non-open loads only to the owning shipper, the booked driver, and drivers who have a booking row on it; otherwise 404. Drivers get `match` (with `ignoreDeadheadLimit: true`) and `myBooking`; the booked driver also gets `shipperPhone`. |
 | POST | `/` | shipper | Body: `{originCityId, destinationCityId, pickupStart, pickupEnd, deliveryBy?, equipmentTypes (≥1), weightLbs (1–200000), lengthFt (1–100), commodity (1–120), notes? (≤2000), loadSize = 'full', hazmat = false, tarpRequired = false, teamRequired = false, rateUsd (50–100000), bookingMode = 'request', referenceNumber? (≤40)}`. Rules: origin ≠ destination; pickupEnd ≥ pickupStart; pickupEnd > now; deliveryBy ≥ pickupStart. `miles = roadMiles(origin, destination)`. After insert call `alertDriversForLoad(ctx, load)` (server/alerts.ts). 201 `Load`. |
 | PATCH | `/:id` | owning shipper | Same fields, all optional. Only while `open`. Recompute miles. Notify drivers with pending requests that the load changed (`load_status`). |
 | POST | `/:id/cancel` | owning shipper | `open` or `booked` only (409 otherwise). Pending/accepted bookings → `cancelled`, notify those drivers (`load_cancelled`). Returns `Load`. |
@@ -139,7 +139,7 @@ A thread is one load + one driver. Shippers see threads on loads they own; drive
 
 ### Alerts — `server/alerts.ts`
 `alertDriversForLoad(ctx, load)`: for each saved search with alerts on whose filters match the new load
-**and** the driver is eligible (`matchLoad` hard checks pass), notify once per driver (`load_match`,
+**and** the driver is eligible (`matchLoad` hard checks pass; a search with `originCityId` treats the deadhead limit as soft, like the board), notify once per driver (`load_match`,
 "New load: Houston, TX → Odessa, TX · $1,400", link `/driver/loads/:id`). Also notify up to 5 other
 available drivers with score ≥ 85 ("Hot match near you"). Never notify the same driver twice for one load.
 

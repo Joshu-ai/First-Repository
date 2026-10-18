@@ -12,8 +12,9 @@ export interface EquipmentInfo {
   typicalPayloadLbs: number;
   requiresEndorsement?: Endorsement;
   /**
-   * Demo market benchmark, all-in spot USD per loaded mile. These are illustrative
-   * figures for matching and rate suggestions, not live market data.
+   * Demo market benchmark, all-in spot USD per loaded mile, in line with 2025 DAT national
+   * averages (van ~$2.00–2.30, reefer ~$2.35–2.70, flatbed ~$2.40–2.60) at diesel near
+   * DEFAULT_FUEL_PRICE_PER_GALLON. Illustrative figures for matching and rate suggestions, not live data.
    */
   benchmarkRatePerMile: number;
   /** Lowest all-in charge a carrier typically accepts for a short run with this equipment. */
@@ -59,7 +60,7 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     label: 'Hotshot car hauler (wedge)',
     shortLabel: 'Car hauler',
     driverClass: 'hotshot',
-    description: 'Wedge or 3-car gooseneck trailer for vehicles.',
+    description: '2- or 3-car wedge or gooseneck trailer for vehicles.',
     typicalLengthFt: 40,
     typicalPayloadLbs: 12_000,
     benchmarkRatePerMile: 1.9,
@@ -169,13 +170,16 @@ export function isEquipmentCode(value: string): value is EquipmentCode {
 }
 
 /**
- * Non-CDL hotshot payload ceiling. A Class A CDL is needed once the combination is rated
- * 26,001+ lbs with a towed unit over 10,000 lbs; a 1-ton dually and gooseneck weigh roughly
- * 15,000 lbs empty, so a non-CDL hotshot can carry about 10,000 lbs before crossing that line.
+ * Non-CDL hotshot payload ceiling. A Class A CDL is needed once the combination is rated (or
+ * weighs) 26,001+ lbs with a towed unit over 10,000 lbs (49 CFR 383.91). A 1-ton dually and
+ * gooseneck weigh roughly 15,000 lbs empty, so a non-CDL rig carries about 10,000 lbs.
  */
 export const NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS = 10_000;
 
-/** The largest load a typical hotshot rig can take; used to flag "hotshot-friendly" freight. */
+/**
+ * The largest load a typical CDL hotshot rig can take (40 ft is the most common gooseneck deck);
+ * used to flag "hotshot-friendly" freight.
+ */
 export const HOTSHOT_MAX_LENGTH_FT = 40;
 export const HOTSHOT_MAX_PAYLOAD_LBS = 16_500;
 
