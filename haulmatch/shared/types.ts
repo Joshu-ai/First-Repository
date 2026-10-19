@@ -308,7 +308,10 @@ export interface RateEstimate {
 }
 
 export interface ShipperStats {
+  /** Open loads still on the board (pickup window not yet closed). */
   open: number;
+  /** Loads still marked open whose pickup window has passed: off the board until edited or cancelled. */
+  expired: number;
   booked: number;
   inTransit: number;
   delivered: number;

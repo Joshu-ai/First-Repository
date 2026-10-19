@@ -8,15 +8,27 @@ import type { Db } from '../db';
 import { notify, publish } from '../events';
 import { forbidden, HttpError, notFound, parse } from '../http';
 import { getLoadById, getUserById, toMessage } from '../mappers';
+import { createThrottle } from '../throttle';
+import { driverCanSeeLoad } from '../visibility';
 
 type Row = Record<string, unknown>;
 
 const PREVIEW_LENGTH = 140;
+/** Messages per page of GET /loads/:loadId/messages, by default and at most. */
+export const MESSAGE_PAGE_SIZE = 100;
+export const MESSAGE_PAGE_MAX = 200;
+/** Messages one user may send per minute, across all their conversations. */
+export const MESSAGES_PER_MINUTE = 30;
 
 const MESSAGE_SELECT = `SELECT m.*, u.name AS sender_name FROM messages m JOIN users u ON u.id = m.sender_id`;
 
 const driverIdSchema = z.string().trim().min(1).max(100);
 const threadQuerySchema = z.object({ driverId: driverIdSchema.optional() });
+const pageQuerySchema = threadQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(MESSAGE_PAGE_MAX).default(MESSAGE_PAGE_SIZE),
+  /** Id of the oldest message the client already has; the page holds the messages just before it. */
+  before: z.string().trim().min(1).max(100).optional(),
+});
 const postSchema = z.object({
   body: z.string().trim().min(1, 'Write a message').max(2000),
   driverId: driverIdSchema.optional(),
@@ -30,21 +42,6 @@ interface ThreadRef {
   counterpartId: string;
 }
 
-const exists = (db: Db, sql: string, ...params: string[]) => db.prepare(sql).get(...params) !== undefined;
-
-/**
- * Drivers can talk about any load they can see: open loads, loads they are booked on or have
- * requested, plus loads where they are already in a thread, so they can still answer a shipper
- * after the load is covered.
- */
-function driverCanSee(db: Db, load: Load, driverId: string): boolean {
-  return (
-    load.status === 'open' ||
-    load.bookedDriverId === driverId ||
-    exists(db, 'SELECT 1 FROM bookings WHERE load_id = ? AND driver_id = ?', load.id, driverId) ||
-    exists(db, 'SELECT 1 FROM messages WHERE load_id = ? AND driver_id = ? LIMIT 1', load.id, driverId)
-  );
-}
 
 function resolveThread(db: Db, user: User, loadId: string, requestedDriverId: string | undefined): ThreadRef {
   const load = getLoadById(db, loadId, user.id);
@@ -54,7 +51,8 @@ function resolveThread(db: Db, user: User, loadId: string, requestedDriverId: st
     if (requestedDriverId !== undefined && requestedDriverId !== user.id) {
       throw forbidden('Drivers can only use their own conversations');
     }
-    if (!driverCanSee(db, load, user.id)) throw notFound('Load');
+    // Drivers can talk about any load they can see (server/visibility.ts).
+    if (!driverCanSeeLoad(db, load, user.id)) throw notFound('Load');
     return { load, driverId: user.id, counterpartId: load.shipperId };
   }
 
@@ -80,6 +78,33 @@ function markThreadRead(ctx: AppContext, ref: ThreadRef, readerId: string): void
        WHERE load_id = ? AND driver_id = ? AND sender_id != ? AND read_at IS NULL`,
     )
     .run(ctx.now().toISOString(), ref.load.id, ref.driverId, readerId);
+}
+
+/**
+ * The newest `limit` messages of a thread (older than `before`, when given), returned oldest first.
+ * A page shorter than `limit` reaches the start of the conversation.
+ */
+function threadPage(db: Db, ref: ThreadRef, limit: number, before: string | undefined): Message[] {
+  const params: (string | number)[] = [ref.load.id, ref.driverId];
+  let cursor = '';
+  if (before !== undefined) {
+    const at = db
+      .prepare('SELECT created_at, rowid FROM messages WHERE id = ? AND load_id = ? AND driver_id = ?')
+      .get(before, ref.load.id, ref.driverId) as { created_at: string; rowid: number } | undefined;
+    if (!at) {
+      throw new HttpError(400, 'validation_error', 'before: Not a message in this conversation', [
+        { path: 'before', message: 'Not a message in this conversation' },
+      ]);
+    }
+    cursor = ' AND (m.created_at < ? OR (m.created_at = ? AND m.rowid < ?))';
+    params.push(at.created_at, at.created_at, at.rowid);
+  }
+  const rows = db
+    .prepare(
+      `${MESSAGE_SELECT} WHERE m.load_id = ? AND m.driver_id = ?${cursor} ORDER BY m.created_at DESC, m.rowid DESC LIMIT ?`,
+    )
+    .all(...params, limit) as Row[];
+  return rows.reverse().map(toMessage);
 }
 
 function getMessage(db: Db, id: string): Message {
@@ -135,26 +160,30 @@ function preview(text: string): string {
 
 export function messagesRouter(ctx: AppContext): Router {
   const router = Router();
+  const sent = createThrottle({ max: MESSAGES_PER_MINUTE, windowMs: 60_000, now: ctx.now });
 
   router.get('/threads', requireAuth, (req, res) => {
     res.json(listThreads(ctx.db, currentUser(req)));
   });
 
+  // Reading changes nothing: a GET can be triggered cross-site, so marking read is POST .../read only.
   router.get('/loads/:loadId/messages', requireAuth, (req, res) => {
     const user = currentUser(req);
-    const { driverId } = parse(threadQuerySchema, req.query);
+    const { driverId, limit, before } = parse(pageQuerySchema, req.query);
     const ref = resolveThread(ctx.db, user, String(req.params.loadId), driverId);
-    markThreadRead(ctx, ref, user.id);
-    const rows = ctx.db
-      .prepare(`${MESSAGE_SELECT} WHERE m.load_id = ? AND m.driver_id = ? ORDER BY m.created_at ASC, m.rowid ASC`)
-      .all(ref.load.id, ref.driverId) as Row[];
-    res.json(rows.map(toMessage));
+    res.json(threadPage(ctx.db, ref, limit, before));
   });
 
   router.post('/loads/:loadId/messages', requireAuth, (req, res) => {
     const user = currentUser(req);
     const input = parse(postSchema, req.body);
     const ref = resolveThread(ctx.db, user, String(req.params.loadId), input.driverId);
+    const wait = sent.retryAfterSeconds(user.id);
+    if (wait > 0) {
+      res.set('Retry-After', String(wait));
+      throw new HttpError(429, 'too_many_messages', "You're sending messages too fast. Wait a minute, then try again.");
+    }
+    sent.record(user.id);
 
     const id = randomUUID();
     ctx.db

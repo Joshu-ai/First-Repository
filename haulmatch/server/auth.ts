@@ -3,6 +3,7 @@ import type { RequestHandler, Response } from 'express';
 import { SESSION_COOKIE, SESSION_TTL_DAYS } from '../shared/api';
 import type { Role, User } from '../shared/types';
 import type { AppContext } from './context';
+import { closeSessionStreams } from './events';
 import { forbidden, unauthorized } from './http';
 import { getUserById } from './mappers';
 
@@ -59,8 +60,10 @@ export function createSession(ctx: AppContext, userId: string): string {
   return token;
 }
 
-export function destroySession(ctx: AppContext, sessionHash: string): void {
+/** Signs a session out: deletes it and ends any live event stream it still has open. */
+export function destroySession(ctx: AppContext, userId: string, sessionHash: string): void {
   ctx.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sessionHash);
+  closeSessionStreams(userId, (hash) => hash === sessionHash);
 }
 
 export function setSessionCookie(res: Response, token: string): void {

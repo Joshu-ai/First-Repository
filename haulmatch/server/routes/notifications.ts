@@ -59,7 +59,7 @@ export function notificationsRouter(ctx: AppContext): Router {
     res.json({ unreadCount: unreadCount(ctx.db, user.id) });
   });
 
-  router.get('/events', requireAuth, eventsHandler);
+  router.get('/events', requireAuth, eventsHandler(ctx));
 
   return router;
 }

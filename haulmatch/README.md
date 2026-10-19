@@ -206,7 +206,8 @@ brief:
   - Book or request, trip status, backhauls, recommended drivers, invite, and a load's bookings.
 - **Bookings.** `/api/bookings`: list, accept, decline, withdraw.
 - **Shipper.** `/api/shipper`: own loads by status, and stats.
-- **Messages.** `/api/threads`, plus `/api/loads/:id/messages` to read, send and mark read.
+- **Messages.** `/api/threads`, plus `/api/loads/:id/messages` to read (in pages of up to 200), send
+  (30 a minute per person) and mark read (`POST .../read`; reading alone marks nothing).
 - **Alerts and notifications.**
   - `/api/saved-searches`: load alerts.
   - `/api/notifications`, plus `/api/events` for the SSE stream.
@@ -237,8 +238,9 @@ brief:
   taps.
 - **No carrier vetting.** MC and DOT numbers are free text and are not checked against FMCSA (authority,
   insurance or safety rating). There is no identity or broker-bond verification.
-- **Single-instance by design.** SQLite on local disk, the in-memory login throttle and the in-process SSE
-  hub all assume one server process. Scaling out needs a shared database, rate limiter and pub/sub.
+- **Single-instance by design.** SQLite on local disk, the in-memory limits (sign-in throttle, message
+  rate) and the in-process SSE hub all assume one server process. Scaling out needs a shared database,
+  rate limiter and pub/sub.
 - **Basic notifications.** Notifications appear in the app only (bell and toasts). There is no email, SMS
   or push.
 - **Maps** use OpenStreetMap tiles. Without network access they show pins and lines on a blank

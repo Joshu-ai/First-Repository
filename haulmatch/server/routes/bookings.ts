@@ -15,7 +15,7 @@ import { currentUser, requireAuth, requireRole } from '../auth';
 import type { AppContext } from '../context';
 import { transaction, type Db } from '../db';
 import { notify, publish, type NotifyInput } from '../events';
-import { conflict, notFound, parse } from '../http';
+import { conflict, HttpError, notFound, parse } from '../http';
 import { getDriverProfile, getDriverSummary, getLoadById, toBooking } from '../mappers';
 
 type Row = Record<string, unknown>;
@@ -104,19 +104,35 @@ export function markLoadBooked(ctx: AppContext, outbox: Outbox, load: Load, book
 }
 
 /**
- * How well a load fits a driver who asked for it, for the shipper's eyes. Judged as if the load were
- * still open so accepted and declined requests keep their rig-fit score after the load is covered.
+ * How well a load fits a driver who asked for it, for the shipper's eyes, judged at `now`. Judged as
+ * if the load were still open, so a covered load does not turn every request into "not a fit".
  */
 export function matchForShipper(load: Load, profile: DriverProfile | null, now: Date): MatchResult | null {
   if (!profile) return null;
   return matchLoad({ ...load, status: 'open' }, profile, { now, ignoreDeadheadLimit: true });
 }
 
-/** A booking as the load's shipper sees it: with the driver (phone included) and how well they fit. */
+/**
+ * A booking as the load's shipper sees it: with the driver (phone included) and how well they fit.
+ * A pending request is scored as of now, so one that can no longer make pickup says so. Settled
+ * ones (accepted, declined, withdrawn, cancelled) are scored as of when they were made, when the
+ * booking checks (timing included) passed, so they keep their fit after the pickup window closes.
+ */
 export function withDriverAndMatch(ctx: AppContext, booking: Booking, load: Load): Booking {
   const driver = getDriverSummary(ctx.db, booking.driverId);
-  const match = matchForShipper(load, getDriverProfile(ctx.db, booking.driverId), ctx.now());
+  const at = booking.status === 'pending' ? ctx.now() : new Date(booking.createdAt);
+  const match = matchForShipper(load, getDriverProfile(ctx.db, booking.driverId), at);
   return { ...booking, ...(driver ? { driver } : {}), match };
+}
+
+/**
+ * The hard checks of matchLoad that a driver fails on this load right now: rig, weight, length,
+ * endorsements, timing, and the pickup window (status). Deadhead over the driver's own limit is
+ * their call, so it never blocks. Throws 422 profile_incomplete when there is no rig to check.
+ */
+export function failedHardChecks(ctx: AppContext, load: Load, profile: DriverProfile | null, incomplete: string) {
+  if (!profile?.profileComplete) throw new HttpError(422, 'profile_incomplete', incomplete);
+  return matchLoad(load, profile, { now: ctx.now(), ignoreDeadheadLimit: true }).checks.filter((c) => c.hard && !c.ok);
 }
 
 // ---- Route handlers ----
@@ -143,6 +159,17 @@ function acceptBooking(ctx: AppContext, id: string, shipper: User): BookLoadResp
     const load = freshLoad(ctx.db, booking.loadId);
     if (booking.status !== 'pending') throw conflict(`This request is ${booking.status}, not pending`);
     if (load.status !== 'open') throw conflict('This load is no longer open');
+    // The same rule as booking: the load or the driver's rig may have changed since the request,
+    // or the pickup window may have closed.
+    const failed = failedHardChecks(
+      ctx,
+      load,
+      getDriverProfile(ctx.db, booking.driverId),
+      "This driver's rig profile is incomplete, so they can't be booked",
+    );
+    if (failed.length > 0) {
+      throw new HttpError(422, 'not_eligible', `This driver no longer fits the load: ${failed[0].label}`, failed);
+    }
 
     const accepted = setBookingStatus(ctx, booking, 'accepted');
     const rateUsd = accepted.offerRateUsd ?? load.rateUsd;
@@ -193,6 +220,8 @@ function withdrawBooking(ctx: AppContext, id: string, driver: User): Booking {
 
     const withdrawn = setBookingStatus(ctx, booking, 'withdrawn');
     outbox.bookingUpdated(withdrawn, [load.shipperId, driver.id]);
+    // A no-show driver may still drop a load after its pickup window, but then it reopens unbookable.
+    const windowPassed = Date.parse(load.pickupEnd) < ctx.now().getTime();
     if (dropsBookedLoad) {
       ctx.db
         .prepare(
@@ -204,9 +233,11 @@ function withdrawBooking(ctx: AppContext, id: string, driver: User): Booking {
     outbox.notify(load.shipperId, {
       type: 'booking_withdrawn',
       title: dropsBookedLoad ? `Driver dropped: ${laneLabel(load)}` : `Request withdrawn: ${laneLabel(load)}`,
-      body: dropsBookedLoad
-        ? `${driver.name} can no longer haul it. The load is open again.`
-        : `${driver.name} withdrew their request.`,
+      body: !dropsBookedLoad
+        ? `${driver.name} withdrew their request.`
+        : windowPassed
+          ? `${driver.name} can no longer haul it, and the pickup window has passed. Set a new pickup window or cancel the load.`
+          : `${driver.name} can no longer haul it. The load is open again.`,
       link: shipperLoadLink(load.id),
     });
     return withdrawn;

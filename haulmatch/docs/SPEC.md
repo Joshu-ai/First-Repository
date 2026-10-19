@@ -19,6 +19,7 @@ data shapes is `shared/types.ts`; this doc says how the pieces behave.
 shared/      types.ts (DTOs) · equipment.ts · geo.ts · cities.ts (+ data/*.json) · matching.ts · rates.ts · api.ts
 server/      index.ts · app.ts (router wiring) · db.ts (schema) · context.ts · auth.ts · events.ts (SSE + notify)
              http.ts (errors, zod parse, CSRF) · mappers.ts (rows -> DTOs) · filters.ts (search filters) · alerts.ts · seed.ts · routes/*.ts
+             throttle.ts (in-memory sliding-window limits) · visibility.ts (who may see a load)
 client/      index.html · src/main.tsx · src/App.tsx · src/styles.css · src/lib/* · src/components/* · src/pages/**
 tests/       helpers.ts · shared/*.test.ts · server/*.test.ts · client/*.test.ts (pure client lib + form helpers)
 e2e/         *.spec.ts (Playwright)
@@ -41,7 +42,10 @@ Scripts: `npm run dev` (API on :4000 + Vite on :5173 with `/api` proxy), `npm ru
 - Map rows with `server/mappers.ts` (`toLoad`, `getLoadById`, `LOAD_SELECT`, `getDriverProfile`, ...).
   Locations are stored as city ids and resolved through `shared/cities.ts`.
 - Live updates: `notify(ctx, userId, {type, title, body, link})` stores a notification and pushes it over SSE;
-  `publish(userId, event)` pushes a raw `ServerEvent`. Links are client routes (see below).
+  `publish(userId, event)` pushes a raw `ServerEvent`. Links are client routes (see below). Each stream belongs
+  to the session that opened it: `destroySession` (logout) and a password change end the streams of the
+  sessions they sign out (`closeSessionStreams`), and the session is re-checked on every ping (`SSE_PING_MS`,
+  25 s) and before every event, so an expired or deleted session never receives another event.
 - Auth: `requireAuth`, `requireRole('driver' | 'shipper')`, `currentUser(req)` from `server/auth.ts`.
 - Mutating requests need header `X-Requested-With: HaulMatch` (enforced globally by `csrfGuard`).
 - Search filters live in `server/filters.ts`: `parseFilterQuery(req.query)` for `GET /api/loads`, `filtersSchema`
@@ -51,6 +55,11 @@ Scripts: `npm run dev` (API on :4000 + Vite on :5173 with `/api` proxy), `npm ru
 - IDs are `crypto.randomUUID()`. Money is whole dollars (integers) except per-mile rates.
 - Never leak another user's private data: password hashes never leave the server; a driver's phone
   is only shown to a shipper who has a booking/request/thread with that driver, or to the driver.
+  Who has a load booked and at what rate (`bookedDriverId`, `bookedRateUsd`) is only shown to the load's
+  shipper and the booked driver: `toLoad(row, viewerId)` nulls both for anyone else (drivers who lost it).
+- In-memory limits use `createThrottle({max, windowMs, now})` from `server/throttle.ts`. Before slow async work
+  (a password check) `reserve(key)` claims an attempt, so requests sent together count toward the limit;
+  idle keys are swept on a timer (once a minute), never on every event.
 
 ## API (all under `/api`, JSON)
 
@@ -61,11 +70,11 @@ Status codes: 200 OK, 201 created, 204 no content, 400 validation, 401 signed ou
 | Method | Path | Who | Body / query | Response |
 |---|---|---|---|---|
 | POST | `/register` | public | `{email, password (8–200), name (1–80), role, company?, phone?, driverClass? (required for drivers)}` | 201 `MeResponse`, sets cookie. 409 `email_taken`. Drivers get a `driver_profiles` row with class defaults (see below) and `equipment_types = []`, so `profileComplete` is false until setup. |
-| POST | `/login` | public | `{email, password}` | 200 `MeResponse`, sets cookie. 401 `invalid_credentials`. Throttle: 10 failed attempts per email per 15 min → 429 `too_many_attempts`. |
-| POST | `/logout` | any | – | 204, deletes session, clears cookie |
+| POST | `/login` | public | `{email, password}` | 200 `MeResponse`, sets cookie. 401 `invalid_credentials`. Throttle: 10 failed attempts per email per 15 min → 429 `too_many_attempts` with `Retry-After`. Each attempt is claimed before the password check, so recorded failures plus checks still running never exceed 10, however many requests arrive at once. A success clears the count. |
+| POST | `/logout` | any | – | 204, deletes session (and ends its live event streams), clears cookie |
 | GET | `/me` | signed in | – | `MeResponse` or 401 |
 | PATCH | `/me` | signed in | `{name?, company?, phone?}` | `MeResponse` |
-| POST | `/password` | signed in | `{currentPassword, newPassword}` | 204; 400 if current is wrong |
+| POST | `/password` | signed in | `{currentPassword, newPassword}` | 204; 400 if current is wrong. Shares the login throttle (keyed by the account email, claimed the same way) → 429. Signs out every other session of the user and ends their live event streams; this session stays. |
 
 Driver profile defaults on register: hotshot → `trailerLengthFt 40`, `maxPayloadLbs 10_000`
 (the non-CDL ceiling), `hasCdl false`; semi → `53 ft`, `45_000 lbs`, `hasCdl true`, `cdlClass 'A'`.
@@ -92,7 +101,7 @@ Both: `maxDeadheadMiles`, `minRatePerMile`, `mpg` from `DRIVER_CLASSES`, fuel `D
 | GET | `/notifications?unread=1&limit=50` | signed in | – | `NotificationsResponse` newest first |
 |---|---|---|---|---|
 | POST | `/notifications/read` | signed in | `{ids?: string[]}` (omit = all) | `{unreadCount}` |
-| GET | `/events` | signed in | – | SSE stream (`eventsHandler` from `server/events.ts`) |
+| GET | `/events` | signed in | – | SSE stream (`eventsHandler(ctx)` from `server/events.ts`). Ends when its session is signed out or expires (see conventions); a reconnect with that cookie then gets 401. |
 
 ### Saved searches / load alerts — `routes/savedSearches.ts` (`/api/saved-searches`, drivers)
 | GET | `/` | `SavedSearch[]` newest first |
@@ -105,37 +114,37 @@ Both: `maxDeadheadMiles`, `minRatePerMile`, `mpg` from `DRIVER_CLASSES`, fuel `D
 | Method | Path | Who | Notes |
 |---|---|---|---|
 | GET | `/` | signed in | Query = `LoadSearchFilters` as strings (`equipment` and `destinationStates` comma-separated, booleans `true/false/1/0`) + `limit` (default 50, max 200) + `offset`. Only `status='open'` and `pickup_end >= now`. Drivers: each load gets `match = matchLoad(load, profile, {now})`; ineligible loads dropped unless `includeIneligible`; `originCityId+originRadiusMiles` filters by road miles from that city (and then the deadhead limit is soft, `ignoreDeadheadLimit: true`, because the driver is planning a run from there); `minRatePerMile` compares the posted `ratePerMile`; `q` matches commodity/notes/reference/shipper/origin/destination after `normalizeSearchText` (case, punctuation and apostrophes ignored), with places in every `cityNameForms` spelling plus state code or name ("st louis", "saint louis missouri", "ft worth tx"); a match never spans two fields, and a `q` with nothing searchable left is no filter. Sorts: `best` (default for drivers, `compareMatches`), `rate` (ratePerMile desc), `deadhead` (asc, nulls last), `pickup` (pickupStart asc), `newest` (default for shippers), `profit` (estimatedProfitUsd desc). If the driver profile is incomplete, matches are null and `driverProfileComplete=false`. Response `LoadListResponse`. |
-| GET | `/:id` | signed in | `LoadDetailResponse`. Open loads are visible to everyone signed in. Non-open loads only to the owning shipper, the booked driver, and drivers who have a booking row on it; otherwise 404. Drivers get `match` (with `ignoreDeadheadLimit: true`) and `myBooking`; the booked driver also gets `shipperPhone`. |
+| GET | `/:id` | signed in | `LoadDetailResponse`. Open loads are visible to everyone signed in. Non-open loads only to the owning shipper, the booked driver, drivers who have a booking row on it, and drivers in a message thread about it (`canViewLoad` in `server/visibility.ts`, the same rule the message routes use); otherwise 404. `bookedDriverId`/`bookedRateUsd` are null unless the viewer is the shipper or the booked driver. Drivers get `match` (with `ignoreDeadheadLimit: true`) and `myBooking`; the booked driver also gets `shipperPhone`. |
 | POST | `/` | shipper | Body: `{originCityId, destinationCityId, pickupStart, pickupEnd, deliveryBy?, equipmentTypes (≥1), weightLbs (1–200000), lengthFt (1–100), commodity (1–120), notes? (≤2000), loadSize = 'full', hazmat = false, tarpRequired = false, teamRequired = false, rateUsd (50–100000), bookingMode = 'request', referenceNumber? (≤40)}`. Rules: origin ≠ destination; pickupEnd ≥ pickupStart; pickupEnd > now; deliveryBy ≥ pickupStart. `miles = roadMiles(origin, destination)`. After insert call `alertDriversForLoad(ctx, load)` (server/alerts.ts). 201 `Load`. |
-| PATCH | `/:id` | owning shipper | Same fields, all optional. Only while `open`. Recompute miles. Notify drivers with pending requests that the load changed (`load_status`). |
+| PATCH | `/:id` | owning shipper | Same fields, all optional. Only while `open`. Recompute miles. Pending requests keep the terms they were made on: if the **lane** (origin or destination), **pickup window** or **delivery deadline** actually changes, every pending request → `cancelled`, and each driver is notified `load_status` "Request cancelled: …" naming what changed and inviting a new request. Otherwise, if `rateUsd` changes, pending requests made at the posted rate (`offer_rate_usd` NULL) are frozen at the old rate, and any request whose offer now equals the new rate becomes NULL (taking the posted rate); drivers with pending requests are notified `load_status` "Load updated: …" naming the new and old rate and what their request stands at. Other edits notify them the same way; accept re-checks their fit. |
 | POST | `/:id/cancel` | owning shipper | `open` or `booked` only (409 otherwise). Pending/accepted bookings → `cancelled`, notify those drivers (`load_cancelled`). Returns `Load`. |
 | POST | `/:id/book` | driver | Body `{message? (≤500), offerRateUsd? (50–100000)}`. Load must be open (409), profile complete (422 `profile_incomplete`), and every hard check of `matchLoad(..., {ignoreDeadheadLimit: true})` must pass (422 `not_eligible`, `details` = failed checks). One live booking per driver per load (409). **Instant** mode with no counter-offer → booking `accepted`, load `booked` (`booked_driver_id`, `booked_rate_usd = rateUsd`), other pending requests → `declined` + notified, shipper notified `load_booked`. Otherwise → booking `pending`, shipper notified `booking_request`. 201 `BookLoadResponse`. All in one transaction that re-checks status. |
 | POST | `/:id/status` | booked driver | `{status: 'in_transit' | 'delivered'}`; allowed `booked→in_transit` (sets `picked_up_at`) and `in_transit→delivered` (sets `delivered_at`, driver `completed_loads + 1`). Notify shipper `load_status`. Returns `Load`. |
 | GET | `/:id/backhauls` | driver | Open loads whose origin is within 150 road miles of this load's destination, matched as if the driver is at the destination and available at `deliveryBy ?? pickupEnd + transitHours(miles)`, `ignoreDeadheadLimit: true`; eligible only; best first; max 10. `LoadWithMatch[]`. |
 | GET | `/:id/recommended-drivers` | owning shipper | Drivers with complete profiles and `available`, `matchLoad(load, driver, {ignoreDeadheadLimit: true})`, eligible only, best first, max 20, excluding drivers with a live booking on the load. `RecommendedDriver[]`. |
-| POST | `/:id/invite` | owning shipper | `{driverId, message?}` → notify that driver (`load_match`, link to the load). Load must be open. 204. |
-| GET | `/:id/bookings` | owning shipper | `Booking[]` newest first, each with `driver` (summary incl. phone) and `match`. |
+| POST | `/:id/invite` | owning shipper | `{driverId, message?}` → notify that driver (`load_match`, link to the load). Load must be open with its pickup window not yet passed (409 otherwise). 204. |
+| GET | `/:id/bookings` | owning shipper | `Booking[]` newest first, each with `driver` (summary incl. phone) and `match` (`withDriverAndMatch`: the load judged as open; a pending request is scored as of now, a settled one as of its `createdAt`, so it keeps its fit after the window closes). |
 
 ### Shipper — `routes/shipper.ts` (`/api/shipper`, shippers)
 | GET | `/loads?status=` | `Load[]` owned by the shipper, newest first. `status` = a `LoadStatus` or `active` (open+booked+in_transit). |
 |---|---|---|
-| GET | `/stats` | `ShipperStats` |
+| GET | `/stats` | `ShipperStats`. `open` counts open loads still on the board; `expired` counts loads still `open` whose `pickupEnd` has passed (off the board until the shipper sets a new window or cancels). `/loads?status=open|active` still lists those loads. |
 
 ### Bookings — `routes/bookings.ts` (`/api/bookings`)
 | Method | Path | Who | Notes |
 |---|---|---|---|
 | GET | `/?status=` | signed in | Drivers: their bookings with `load`. Shippers: bookings on their loads with `load`, `driver`, `match`. Newest first. |
-| POST | `/:id/accept` | owning shipper | Booking `pending` and load `open` (409 otherwise). Booking → `accepted`; load → `booked` with `booked_rate_usd = offerRateUsd ?? rateUsd`; other pending requests → `declined` (notify each); notify driver `booking_accepted`; publish `load_updated`/`booking_updated`. Returns `BookLoadResponse`. |
+| POST | `/:id/accept` | owning shipper | Booking `pending` and load `open` (409 otherwise). Then the same rule as `/book`, against the load and the driver's profile as they are now: profile complete (422 `profile_incomplete`) and every hard check of `matchLoad(..., {ignoreDeadheadLimit: true})` passes, pickup window included (422 `not_eligible` "This driver no longer fits the load: …", `details` = failed checks). Booking → `accepted`; load → `booked` with `booked_rate_usd = offerRateUsd ?? rateUsd`; other pending requests → `declined` (notify each); notify driver `booking_accepted`; publish `load_updated`/`booking_updated`. Returns `BookLoadResponse`. |
 | POST | `/:id/decline` | owning shipper | `pending` only. Notify driver `booking_declined`. Returns `Booking`. |
-| POST | `/:id/withdraw` | the booking's driver | `pending`, or `accepted` while load is still `booked` (not picked up). Accepted withdraw reopens the load (`open`, clears booked driver/rate). Notify shipper `booking_withdrawn`. Returns `Booking`. |
+| POST | `/:id/withdraw` | the booking's driver | `pending`, or `accepted` while load is still `booked` (not picked up). Accepted withdraw reopens the load (`open`, clears booked driver/rate), even after the pickup window. Notify shipper `booking_withdrawn`; when the window has passed the message says to set a new pickup window or cancel. Returns `Booking`. |
 
 ### Messages — `routes/messages.ts` (mounted at `/api`)
 A thread is one load + one driver. Shippers see threads on loads they own; drivers see their own.
 | GET | `/threads` | `Thread[]` sorted by last activity |
 |---|---|---|
-| GET | `/loads/:loadId/messages?driverId=` | `Message[]` oldest first; drivers omit `driverId` (self). Marks the counterpart's messages read. |
-| POST | `/loads/:loadId/messages` | `{body (1–2000), driverId? (required for shippers)}` → 201 `Message`. A driver may message about any load visible to them. A shipper may only message about loads they own, to a driver who is a driver account. Publishes `{type:'message'}` to the other side and `notify`s them (`message`). |
-| POST | `/loads/:loadId/messages/read` | `{driverId?}` → 204 |
+| GET | `/loads/:loadId/messages?driverId=&limit=&before=` | `Message[]`: the newest `limit` messages (default 100, max 200), returned oldest first; drivers omit `driverId` (self). `before` = id of the oldest message the client has; the page holds the messages just before it (400 if it is not a message in this thread). A page shorter than `limit` reaches the start. No side effects: it does **not** mark anything read (a GET can be triggered cross-site). |
+| POST | `/loads/:loadId/messages` | `{body (1–2000), driverId? (required for shippers)}` → 201 `Message`. A driver may message about any load visible to them (`driverCanSeeLoad`). A shipper may only message about loads they own, to a driver who is a driver account. Each user may send 30 messages per minute across all threads (429 `too_many_messages` with `Retry-After`). Publishes `{type:'message'}` to the other side and `notify`s them (`message`). |
+| POST | `/loads/:loadId/messages/read` | `{driverId?}` → 204. The only way to mark the counterpart's messages read: clients call it when a thread opens and when new messages are seen. |
 
 ### Alerts — `server/alerts.ts`
 `alertDriversForLoad(ctx, load)`: for each saved search with alerts on whose filters match the new load

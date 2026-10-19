@@ -24,11 +24,15 @@ function shipperLoads(db: Db, shipperId: string, status: LoadStatus | 'active' |
   return rows.map((row) => toLoad(row, shipperId));
 }
 
-function shipperStats(db: Db, shipperId: string): ShipperStats {
+function shipperStats(db: Db, shipperId: string, now: Date): ShipperStats {
   const counts = db
     .prepare('SELECT status, COUNT(*) AS n FROM loads WHERE shipper_id = ? GROUP BY status')
     .all(shipperId) as { status: LoadStatus; n: number }[];
   const byStatus = new Map(counts.map((c) => [c.status, Number(c.n)]));
+  // Open loads whose pickup window has closed are off the board (search and booking skip them).
+  const { n: expired } = db
+    .prepare(`SELECT COUNT(*) AS n FROM loads WHERE shipper_id = ? AND status = 'open' AND pickup_end < ?`)
+    .get(shipperId, now.toISOString()) as { n: number };
   const { n: pendingRequests } = db
     .prepare(
       `SELECT COUNT(*) AS n FROM bookings b JOIN loads l ON l.id = b.load_id
@@ -36,7 +40,8 @@ function shipperStats(db: Db, shipperId: string): ShipperStats {
     )
     .get(shipperId) as { n: number };
   return {
-    open: byStatus.get('open') ?? 0,
+    open: (byStatus.get('open') ?? 0) - Number(expired),
+    expired: Number(expired),
     booked: byStatus.get('booked') ?? 0,
     inTransit: byStatus.get('in_transit') ?? 0,
     delivered: byStatus.get('delivered') ?? 0,
@@ -55,7 +60,7 @@ export function shipperRouter(ctx: AppContext): Router {
   });
 
   router.get('/stats', (req, res) => {
-    res.json(shipperStats(ctx.db, currentUser(req).id));
+    res.json(shipperStats(ctx.db, currentUser(req).id, ctx.now()));
   });
 
   return router;

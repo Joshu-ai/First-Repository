@@ -602,6 +602,88 @@ describe('PATCH /api/loads/:id', () => {
     expect(notificationsFor(t, shipper.user.id)).toEqual([]);
   });
 
+  it('keeps each waiting request at the rate it was made at when the shipper changes the rate', async () => {
+    const atPosted = seedUser(t, { role: 'driver', name: 'Jake Morales' });
+    const countered = seedUser(t, { role: 'driver' });
+    const postedId = insertBooking(t, load.id, atPosted.user.id);
+    const counterId = insertBooking(t, load.id, countered.user.id, 'pending', 1_500);
+    const offerOf = (id: string) =>
+      (t.db.prepare('SELECT offer_rate_usd FROM bookings WHERE id = ?').get(id) as { offer_rate_usd: number | null }).offer_rate_usd;
+
+    expect((await shipper.c.patch(`/api/loads/${load.id}`, { rateUsd: 500 })).status).toBe(200);
+    expect(offerOf(postedId)).toBe(1_400);
+    expect(offerOf(counterId)).toBe(1_500);
+    expect(bookingStatus(t, postedId)).toBe('pending');
+    expect(notificationsFor(t, atPosted.user.id)).toEqual([
+      {
+        type: 'load_status',
+        title: 'Load updated: Houston, TX → Odessa, TX',
+        body: 'Lone Star Oilfield Supply changed the details: the rate is now $500 (was $1,400). Your request stands at $1,400.',
+        link: `/driver/loads/${load.id}`,
+      },
+    ]);
+
+    // Accepting books the driver at what they asked for, never at the cut rate.
+    const accepted = await shipper.c.post(`/api/bookings/${postedId}/accept`);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.load).toMatchObject({ status: 'booked', rateUsd: 500, bookedRateUsd: 1_400 });
+    expect(notificationsFor(t, atPosted.user.id).at(-1)!.body).toBe('Lone Star Oilfield Supply accepted your request at $1,400.');
+  });
+
+  it('reads a request that matches the new rate as taking it, and says how to take a raise', async () => {
+    const atPosted = seedUser(t, { role: 'driver' });
+    const countered = seedUser(t, { role: 'driver' });
+    const postedId = insertBooking(t, load.id, atPosted.user.id);
+    const counterId = insertBooking(t, load.id, countered.user.id, 'pending', 1_500);
+    await shipper.c.patch(`/api/loads/${load.id}`, { rateUsd: 1_500 });
+
+    const bookings = (await shipper.c.get(`/api/loads/${load.id}/bookings`)).body as Booking[];
+    expect(Object.fromEntries(bookings.map((b) => [b.id, b.offerRateUsd]))).toEqual({ [postedId]: 1_400, [counterId]: null });
+    expect(notificationsFor(t, atPosted.user.id)[0].body).toBe(
+      'Lone Star Oilfield Supply changed the details: the rate is now $1,500 (was $1,400). Your request stands at $1,400. ' +
+        'Withdraw it and send a new one to take the new rate.',
+    );
+    expect(notificationsFor(t, countered.user.id)[0].body).toContain('Your request stands at $1,500.');
+  });
+
+  it('cancels waiting requests when the lane, pickup window or delivery deadline changes', async () => {
+    const pending = seedUser(t, { role: 'driver' });
+    const declined = seedUser(t, { role: 'driver' });
+    const pendingId = insertBooking(t, load.id, pending.user.id);
+    const declinedId = insertBooking(t, load.id, declined.user.id, 'declined');
+
+    // Sending the same window again changes nothing that matters.
+    await shipper.c.patch(`/api/loads/${load.id}`, { pickupStart: load.pickupStart, pickupEnd: load.pickupEnd });
+    expect(bookingStatus(t, pendingId)).toBe('pending');
+
+    const res = await shipper.c.patch(`/api/loads/${load.id}`, { pickupStart: at(t, 30), pickupEnd: at(t, 40) });
+    expect(res.status).toBe(200);
+    expect(res.body.pendingRequestCount).toBe(0);
+    expect(bookingStatus(t, pendingId)).toBe('cancelled');
+    expect(bookingStatus(t, declinedId)).toBe('declined');
+    expect(notificationsFor(t, pending.user.id).at(-1)).toEqual({
+      type: 'load_status',
+      title: 'Request cancelled: Houston, TX → Odessa, TX',
+      body: 'Lone Star Oilfield Supply changed the pickup window, so your request was cancelled. Send a new one if the new terms work for you.',
+      link: `/driver/loads/${load.id}`,
+    });
+    expect(notificationsFor(t, declined.user.id)).toEqual([]);
+
+    // The driver can ask again on the new terms.
+    expect((await pending.c.post(`/api/loads/${load.id}/book`)).status).toBe(201);
+    await shipper.c.patch(`/api/loads/${load.id}`, { destinationCityId: 'midland-tx', deliveryBy: at(t, 60) });
+    expect(notificationsFor(t, pending.user.id).at(-1)).toMatchObject({
+      title: 'Request cancelled: Houston, TX → Midland, TX',
+      body: expect.stringContaining('changed the lane and delivery deadline, so your request was cancelled'),
+    });
+    // Newest first: the second request, the declined one, then the first request.
+    expect((await shipper.c.get(`/api/loads/${load.id}/bookings`)).body.map((b: Booking) => b.status)).toEqual([
+      'cancelled',
+      'declined',
+      'cancelled',
+    ]);
+  });
+
   it('treats an empty edit as a no-op', async () => {
     const pending = seedUser(t, { role: 'driver' });
     insertBooking(t, load.id, pending.user.id, 'pending');
@@ -859,6 +941,14 @@ describe('POST /api/loads/:id/invite', () => {
     expect((await shipper.c.post(`/api/loads/${booked.id}/invite`, { driverId: driver.user.id })).status).toBe(409);
     expect(notificationsFor(t, driver.user.id)).toEqual([]);
   });
+
+  it('refuses to offer an open load whose pickup window has passed', async () => {
+    t.clock.advance(31);
+    const res = await shipper.c.post(`/api/loads/${load.id}/invite`, { driverId: driver.user.id });
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toMatch(/pickup window has passed/i);
+    expect(notificationsFor(t, driver.user.id)).toEqual([]);
+  });
 });
 
 describe('shipper views', () => {
@@ -910,6 +1000,7 @@ describe('shipper views', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       open: 2,
+      expired: 0,
       booked: 1,
       inTransit: 1,
       delivered: 1,
@@ -919,12 +1010,25 @@ describe('shipper views', () => {
     const fresh = seedUser(t, { role: 'shipper' });
     expect((await fresh.c.get('/api/shipper/stats')).body).toEqual({
       open: 0,
+      expired: 0,
       booked: 0,
       inTransit: 0,
       delivered: 0,
       cancelled: 0,
       pendingRequests: 0,
     });
+  });
+
+  it('counts open loads whose pickup window has passed as expired, not open, and still lists them', async () => {
+    const stale = insertLoad(t, shipper.user.id, { pickupStart: at(t, -30), pickupEnd: at(t, -2) });
+    const stats = (await shipper.c.get('/api/shipper/stats')).body as ShipperStats;
+    expect(stats).toMatchObject({ open: 2, expired: 1 });
+    // The shipper still needs it in the list to move the window or cancel it.
+    const active = (await shipper.c.get('/api/shipper/loads?status=active')).body as Load[];
+    expect(active.map((l) => l.id)).toContain(stale.id);
+
+    t.clock.advance(31);
+    expect((await shipper.c.get('/api/shipper/stats')).body).toMatchObject({ open: 0, expired: 3 });
   });
 
   it('is only for shippers', async () => {

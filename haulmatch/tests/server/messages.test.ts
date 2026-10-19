@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '../../shared/api';
 import type { AppNotification, Message, ServerEvent, Thread } from '../../shared/types';
 import { createSession } from '../../server/auth';
+import { MESSAGE_PAGE_MAX, MESSAGE_PAGE_SIZE, MESSAGES_PER_MINUTE } from '../../server/routes/messages';
 import { client, createTestApp, insertLoad, seedUser, type TestApp } from '../helpers';
 
 type Seeded = ReturnType<typeof seedUser>;
@@ -136,17 +137,27 @@ describe('messages between a driver and a shipper', () => {
     });
   });
 
-  it('marks only the counterpart messages read when a thread is opened', async () => {
+  // This test used to expect GET to mark the thread read. A GET can be fired cross-site (SameSite=Lax
+  // sends the cookie on a top-level navigation), so reading now changes nothing and POST /read marks.
+  it('leaves a thread unread when it is fetched, and POST /read marks only the counterpart messages', async () => {
     const load = insertLoad(t, shipper.user.id);
     await driver.c.post(`/api/loads/${load.id}/messages`, { body: 'One' });
     t.clock.advance(0.1);
     await driver.c.post(`/api/loads/${load.id}/messages`, { body: 'Two' });
     t.clock.advance(0.1);
 
-    const opened = await shipper.c.get(`/api/loads/${load.id}/messages?driverId=${driver.user.id}`);
+    const thread = `/api/loads/${load.id}/messages?driverId=${driver.user.id}`;
+    const opened = await shipper.c.get(thread);
     expect(opened.status).toBe(200);
-    const readAt = t.clock.now().toISOString();
     expect(opened.body.map((m: Message) => [m.body, m.readAt])).toEqual([
+      ['One', null],
+      ['Two', null],
+    ]);
+    expect((await threadsOf(shipper))[0].unreadCount).toBe(2);
+
+    expect((await shipper.c.post(`/api/loads/${load.id}/messages/read`, { driverId: driver.user.id })).status).toBe(204);
+    const readAt = t.clock.now().toISOString();
+    expect((await shipper.c.get(thread)).body.map((m: Message) => [m.body, m.readAt])).toEqual([
       ['One', readAt],
       ['Two', readAt],
     ]);
@@ -154,11 +165,13 @@ describe('messages between a driver and a shipper', () => {
 
     t.clock.advance(0.1);
     await shipper.c.post(`/api/loads/${load.id}/messages`, { body: 'Yes, 6am works', driverId: driver.user.id });
+    expect((await driver.c.get(`/api/loads/${load.id}/messages`)).status).toBe(200);
     expect((await threadsOf(driver))[0].unreadCount).toBe(1);
     expect((await threadsOf(shipper))[0].unreadCount).toBe(0);
 
     // Reading as the driver leaves the driver's own messages alone.
     t.clock.advance(0.1);
+    await driver.c.post(`/api/loads/${load.id}/messages/read`);
     const driverView = await driver.c.get(`/api/loads/${load.id}/messages`);
     expect(driverView.body.map((m: Message) => [m.body, m.readAt])).toEqual([
       ['One', readAt],
@@ -302,6 +315,28 @@ describe('who may message about a load', () => {
     expect((await driver.c.get(`/api/loads/${load.id}/messages`)).body).toHaveLength(3);
   });
 
+  it('lets a driver open the load of a thread they are in, even after someone else covers it', async () => {
+    const load = insertLoad(t, shipper.user.id, { bookingMode: 'instant' });
+    expect((await send(driver, load.id, { body: 'Is the gate open Sunday?' })).status).toBe(201);
+    expect((await other.c.post(`/api/loads/${load.id}/book`)).status).toBe(201);
+    expect((await send(shipper, load.id, { driverId: driver.user.id, body: 'Sorry, just got covered' })).status).toBe(201);
+
+    const [thread] = await threadsOf(driver);
+    expect(thread.load.status).toBe('booked');
+    const detail = await driver.c.get(`/api/loads/${load.id}`);
+    expect(detail.status).toBe(200);
+    // They can follow the thread's link, but who took it, and for how much, stays private.
+    expect(detail.body.load).toMatchObject({ id: load.id, status: 'booked', bookedDriverId: null, bookedRateUsd: null });
+    expect(detail.body.myBooking).toBeNull();
+    expect(detail.body.bookedDriver).toBeNull();
+
+    // A shipper reaching out to an uninvolved driver about a covered load lets them open it too.
+    const third = seedUser(t, { role: 'driver' });
+    expect((await third.c.get(`/api/loads/${load.id}`)).status).toBe(404);
+    expect((await send(shipper, load.id, { driverId: third.user.id, body: 'Same lane again next week?' })).status).toBe(201);
+    expect((await third.c.get(`/api/loads/${load.id}`)).status).toBe(200);
+  });
+
   it('only lets drivers write in their own thread', async () => {
     const load = insertLoad(t, shipper.user.id);
     const res = await send(driver, load.id, { driverId: other.user.id });
@@ -369,6 +404,105 @@ describe('who may message about a load', () => {
     const res = await driver.c.agent.post(`/api/loads/${load.id}/messages`).send({ body: 'hi' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('csrf');
+  });
+});
+
+/** Stores `count` messages straight into a thread, three per second, so some share a timestamp. */
+function insertMessages(t: TestApp, loadId: string, driverId: string, senderIds: string[], count: number): void {
+  const start = t.clock.now().getTime();
+  const insert = t.db.prepare(
+    'INSERT INTO messages (id, load_id, driver_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  for (let i = 0; i < count; i += 1) {
+    const createdAt = new Date(start + Math.floor(i / 3) * 1_000).toISOString();
+    insert.run(randomUUID(), loadId, driverId, senderIds[i % senderIds.length], `m${i}`, createdAt);
+  }
+}
+
+const bodies = (res: { body: Message[] }) => res.body.map((m) => m.body);
+const range = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => `m${from + i}`);
+
+describe('paging a long conversation', () => {
+  let t: TestApp;
+  let shipper: Seeded;
+  let driver: Seeded;
+  let load: ReturnType<typeof insertLoad>;
+  let url: string;
+  beforeEach(() => {
+    t = createTestApp();
+    shipper = seedUser(t, { role: 'shipper' });
+    driver = seedUser(t, { role: 'driver' });
+    load = insertLoad(t, shipper.user.id);
+    url = `/api/loads/${load.id}/messages`;
+    insertMessages(t, load.id, driver.user.id, [driver.user.id, shipper.user.id], 250);
+  });
+
+  it(`returns the newest ${MESSAGE_PAGE_SIZE} messages by default, oldest first`, async () => {
+    const res = await driver.c.get(url);
+    expect(res.status).toBe(200);
+    expect(bodies(res)).toEqual(range(150, 250));
+    expect(bodies(await shipper.c.get(`${url}?driverId=${driver.user.id}`))).toEqual(range(150, 250));
+  });
+
+  it('pages back with before=<id of the oldest message> until a page comes back short', async () => {
+    const first = await driver.c.get(`${url}?limit=100`);
+    expect(bodies(first)).toEqual(range(150, 250));
+    const second = await driver.c.get(`${url}?limit=100&before=${first.body[0].id}`);
+    expect(bodies(second)).toEqual(range(50, 150));
+    const third = await driver.c.get(`${url}?limit=100&before=${second.body[0].id}`);
+    expect(bodies(third)).toEqual(range(0, 50));
+    expect((await driver.c.get(`${url}?before=${third.body[0].id}`)).body).toEqual([]);
+    // Small pages split messages that share a timestamp without losing or repeating any.
+    const small = await driver.c.get(`${url}?limit=2&before=${first.body[1].id}`);
+    expect(bodies(small)).toEqual(['m149', 'm150']);
+  });
+
+  it(`allows up to ${MESSAGE_PAGE_MAX} per page and validates the query`, async () => {
+    expect(bodies(await driver.c.get(`${url}?limit=${MESSAGE_PAGE_MAX}`))).toEqual(range(50, 250));
+    for (const query of [`limit=${MESSAGE_PAGE_MAX + 1}`, 'limit=0', 'limit=lots', `before=${randomUUID()}`]) {
+      const res = await driver.c.get(`${url}?${query}`);
+      expect(res.status, query).toBe(400);
+      expect(res.body.error.code).toBe('validation_error');
+    }
+    // A cursor from someone else's thread is not a message in this one.
+    const other = seedUser(t, { role: 'driver' });
+    const theirs = (await other.c.post(url, { body: 'Mine' })).body as Message;
+    const res = await driver.c.get(`${url}?before=${theirs.id}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error.details).toEqual([expect.objectContaining({ path: 'before' })]);
+  });
+});
+
+describe('sending limits', () => {
+  let t: TestApp;
+  beforeEach(() => {
+    t = createTestApp();
+  });
+
+  it(`lets one person send ${MESSAGES_PER_MINUTE} messages a minute across all their threads`, async () => {
+    const shipper = seedUser(t, { role: 'shipper' });
+    const driver = seedUser(t, { role: 'driver' });
+    const other = seedUser(t, { role: 'driver' });
+    const loadA = insertLoad(t, shipper.user.id);
+    const loadB = insertLoad(t, shipper.user.id);
+    for (let i = 0; i < MESSAGES_PER_MINUTE; i += 1) {
+      expect((await driver.c.post(`/api/loads/${(i % 2 ? loadA : loadB).id}/messages`, { body: `msg ${i}` })).status).toBe(201);
+    }
+    const refused = await driver.c.post(`/api/loads/${loadA.id}/messages`, { body: 'one too many' });
+    expect(refused.status).toBe(429);
+    expect(refused.body.error.code).toBe('too_many_messages');
+    expect(refused.headers['retry-after']).toBe('60');
+    expect((await driver.c.post(`/api/loads/${loadB.id}/messages`, { body: 'other thread' })).status).toBe(429);
+    const count = () => (t.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE sender_id = ?').get(driver.user.id) as { n: number }).n;
+    expect(count()).toBe(MESSAGES_PER_MINUTE);
+
+    // Other people are not held up, and the driver can go again once the minute is up.
+    expect((await other.c.post(`/api/loads/${loadA.id}/messages`, { body: 'Hi' })).status).toBe(201);
+    expect((await shipper.c.post(`/api/loads/${loadA.id}/messages`, { body: 'Slow down', driverId: driver.user.id })).status).toBe(
+      201,
+    );
+    t.clock.advance(1 / 60);
+    expect((await driver.c.post(`/api/loads/${loadA.id}/messages`, { body: 'Sorry' })).status).toBe(201);
   });
 });
 

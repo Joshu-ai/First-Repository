@@ -128,12 +128,16 @@ SELECT l.*, u.name AS shipper_name, u.company AS shipper_company,
 FROM loads l JOIN users u ON u.id = l.shipper_id`;
 
 /**
- * @param viewerId pendingRequestCount is only revealed to the shipper who owns the load.
+ * @param viewerId Who will see the load. pendingRequestCount is only revealed to the shipper who owns
+ * it, and who has it booked (and at what rate) only to that shipper and the booked driver, never to
+ * drivers who lost it. Omit the viewer for internal reads that need the raw values.
  */
 export function toLoad(row: Row, viewerId?: string | null): Load {
   const miles = Math.max(1, num(row.miles));
   const rateUsd = num(row.rate_usd);
   const shipperId = str(row.shipper_id);
+  const bookedDriverId = strOrNull(row.booked_driver_id);
+  const seesBooking = viewerId == null || viewerId === shipperId || viewerId === bookedDriverId;
   return {
     id: str(row.id),
     shipperId,
@@ -159,8 +163,8 @@ export function toLoad(row: Row, viewerId?: string | null): Load {
     ratePerMile: Math.round((rateUsd / miles) * 100) / 100,
     bookingMode: str(row.booking_mode) as BookingMode,
     referenceNumber: strOrNull(row.reference_number),
-    bookedDriverId: strOrNull(row.booked_driver_id),
-    bookedRateUsd: numOrNull(row.booked_rate_usd),
+    bookedDriverId: seesBooking ? bookedDriverId : null,
+    bookedRateUsd: seesBooking ? numOrNull(row.booked_rate_usd) : null,
     pendingRequestCount: viewerId && viewerId === shipperId ? num(row.pending_count) : 0,
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),

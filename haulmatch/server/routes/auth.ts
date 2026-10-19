@@ -15,13 +15,13 @@ import {
 } from '../auth';
 import type { AppContext } from '../context';
 import { bool, transaction, type Db } from '../db';
+import { closeSessionStreams } from '../events';
 import { HttpError, parse } from '../http';
 import { getDriverProfile, getUserById } from '../mappers';
+import { createThrottle, type Throttle } from '../throttle';
 
-const THROTTLE_MAX_FAILURES = 10;
-const THROTTLE_WINDOW_MS = 15 * 60_000;
-/** Sweep stale throttle entries once the map grows past this, so it cannot grow without bound. */
-const THROTTLE_SWEEP_SIZE = 1_000;
+const LOGIN_MAX_FAILURES = 10;
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60_000;
 
 const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email('Enter a valid email address'));
 const passwordSchema = z.string().min(8, 'Use at least 8 characters').max(200);
@@ -72,46 +72,16 @@ const changePasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
-/** In-memory failed-login counter keyed by lowercased email. Per app instance, so tests stay isolated. */
-function createLoginThrottle(now: () => Date) {
-  const failures = new Map<string, number[]>();
-
-  const recent = (key: string): number[] => {
-    const cutoff = now().getTime() - THROTTLE_WINDOW_MS;
-    const kept = (failures.get(key) ?? []).filter((t) => t > cutoff);
-    if (kept.length > 0) failures.set(key, kept);
-    else failures.delete(key);
-    return kept;
-  };
-
-  const sweep = () => {
-    for (const key of [...failures.keys()]) recent(key);
-  };
-
-  return {
-    /** Seconds until another attempt is allowed, or 0 when not blocked. */
-    retryAfterSeconds(key: string): number {
-      const kept = recent(key);
-      if (kept.length < THROTTLE_MAX_FAILURES) return 0;
-      const unblockAt = kept[kept.length - THROTTLE_MAX_FAILURES] + THROTTLE_WINDOW_MS;
-      return Math.max(1, Math.ceil((unblockAt - now().getTime()) / 1000));
-    },
-    recordFailure(key: string): void {
-      if (failures.size >= THROTTLE_SWEEP_SIZE) sweep();
-      failures.set(key, [...recent(key), now().getTime()]);
-    },
-    clear(key: string): void {
-      failures.delete(key);
-    },
-  };
-}
-
-type LoginThrottle = ReturnType<typeof createLoginThrottle>;
-
-function assertNotThrottled(throttle: LoginThrottle, key: string, res: Response): void {
-  const retryAfter = throttle.retryAfterSeconds(key);
-  if (retryAfter === 0) return;
-  res.set('Retry-After', String(retryAfter));
+/**
+ * Claims one sign-in attempt for key (a lowercased email) before the password check, or answers 429.
+ * Claiming first means guesses sent all at once count toward the limit too: at most
+ * LOGIN_MAX_FAILURES are ever checked at a time, recorded failures and checks still running together.
+ * Call the returned function once the attempt is over.
+ */
+function claimAttempt(throttle: Throttle, key: string, res: Response): () => void {
+  const release = throttle.reserve(key);
+  if (release) return release;
+  res.set('Retry-After', String(Math.max(1, throttle.retryAfterSeconds(key))));
   throw new HttpError(429, 'too_many_attempts', 'Too many failed sign-in attempts. Try again in a few minutes.');
 }
 
@@ -156,7 +126,8 @@ function isUniqueEmailViolation(err: unknown): boolean {
 
 export function authRouter(ctx: AppContext): Router {
   const router = Router();
-  const throttle = createLoginThrottle(ctx.now);
+  // Failed sign-ins per email, shared by login and password change.
+  const throttle = createThrottle({ max: LOGIN_MAX_FAILURES, windowMs: LOGIN_FAILURE_WINDOW_MS, now: ctx.now });
   void getDummyHash();
 
   router.post('/register', async (req, res) => {
@@ -188,15 +159,17 @@ export function authRouter(ctx: AppContext): Router {
 
   router.post('/login', async (req, res) => {
     const { email, password } = parse(loginSchema, req.body);
-    assertNotThrottled(throttle, email, res);
-
-    const row = ctx.db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(email) as
-      | { id: string; password_hash: string }
-      | undefined;
-    const ok = await verifyPassword(password, row?.password_hash ?? (await getDummyHash()));
-    if (!row || !ok) {
-      throttle.recordFailure(email);
-      throw new HttpError(401, 'invalid_credentials', 'Email or password is incorrect');
+    const release = claimAttempt(throttle, email, res);
+    let row: { id: string; password_hash: string } | undefined;
+    try {
+      row = ctx.db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(email) as typeof row;
+      const ok = await verifyPassword(password, row?.password_hash ?? (await getDummyHash()));
+      if (!row || !ok) {
+        throttle.record(email);
+        throw new HttpError(401, 'invalid_credentials', 'Email or password is incorrect');
+      }
+    } finally {
+      release();
     }
 
     throttle.clear(email);
@@ -205,7 +178,7 @@ export function authRouter(ctx: AppContext): Router {
   });
 
   router.post('/logout', (req, res) => {
-    if (req.sessionHash) destroySession(ctx, req.sessionHash);
+    if (req.user && req.sessionHash) destroySession(ctx, req.user.id, req.sessionHash);
     clearSessionCookie(res);
     res.status(204).end();
   });
@@ -233,23 +206,29 @@ export function authRouter(ctx: AppContext): Router {
     const input = parse(changePasswordSchema, req.body);
     const key = user.email.toLowerCase();
     // Shares the login throttle so a stolen session cannot be used to brute-force the password.
-    assertNotThrottled(throttle, key, res);
-
-    const row = ctx.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id) as { password_hash: string };
-    if (!(await verifyPassword(input.currentPassword, row.password_hash))) {
-      throttle.recordFailure(key);
-      throw new HttpError(400, 'invalid_password', 'Current password is incorrect', [
-        { path: 'currentPassword', message: 'Current password is incorrect' },
-      ]);
+    const release = claimAttempt(throttle, key, res);
+    try {
+      const row = ctx.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id) as { password_hash: string };
+      if (!(await verifyPassword(input.currentPassword, row.password_hash))) {
+        throttle.record(key);
+        throw new HttpError(400, 'invalid_password', 'Current password is incorrect', [
+          { path: 'currentPassword', message: 'Current password is incorrect' },
+        ]);
+      }
+    } finally {
+      release();
     }
 
     throttle.clear(key);
     const passwordHash = await hashPassword(input.newPassword);
+    const keep = req.sessionHash ?? '';
     transaction(ctx.db, () => {
       ctx.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, user.id);
       // Sign out every other device; the session making the change stays valid.
-      ctx.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(user.id, req.sessionHash ?? '');
+      ctx.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(user.id, keep);
     });
+    // Live event streams those devices still hold open stop too.
+    closeSessionStreams(user.id, (sessionHash) => sessionHash !== keep);
     res.status(204).end();
   });
 

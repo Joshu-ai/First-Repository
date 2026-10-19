@@ -442,6 +442,53 @@ describe('accepting, declining and withdrawing requests', () => {
     expect(loadRow(t, load.id).booked_driver_id).toBe(driver.user.id);
   });
 
+  it('re-checks that the driver still fits when the shipper changed the load after the request', async () => {
+    // A non-CDL hotshot (16,500 lbs payload) asks for the 9,000 lb load; then it becomes heavy hazmat.
+    const mine = insertBooking(t, load.id, driver.user.id);
+    expect((await shipper.c.patch(`/api/loads/${load.id}`, { weightLbs: 14_000, hazmat: true })).status).toBe(200);
+    const res = await shipper.c.post(`/api/bookings/${mine}/accept`);
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('not_eligible');
+    expect(res.body.error.message).toMatch(/^This driver no longer fits the load: Over 10,000 lbs: needs a CDL/);
+    expect(res.body.error.details).toEqual([
+      expect.objectContaining({ key: 'cdl', ok: false, hard: true }),
+      expect.objectContaining({ key: 'hazmat', ok: false, label: 'Hazmat: needs a CDL with H endorsement' }),
+    ]);
+    expect(bookingStatus(t, mine)).toBe('pending');
+    expect(loadRow(t, load.id)).toEqual({ status: 'open', booked_driver_id: null, booked_rate_usd: null });
+    expect(notificationsFor(t, driver.user.id).map((n) => n.type)).not.toContain('booking_accepted');
+  });
+
+  it("re-checks the driver's rig as it is now", async () => {
+    const mine = insertBooking(t, load.id, driver.user.id);
+    expect(
+      (await driver.c.put('/api/drivers/me/profile', { equipmentTypes: ['HS_BUMPER_PULL'], trailerLengthFt: 20 })).status,
+    ).toBe(200);
+    const res = await shipper.c.post(`/api/bookings/${mine}/accept`);
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('not_eligible');
+    expect(res.body.error.details.map((c: { key: string }) => c.key)).toEqual(['equipment', 'length']);
+
+    t.db.prepare('UPDATE driver_profiles SET current_city_id = NULL WHERE user_id = ?').run(driver.user.id);
+    const incomplete = await shipper.c.post(`/api/bookings/${mine}/accept`);
+    expect(incomplete.status).toBe(422);
+    expect(incomplete.body.error.code).toBe('profile_incomplete');
+    expect(bookingStatus(t, mine)).toBe('pending');
+  });
+
+  it('refuses to accept once the pickup window has closed', async () => {
+    const mine = insertBooking(t, load.id, driver.user.id);
+    t.clock.advance(48);
+    const res = await shipper.c.post(`/api/bookings/${mine}/accept`);
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('not_eligible');
+    expect(res.body.error.message).toBe('This driver no longer fits the load: Pickup window has passed');
+    expect(res.body.error.details).toContainEqual(
+      expect.objectContaining({ key: 'status', ok: false, label: 'Pickup window has passed' }),
+    );
+    expect(loadRow(t, load.id).status).toBe('open');
+  });
+
   it('declines a pending request and tells the driver', async () => {
     const mine = insertBooking(t, load.id, driver.user.id);
     const res = await shipper.c.post(`/api/bookings/${mine}/decline`);
@@ -503,6 +550,22 @@ describe('accepting, declining and withdrawing requests', () => {
     ]);
     // The reopened load can be booked again.
     expect((await rival.c.post(`/api/loads/${load.id}/book`)).status).toBe(201);
+  });
+
+  it('lets a driver drop a load after its pickup window, and tells the shipper to set a new one', async () => {
+    const mine = insertBooking(t, load.id, driver.user.id);
+    await shipper.c.post(`/api/bookings/${mine}/accept`);
+    t.clock.advance(31);
+    const res = await driver.c.post(`/api/bookings/${mine}/withdraw`);
+    expect(res.status).toBe(200);
+    expect(loadRow(t, load.id).status).toBe('open');
+    expect(notificationsFor(t, shipper.user.id)).toEqual([
+      expect.objectContaining({
+        type: 'booking_withdrawn',
+        title: 'Driver dropped: Houston, TX → Odessa, TX',
+        body: 'Jake Morales can no longer haul it, and the pickup window has passed. Set a new pickup window or cancel the load.',
+      }),
+    ]);
   });
 
   it('refuses to withdraw once the load is picked up or the request is settled', async () => {
@@ -607,6 +670,54 @@ describe('listing bookings', () => {
 
     expect((await seedUser(t, { role: 'shipper' }).c.get(`/api/loads/${load.id}/bookings`)).status).toBe(404);
     expect((await driver.c.get(`/api/loads/${load.id}/bookings`)).status).toBe(403);
+  });
+
+  it('keeps the fit of settled requests after the pickup window closes, but not of a live one', async () => {
+    const theirs = insertBooking(t, load.id, rival.user.id);
+    t.clock.advance(1);
+    const mine = insertBooking(t, load.id, driver.user.id);
+    const waiting = insertLoad(t, shipper.user.id, { destinationCityId: 'midland-tx' });
+    const live = insertBooking(t, waiting.id, rival.user.id);
+    await shipper.c.post(`/api/bookings/${mine}/accept`);
+    expect((await driver.c.post(`/api/loads/${load.id}/status`, { status: 'in_transit' })).status).toBe(200);
+    t.clock.advance(40);
+    expect((await driver.c.post(`/api/loads/${load.id}/status`, { status: 'delivered' })).status).toBe(200);
+
+    const list = (await shipper.c.get(`/api/loads/${load.id}/bookings`)).body as Booking[];
+    expect(list.map((b) => [b.id, b.status, b.match!.eligible])).toEqual([
+      [mine, 'accepted', true],
+      [theirs, 'declined', true],
+    ]);
+    for (const booking of list) {
+      expect(booking.match!.score).toBeGreaterThan(0);
+      expect(booking.match!.checks.filter((c) => c.hard && !c.ok)).toEqual([]);
+    }
+    const all = (await shipper.c.get('/api/bookings')).body as Booking[];
+    expect(all.find((b) => b.id === theirs)!.match!.eligible).toBe(true);
+    // A request still waiting is judged as of now, so the shipper sees it can no longer make pickup.
+    const pending = all.find((b) => b.id === live)!;
+    expect(pending.match!.eligible).toBe(false);
+    expect(pending.match!.checks).toContainEqual(expect.objectContaining({ key: 'status', label: 'Pickup window has passed' }));
+  });
+
+  it('hides who won the load, and at what rate, from the drivers who lost it', async () => {
+    const lost = insertBooking(t, load.id, driver.user.id);
+    const won = insertBooking(t, load.id, rival.user.id, 'pending', 1_325);
+    expect((await shipper.c.post(`/api/bookings/${won}/accept`)).status).toBe(200);
+
+    const view = await driver.c.get(`/api/loads/${load.id}`);
+    expect(view.status).toBe(200);
+    expect(view.body.load).toMatchObject({ status: 'booked', bookedDriverId: null, bookedRateUsd: null });
+    expect(view.body.myBooking).toMatchObject({ id: lost, status: 'declined' });
+    expect(view.body.bookedDriver).toBeNull();
+    const [mine] = (await driver.c.get('/api/bookings')).body as Booking[];
+    expect(mine.load).toMatchObject({ status: 'booked', bookedDriverId: null, bookedRateUsd: null });
+
+    // The winner and the shipper still see it.
+    const booked = { bookedDriverId: rival.user.id, bookedRateUsd: 1_325 };
+    expect((await rival.c.get(`/api/loads/${load.id}`)).body.load).toMatchObject(booked);
+    expect((await shipper.c.get(`/api/loads/${load.id}`)).body.load).toMatchObject(booked);
+    expect(((await shipper.c.get('/api/bookings')).body as Booking[])[0].load).toMatchObject(booked);
   });
 
   it('refuses another shipper on an open load with 403', async () => {

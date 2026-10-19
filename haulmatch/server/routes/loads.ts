@@ -45,11 +45,14 @@ import {
 } from '../mappers';
 import {
   commit,
+  failedHardChecks,
   freshLoad,
   getBooking,
   markLoadBooked,
+  setBookingStatus,
   withDriverAndMatch,
 } from './bookings';
+import { canViewLoad } from '../visibility';
 import { shipperKnowsDriver } from './drivers';
 
 type Row = Record<string, unknown>;
@@ -131,19 +134,9 @@ const loadNotOpen = () => conflict('This load is no longer open for booking');
 
 // ---- Visibility ----
 
-const hasBookingOn = (db: Db, loadId: string, driverId: string) =>
-  db.prepare('SELECT 1 FROM bookings WHERE load_id = ? AND driver_id = ? LIMIT 1').get(loadId, driverId) !== undefined;
-
-/** Open loads are public to signed-in users; anything else only to the people involved in it. */
-function canView(db: Db, load: Load, user: User): boolean {
-  if (load.status === 'open') return true;
-  if (user.role === 'shipper') return load.shipperId === user.id;
-  return load.bookedDriverId === user.id || hasBookingOn(db, load.id, user.id);
-}
-
 function visibleLoad(db: Db, id: string, user: User): Load {
   const load = getLoadById(db, id, user.id);
-  if (!load || !canView(db, load, user)) throw notFound('Load');
+  if (!load || !canViewLoad(db, load, user)) throw notFound('Load');
   return load;
 }
 
@@ -235,14 +228,49 @@ function createLoad(ctx: AppContext, shipper: User, fields: LoadFields): Load {
   return getLoadById(ctx.db, id, shipper.id)!;
 }
 
+const sameInstant = (a: string | null, b: string | null) =>
+  a === null || b === null ? a === b : Date.parse(a) === Date.parse(b);
+
+/** And-joined list: "lane", "lane and pickup window", "lane, pickup window and delivery deadline". */
+const andList = (items: string[]) =>
+  items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/**
+ * Where and when the freight moves: the terms a driver planned a request around. Changing any of
+ * them cancels the requests made on the old ones.
+ */
+function scheduleChanges(before: LoadFields, after: LoadFields): string[] {
+  const changes: string[] = [];
+  if (before.originCityId !== after.originCityId || before.destinationCityId !== after.destinationCityId) {
+    changes.push('lane');
+  }
+  if (!sameInstant(before.pickupStart, after.pickupStart) || !sameInstant(before.pickupEnd, after.pickupEnd)) {
+    changes.push('pickup window');
+  }
+  if (!sameInstant(before.deliveryBy, after.deliveryBy)) changes.push('delivery deadline');
+  return changes;
+}
+
+function pendingBookings(db: Db, loadId: string): Booking[] {
+  const rows = db.prepare(`SELECT * FROM bookings WHERE load_id = ? AND status = 'pending'`).all(loadId) as Row[];
+  return rows.map(toBooking);
+}
+
+/**
+ * Edit an open load. Drivers waiting on it keep the terms they asked for: a new lane, pickup window
+ * or delivery deadline cancels their requests (they can ask again on the new terms), and a new rate
+ * leaves each request at the price it was made at. Other changes (specs) are re-checked on accept.
+ */
 function updateLoad(ctx: AppContext, load: Load, update: z.infer<typeof updateSchema>): Load {
   const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
   commit(ctx, (outbox) => {
     const current = freshLoad(ctx.db, load.id);
     if (current.status !== 'open') throw conflict('Only open loads can be edited');
     if (Object.keys(defined).length === 0) return;
-    const next: LoadFields = { ...fieldsOf(current), ...defined };
+    const before = fieldsOf(current);
+    const next: LoadFields = { ...before, ...defined };
     checkLoadRules(next, ctx.now(), update.pickupStart !== undefined || update.pickupEnd !== undefined);
+    const nowIso = ctx.now().toISOString();
     ctx.db
       .prepare(
         `UPDATE loads SET origin_city_id = ?, dest_city_id = ?, pickup_start = ?, pickup_end = ?, delivery_by = ?,
@@ -251,31 +279,53 @@ function updateLoad(ctx: AppContext, load: Load, update: z.infer<typeof updateSc
           updated_at = ?
          WHERE id = ?`,
       )
-      .run(...columnValues(next), ctx.now().toISOString(), load.id);
+      .run(...columnValues(next), nowIso, load.id);
 
-    const waiting = pendingDriverIds(ctx.db, load.id);
-    outbox.loadUpdated(current, [load.shipperId, ...waiting]);
     const lane = laneLabel({
       origin: placeForCityId(next.originCityId)!,
       destination: placeForCityId(next.destinationCityId)!,
     });
-    for (const driverId of waiting) {
-      outbox.notify(driverId, {
-        type: 'load_status',
-        title: `Load updated: ${lane}`,
-        body: `${shipperLabel(current)} changed the details. Check pickup, rate and specs before you roll.`,
-        link: driverLoadLink(load.id),
-      });
+    const shipper = shipperLabel(current);
+    const changed = scheduleChanges(before, next);
+    const rateChanged = next.rateUsd !== before.rateUsd;
+    if (changed.length === 0 && rateChanged) {
+      // A request "at your posted rate" was made at the old rate: keep it there, so accepting never
+      // books a driver at a price they did not ask for. A request that now matches the posted rate
+      // reads as taking it, as when booking.
+      ctx.db
+        .prepare(`UPDATE bookings SET offer_rate_usd = ? WHERE load_id = ? AND status = 'pending' AND offer_rate_usd IS NULL`)
+        .run(before.rateUsd, load.id);
+      ctx.db
+        .prepare(`UPDATE bookings SET offer_rate_usd = NULL WHERE load_id = ? AND status = 'pending' AND offer_rate_usd = ?`)
+        .run(load.id, next.rateUsd);
+    }
+
+    const waiting = pendingBookings(ctx.db, load.id);
+    outbox.loadUpdated(current, [load.shipperId, ...waiting.map((b) => b.driverId)]);
+    for (const booking of waiting) {
+      if (changed.length > 0) {
+        const cancelled = setBookingStatus(ctx, booking, 'cancelled');
+        outbox.bookingUpdated(cancelled, [load.shipperId, booking.driverId]);
+        outbox.notify(booking.driverId, {
+          type: 'load_status',
+          title: `Request cancelled: ${lane}`,
+          body: `${shipper} changed the ${andList(changed)}, so your request was cancelled. Send a new one if the new terms work for you.`,
+          link: driverLoadLink(load.id),
+        });
+        continue;
+      }
+      let body = `${shipper} changed the details. Check pickup, rate and specs before you roll.`;
+      if (rateChanged) {
+        const stands = booking.offerRateUsd ?? next.rateUsd;
+        body =
+          `${shipper} changed the details: the rate is now ${formatUsd(next.rateUsd)} (was ${formatUsd(before.rateUsd)}). ` +
+          `Your request stands at ${formatUsd(stands)}.` +
+          (next.rateUsd > stands ? ' Withdraw it and send a new one to take the new rate.' : '');
+      }
+      outbox.notify(booking.driverId, { type: 'load_status', title: `Load updated: ${lane}`, body, link: driverLoadLink(load.id) });
     }
   });
   return getLoadById(ctx.db, load.id, load.shipperId)!;
-}
-
-function pendingDriverIds(db: Db, loadId: string): string[] {
-  const rows = db
-    .prepare(`SELECT driver_id FROM bookings WHERE load_id = ? AND status = 'pending'`)
-    .all(loadId) as { driver_id: string }[];
-  return rows.map((r) => r.driver_id);
 }
 
 function cancelLoad(ctx: AppContext, load: Load): Load {
@@ -414,19 +464,13 @@ function insertBooking(ctx: AppContext, booking: Omit<Booking, 'createdAt' | 'up
   }
 }
 
-function requireBookableProfile(db: Db, driverId: string): DriverProfile {
-  const profile = getDriverProfile(db, driverId);
-  if (!profile?.profileComplete) {
-    throw new HttpError(422, 'profile_incomplete', 'Finish your rig profile (equipment, capacity and location) before booking');
-  }
-  return profile;
-}
-
 function bookLoad(ctx: AppContext, load: Load, driver: User, input: z.infer<typeof bookSchema>): BookLoadResponse {
   if (load.status !== 'open') throw loadNotOpen();
-  const profile = requireBookableProfile(ctx.db, driver.id);
-  const failed = matchLoad(load, profile, { now: ctx.now(), ignoreDeadheadLimit: true }).checks.filter(
-    (c) => c.hard && !c.ok,
+  const failed = failedHardChecks(
+    ctx,
+    load,
+    getDriverProfile(ctx.db, driver.id),
+    'Finish your rig profile (equipment, capacity and location) before booking',
   );
   if (failed.length > 0) {
     throw new HttpError(422, 'not_eligible', `This load doesn't fit your rig: ${failed[0].label}`, failed);
@@ -557,6 +601,9 @@ function recommendedDrivers(ctx: AppContext, load: Load): RecommendedDriver[] {
 
 function inviteDriver(ctx: AppContext, load: Load, input: z.infer<typeof inviteSchema>): void {
   if (load.status !== 'open') throw conflict('Only open loads can be offered to drivers');
+  if (Date.parse(load.pickupEnd) < ctx.now().getTime()) {
+    throw conflict('The pickup window has passed. Set a new one before offering the load to drivers.');
+  }
   const driver = getUserById(ctx.db, input.driverId);
   if (!driver || driver.role !== 'driver') throw notFound('Driver');
   notify(ctx, driver.id, {

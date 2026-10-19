@@ -2,11 +2,11 @@ import { once } from 'node:events';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Express } from 'express';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_COOKIE } from '../../shared/api';
 import type { AppNotification, SavedSearch, ServerEvent } from '../../shared/types';
 import { createSession } from '../../server/auth';
-import { connectedClientCount, notify } from '../../server/events';
+import { connectedClientCount, notify, SSE_PING_MS } from '../../server/events';
 import { MAX_SAVED_SEARCHES } from '../../server/routes/savedSearches';
 import { client, createTestApp, seedUser, type TestApp } from '../helpers';
 
@@ -21,6 +21,14 @@ async function openEventStream(app: Express, cookie?: string) {
 
   const events: ServerEvent[] = [];
   const listeners = new Set<() => void>();
+  let ended = false;
+  // Resolves when the server ends the response (the session was signed out).
+  const endedPromise = new Promise<void>((resolve) =>
+    res.on('end', () => {
+      ended = true;
+      resolve();
+    }),
+  );
   let buffer = '';
   res.on('data', (chunk: string) => {
     buffer += chunk;
@@ -58,8 +66,17 @@ async function openEventStream(app: Express, cookie?: string) {
     await new Promise((resolve) => server.close(resolve));
   };
 
-  return { status: res.statusCode, headers: res.headers, events, waitFor, close };
+  const waitForEnd = (timeoutMs = 2_000) =>
+    Promise.race([
+      endedPromise,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('stream did not end')), timeoutMs)),
+    ]);
+
+  return { status: res.statusCode, headers: res.headers, events, waitFor, waitForEnd, isEnded: () => ended, close };
 }
+
+/** Lets in-flight socket data arrive before asserting that nothing did. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 const cookieFor = (t: TestApp, userId: string) => `${SESSION_COOKIE}=${createSession({ db: t.db, now: t.clock.now }, userId)}`;
 
@@ -241,6 +258,93 @@ describe('GET /api/events', () => {
     const event = await stream.waitFor((e) => e.type === 'notification');
     expect(event).toEqual({ type: 'notification', notification: sent });
     expect(stream.events.filter((e) => e.type === 'notification')).toHaveLength(1);
+  });
+
+  it('ends the stream of a session that logs out, and sends it nothing more', async () => {
+    const { user } = seedUser(t, { role: 'driver' });
+    const cookie = cookieFor(t, user.id);
+    const other = await openEventStream(t.app, cookieFor(t, user.id));
+    const stream = await openEventStream(t.app, cookie);
+    streams.push(stream, other);
+    await stream.waitFor((e) => e.type === 'hello');
+    await other.waitFor((e) => e.type === 'hello');
+
+    expect((await client(t.app, cookie).post('/api/auth/logout')).status).toBe(204);
+    await stream.waitForEnd();
+    expect(connectedClientCount(user.id)).toBe(1);
+
+    notify({ db: t.db, now: t.clock.now }, user.id, { type: 'message', title: 'Gate code 4471' });
+    await other.waitFor((e) => e.type === 'notification');
+    expect(stream.events.map((e) => e.type)).toEqual(['hello']);
+  });
+
+  it("ends other devices' streams on a password change and keeps this one", async () => {
+    const { user } = seedUser(t, { role: 'driver' });
+    const cookie = cookieFor(t, user.id);
+    const thisDevice = client(t.app, cookie);
+    const mine = await openEventStream(t.app, cookie);
+    const stolen = await openEventStream(t.app, cookieFor(t, user.id));
+    streams.push(mine, stolen);
+    await mine.waitFor((e) => e.type === 'hello');
+    await stolen.waitFor((e) => e.type === 'hello');
+
+    const res = await thisDevice.post('/api/auth/password', {
+      currentPassword: 'correct-horse-battery',
+      newPassword: 'a-brand-new-pass',
+    });
+    expect(res.status).toBe(204);
+    await stolen.waitForEnd();
+    expect(mine.isEnded()).toBe(false);
+    expect(connectedClientCount(user.id)).toBe(1);
+
+    notify({ db: t.db, now: t.clock.now }, user.id, { type: 'message', title: 'SECRET gate code 4471' });
+    await mine.waitFor((e) => e.type === 'notification');
+    await settle();
+    expect(stolen.events.map((e) => e.type)).toEqual(['hello']);
+  });
+
+  it('never delivers an event to a session that expired or was deleted since the stream opened', async () => {
+    const { user } = seedUser(t, { role: 'shipper' });
+    const stream = await openEventStream(t.app, cookieFor(t, user.id));
+    streams.push(stream);
+    await stream.waitFor((e) => e.type === 'hello');
+
+    t.clock.advance(31 * 24);
+    notify({ db: t.db, now: t.clock.now }, user.id, { type: 'load_match', title: 'After expiry' });
+    await stream.waitForEnd();
+    expect(stream.events.map((e) => e.type)).toEqual(['hello']);
+    expect(connectedClientCount(user.id)).toBe(0);
+
+    // A session row removed some other way is caught the same way.
+    const again = await openEventStream(t.app, cookieFor(t, user.id));
+    streams.push(again);
+    await again.waitFor((e) => e.type === 'hello');
+    t.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+    notify({ db: t.db, now: t.clock.now }, user.id, { type: 'load_match', title: 'After delete' });
+    await again.waitForEnd();
+    expect(again.events.map((e) => e.type)).toEqual(['hello']);
+  });
+
+  it('re-checks the session on every ping, so an idle stream ends too', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const { user } = seedUser(t, { role: 'driver' });
+      const { user: stays } = seedUser(t, { role: 'driver' });
+      const stream = await openEventStream(t.app, cookieFor(t, user.id));
+      const live = await openEventStream(t.app, cookieFor(t, stays.id));
+      streams.push(stream, live);
+      await stream.waitFor((e) => e.type === 'hello');
+      await live.waitFor((e) => e.type === 'hello');
+
+      t.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+      vi.advanceTimersByTime(SSE_PING_MS);
+      await stream.waitForEnd();
+      await settle();
+      expect(live.isEnded()).toBe(false);
+      expect(connectedClientCount(stays.id)).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('drops the connection from the registry when the client goes away', async () => {

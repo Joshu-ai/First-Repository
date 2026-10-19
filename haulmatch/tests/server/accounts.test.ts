@@ -287,6 +287,36 @@ describe('POST /api/auth/login', () => {
   );
 
   it(
+    'counts guesses sent all at once, so a burst gets no more than 10 password checks',
+    async () => {
+      // Every guess claims its attempt before the slow password check, so a burst cannot all pass
+      // the throttle before any failure is recorded.
+      const burst = await Promise.all(Array.from({ length: 30 }, (_, i) => login({ email, password: `wrong-${i}` })));
+      const statuses = burst.map((r) => r.status);
+      expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(20);
+      expect(verifyPassword).toHaveBeenCalledTimes(10);
+      expect(burst.find((r) => r.status === 429)!.headers['retry-after']).toMatch(/^\d+$/);
+
+      // The ten checked guesses failed, so the account is locked like after ten in a row.
+      const after = await login({ email, password: PASSWORD });
+      expect(after.status).toBe(429);
+      expect(after.headers['retry-after']).toBe(String(15 * 60));
+    },
+    30_000,
+  );
+
+  it(
+    'frees each claimed attempt once its check is done',
+    async () => {
+      const burst = await Promise.all(Array.from({ length: 9 }, (_, i) => login({ email, password: `wrong-${i}` })));
+      expect(burst.map((r) => r.status)).toEqual(Array(9).fill(401));
+      expect((await login({ email, password: PASSWORD })).status).toBe(200);
+    },
+    30_000,
+  );
+
+  it(
     'only counts failures inside the 15 minute window',
     async () => {
       for (let i = 0; i < 9; i += 1) expect((await login({ email, password: 'wrong-password' })).status).toBe(401);
@@ -445,6 +475,24 @@ describe('POST /api/auth/password', () => {
       const res = await c.post('/api/auth/password', { currentPassword: PASSWORD, newPassword: 'a-brand-new-pass' });
       expect(res.status).toBe(429);
       expect(res.body.error.code).toBe('too_many_attempts');
+    },
+    30_000,
+  );
+
+  it(
+    'counts wrong current passwords sent all at once toward the same limit',
+    async () => {
+      const { c } = seedUser(t, { role: 'driver' });
+      const burst = await Promise.all(
+        Array.from({ length: 25 }, (_, i) =>
+          c.post('/api/auth/password', { currentPassword: `guess-${i}-x`, newPassword: 'a-brand-new-pass' }),
+        ),
+      );
+      const statuses = burst.map((r) => r.status);
+      expect(statuses.filter((s) => s === 400)).toHaveLength(10);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(15);
+      const res = await c.post('/api/auth/password', { currentPassword: PASSWORD, newPassword: 'a-brand-new-pass' });
+      expect(res.status).toBe(429);
     },
     30_000,
   );
