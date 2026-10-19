@@ -117,8 +117,17 @@ describe('client api endpoint shapes', () => {
     expect(last().url).toBe('/api/loads/l1/messages');
     await api.messages.list('l1', 'd1');
     expect(last().url).toBe('/api/loads/l1/messages?driverId=d1');
+    // Paging: the newest page, then the one before the oldest message shown.
+    await api.messages.list('l1', undefined, { limit: 100 });
+    expect(last().url).toBe('/api/loads/l1/messages?limit=100');
+    await api.messages.list('l1', 'd1', { before: 'm 1', limit: 100 });
+    expect(last().url).toBe('/api/loads/l1/messages?driverId=d1&before=m+1&limit=100');
+    expect(last().init.method).toBe('GET');
+    // Marking read is its own POST (a GET marks nothing read).
     await api.messages.markRead('l1', 'd1');
     expect(last().url).toBe('/api/loads/l1/messages/read');
+    expect(last().init.method).toBe('POST');
+    expect(headers(last())['X-Requested-With']).toBe('HaulMatch');
     expect(last().init.body).toBe(JSON.stringify({ driverId: 'd1' }));
     await api.shipper.loads('active');
     expect(last().url).toBe('/api/shipper/loads?status=active');

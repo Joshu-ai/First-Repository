@@ -1,7 +1,7 @@
 // Match checks are written for the driver ("Your gooseneck works"). Shippers read the same
 // result about someone else, so each check is reworded from its key and outcome.
 import { EQUIPMENT } from '../../../../../shared/equipment';
-import type { DriverSummary, Load, MatchCheck, MatchResult } from '../../../../../shared/types';
+import type { Booking, DriverSummary, Load, MatchCheck, MatchResult } from '../../../../../shared/types';
 import { feet, lbs, miles, ratePerMile, scoreLabel } from '../../../lib/format';
 import { lengthLabel } from './loadForm';
 
@@ -72,4 +72,16 @@ export function shipperMatchLine(match: MatchResult | null | undefined): string 
   const timing = match.checks.find((c) => c.key === 'timing');
   if (timing) parts.push(timing.ok ? 'Can make pickup' : 'May miss pickup');
   return parts.join(' · ');
+}
+
+/**
+ * Why Accept would be refused right now, or null when it can go ahead. Accepting re-checks the
+ * driver against the load and their rig as they are now (422 otherwise), and a pending request's
+ * match is judged as of now, so a request that no longer fits says so before the shipper taps.
+ */
+export function acceptBlocker(booking: Pick<Booking, 'status' | 'match'>): string | null {
+  if (booking.status !== 'pending') return null;
+  if (!booking.match) return 'Can’t be booked until their rig profile is finished';
+  if (!booking.match.eligible) return 'Doesn’t fit this load as it is now';
+  return null;
 }

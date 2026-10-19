@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import type { Load, MatchResult } from '../../../shared/types';
 import { cx } from '../lib/cx';
 import { feet, lbs, miles, money, pickupTime, place, plural, ratePerMile, scoreLabel, scoreTier } from '../lib/format';
+import { PICKUP_PASSED_LABEL, pickupWindowPassed } from '../lib/loads';
 import { Badge, StatusBadge, Tag } from './Badge';
 import { EquipmentChips } from './Equipment';
 import { Icon } from './Icon';
@@ -229,7 +230,13 @@ function CompactLoadCard({ load, href, actions, now, selected, className }: Load
         </div>
       </div>
       <div className="load-card__specs">
-        <StatusBadge kind="load" status={load.status} />
+        {pickupWindowPassed(load, reference) ? (
+          <Badge tone="warn" icon="clock">
+            {PICKUP_PASSED_LABEL}
+          </Badge>
+        ) : (
+          <StatusBadge kind="load" status={load.status} />
+        )}
         {load.pendingRequestCount > 0 ? (
           <Badge tone="warn" solid icon="users">
             {plural(load.pendingRequestCount, 'request')}

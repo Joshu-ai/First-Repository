@@ -198,6 +198,20 @@ export function pickupWindowChanged(v: LoadFormValues, original: Load): boolean 
   return !sameTime(v.pickupStart, original.pickupStart) || !sameTime(v.pickupEnd, original.pickupEnd);
 }
 
+/**
+ * True when the edit moves the lane, the pickup window or the delivery deadline. Saving such an edit
+ * cancels the load's waiting requests (PATCH /api/loads/:id), and each driver is asked to send a new
+ * one, so the form warns first. Works on a half-filled form: a cleared city counts as a change.
+ */
+export function changesLaneOrSchedule(v: LoadFormValues, original: Load): boolean {
+  return (
+    (v.origin?.id ?? null) !== original.origin.cityId ||
+    (v.destination?.id ?? null) !== original.destination.cityId ||
+    pickupWindowChanged(v, original) ||
+    !sameTime(v.deliveryBy ?? null, original.deliveryBy)
+  );
+}
+
 /** The PATCH body: only fields that differ from the load as posted. Empty when nothing changed. */
 export function toLoadUpdate(v: LoadFormValues, original: Load): LoadUpdate {
   const next = toLoadInput(v);

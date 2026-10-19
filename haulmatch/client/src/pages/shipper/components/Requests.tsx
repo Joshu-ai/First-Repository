@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Link } from 'react-router';
 import type { Booking, Load } from '../../../../../shared/types';
 import { Badge, StatusBadge } from '../../../components/Badge';
@@ -9,7 +10,7 @@ import { MatchChecks } from '../../../components/MatchDetails';
 import { ScoreBadge } from '../../../components/ScoreBadge';
 import { driverClassLabel, lane, money, ratePerMile, timeAgo } from '../../../lib/format';
 import { paths } from '../../../lib/routes';
-import { shipperChecks, shipperMatchLine } from './shipperChecks';
+import { acceptBlocker, shipperChecks, shipperMatchLine } from './shipperChecks';
 
 type OfferLoad = Pick<Load, 'rateUsd' | 'miles'>;
 
@@ -57,6 +58,7 @@ export interface RequestCardProps {
 
 /** One booking request on the load detail page: the full driver card plus offer, note and checks. */
 export function RequestCard({ booking, load, canDecide, busy, locked, onAccept, onDecline, now }: RequestCardProps) {
+  const blockedId = useId();
   const driver = booking.driver;
   if (!driver) {
     return (
@@ -67,11 +69,19 @@ export function RequestCard({ booking, load, canDecide, busy, locked, onAccept, 
     );
   }
   const first = driver.name.split(' ')[0];
+  const blocked = canDecide ? acceptBlocker(booking) : null;
   const actions = (
     <>
       {canDecide ? (
         <>
-          <Button icon="check" loading={busy} disabled={locked} onClick={onAccept} aria-label={`Accept ${driver.name}`}>
+          <Button
+            icon="check"
+            loading={busy}
+            disabled={locked || blocked !== null}
+            onClick={onAccept}
+            aria-label={`Accept ${driver.name}`}
+            aria-describedby={blocked ? blockedId : undefined}
+          >
             Accept
           </Button>
           <Button
@@ -100,6 +110,12 @@ export function RequestCard({ booking, load, canDecide, busy, locked, onAccept, 
         </span>
       </div>
       <OfferLine booking={booking} load={load} />
+      {blocked ? (
+        <p className="row text-sm text-bad" id={blockedId}>
+          <Icon name="warning" size={16} />
+          <span>{blocked}</span>
+        </p>
+      ) : null}
       {booking.message ? (
         <blockquote className="sh-quote">
           <span className="visually-hidden">{first} wrote: </span>
@@ -127,7 +143,11 @@ export interface RequestRowProps {
 
 /** Compact request for the dashboard panel: who, which load, the offer, and Accept / Decline. */
 export function RequestRow({ booking, busy, locked, onAccept, onDecline, now }: RequestRowProps) {
+  const blockedId = useId();
   const { load, driver, match } = booking;
+  const blocked = acceptBlocker(booking);
+  // The row has no checklist, so name the check that fails.
+  const failed = blocked && match && driver ? shipperChecks(load, driver, match).find((c) => c.hard && !c.ok) : undefined;
   const name = driver?.name ?? 'Driver';
   const offer = booking.offerRateUsd;
   const countered = offer !== null && offer !== load.rateUsd;
@@ -157,8 +177,22 @@ export function RequestRow({ booking, busy, locked, onAccept, onDecline, now }: 
         {shipperMatchLine(match)} · {timeAgo(booking.createdAt, now)}
       </p>
       {booking.message ? <p className="sh-quote">{booking.message}</p> : null}
+      {blocked ? (
+        <p className="row row-nowrap text-sm text-bad" id={blockedId}>
+          <Icon name="warning" size={16} />
+          <span>{failed ? `${blocked}: ${failed.label.charAt(0).toLowerCase()}${failed.label.slice(1)}` : blocked}</span>
+        </p>
+      ) : null}
       <div className="sh-request__actions">
-        <Button size="sm" icon="check" loading={busy} disabled={locked} onClick={onAccept} aria-label={`Accept ${name}`}>
+        <Button
+          size="sm"
+          icon="check"
+          loading={busy}
+          disabled={locked || blocked !== null}
+          onClick={onAccept}
+          aria-label={`Accept ${name}`}
+          aria-describedby={blocked ? blockedId : undefined}
+        >
           Accept
         </Button>
         <Button

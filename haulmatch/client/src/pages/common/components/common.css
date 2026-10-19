@@ -372,6 +372,14 @@ a.cm-thread:focus-visible {
   align-self: flex-end;
 }
 
+/* "Load earlier messages" above the first loaded page, or the note that this is the start. */
+.cm-older {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 var(--space-3);
+  text-align: center;
+}
+
 .cm-log__list,
 .cm-day__list {
   margin: 0;

@@ -1,5 +1,5 @@
 // Display formatting. Times render in the viewer's local time zone; pass `now` for testable output.
-import { DRIVER_CLASSES, EQUIPMENT } from '../../../shared/equipment';
+import { DRIVER_CLASSES, EQUIPMENT, MARKET_SNAPSHOT } from '../../../shared/equipment';
 import { US_STATES } from '../../../shared/geo';
 import type {
   BookingStatus,
@@ -151,6 +151,30 @@ export function relativeHours(value: string | Date, now: Date = new Date()): str
   if (Math.abs(diffH) < 1) return 'now';
   const n = Math.abs(diffH) < 48 ? `${Math.round(Math.abs(diffH))}h` : `${Math.round(Math.abs(diffH) / 24)}d`;
   return diffH > 0 ? `in ${n}` : `${n} ago`;
+}
+
+// ---------------------------------------------------------------------------
+// Market data
+// ---------------------------------------------------------------------------
+
+/** Month names as freight news writes them: "Sept 2026", "March 2026". */
+const NEWS_MONTHS = ['Jan', 'Feb', 'March', 'April', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+type MarketSnapshot = { asOf: string; dieselUsdPerGallon: number };
+
+/** "Sept 2026" for MARKET_SNAPSHOT.asOf "2026-09". */
+export function marketMonth(snapshot: Pick<MarketSnapshot, 'asOf'> = MARKET_SNAPSHOT): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(snapshot.asOf);
+  const month = m ? NEWS_MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${m[1]}` : snapshot.asOf;
+}
+
+/**
+ * "Market data: DAT national averages, Sept 2026 · diesel $6.29": where the rate benchmarks and the
+ * default diesel price come from, shown next to the rate estimate and the driver's money panel.
+ */
+export function marketDataLine(snapshot: MarketSnapshot = MARKET_SNAPSHOT): string {
+  return `Market data: DAT national averages, ${marketMonth(snapshot)} · diesel ${money(snapshot.dieselUsdPerGallon, { cents: true })}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -369,7 +369,7 @@ function useFilterDraft(filters: LoadSearchFilters, originCity: City | null) {
   // The real city record can arrive after the panel opened with a stand-in label.
   useEffect(() => {
     if (!originCity) return;
-    setDraft((prev) => (prev.originCity?.id === originCity.id ? { ...prev, originCity } : prev));
+    setDraft((prev) => (prev.originCity?.id === originCity.id && prev.originCity !== originCity ? { ...prev, originCity } : prev));
   }, [originCity]);
 
   const update = (patch: Partial<FilterDraft>) => {

@@ -4,7 +4,7 @@ import { Button } from '../../../components/Button';
 import { DetailList } from '../../../components/DataDisplay';
 import { ErrorState, Skeleton, Spinner } from '../../../components/Feedback';
 import { api } from '../../../lib/api';
-import { miles, money, ratePerMile } from '../../../lib/format';
+import { marketDataLine, miles, money, ratePerMile } from '../../../lib/format';
 import { useApi, useDebounced } from '../../../lib/hooks';
 
 export interface RateEstimatePanelProps {
@@ -144,7 +144,8 @@ export function RateEstimatePanel({
           { label: 'High', value: `${money(estimate.highUsd)} · ${ratePerMile(rpm.high)}` },
         ]}
       />
-      <p className="muted text-xs">{estimate.basis}. A monthly snapshot, not live market data.</p>
+      <p className="muted text-xs">{estimate.basis}.</p>
+      <p className="muted text-xs">{marketDataLine()}</p>
       <Button
         variant="secondary"
         icon="dollar"

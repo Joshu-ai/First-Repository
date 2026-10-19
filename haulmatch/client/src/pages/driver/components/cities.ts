@@ -43,7 +43,21 @@ function fetchCity(id: string): Promise<City | null> {
   return request;
 }
 
-/** The City for an id: cached or fetched, with a stand-in from the id while it loads. */
+/**
+ * The city to show for `id` given the one a hook is holding: the held city when it is for this id,
+ * otherwise the cached record or a stand-in. Never a city for another id, and null only without an id.
+ */
+export function cityForId(id: string | null | undefined, held: City | null): City | null {
+  if (!id) return null;
+  if (held?.id === id) return held;
+  return cache.get(id) ?? cityFromId(id);
+}
+
+/**
+ * The City for an id: cached or fetched, with a stand-in from the id while it loads. It answers for
+ * the id of this render, so a draft built right after the id changes never gets the previous city
+ * (or none) while the effect below catches up.
+ */
 export function useCity(id: string | null | undefined): City | null {
   const [city, setCity] = useState<City | null>(() => (id ? (cache.get(id) ?? cityFromId(id)) : null));
   useEffect(() => {
@@ -60,7 +74,8 @@ export function useCity(id: string | null | undefined): City | null {
       live = false;
     };
   }, [id]);
-  return city;
+  // Memoized so the stand-in keeps its identity across renders (callers key effects on it).
+  return useMemo(() => cityForId(id, city), [id, city]);
 }
 
 /** "St. Louis, MO" style labels for many city ids at once (e.g. a list of saved searches). */

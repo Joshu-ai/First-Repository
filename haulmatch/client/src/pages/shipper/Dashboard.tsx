@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import type { Booking, Load, LoadStatus, ServerEvent, ShipperStats } from '../../../../shared/types';
+import type { Booking, Load, ServerEvent, ShipperStats } from '../../../../shared/types';
 import { Badge } from '../../components/Badge';
 import { Button, ButtonLink } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -15,25 +15,15 @@ import { useSignedInUser } from '../../lib/auth';
 import { cx } from '../../lib/cx';
 import { lane, plural } from '../../lib/format';
 import { useApi, useNow } from '../../lib/hooks';
+import { pickupWindowPassed } from '../../lib/loads';
 import { paths } from '../../lib/routes';
+import { isTab, tabCount, TAB_LABELS, TABS, type Tab } from './components/dashboardTabs';
 import { RequestRow } from './components/Requests';
 import { useLiveReload } from './components/useLiveReload';
 import { useRequestDecisions, type RequestDecisions } from './components/useRequestDecisions';
 import './shipper.css';
 
-type Tab = 'active' | LoadStatus;
-
-const TABS: Tab[] = ['active', 'open', 'booked', 'in_transit', 'delivered', 'cancelled'];
 const TAB_PARAM = 'tab';
-
-const TAB_LABELS: Record<Tab, string> = {
-  active: 'Active',
-  open: 'Open',
-  booked: 'Booked',
-  in_transit: 'In transit',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-};
 
 const EMPTY_COPY: Record<Tab, { icon: IconName; title: string; body: string }> = {
   active: {
@@ -74,28 +64,6 @@ const LOAD_PAGE = 15;
 /** Loads stay live as long as these events keep arriving. */
 const SHIPPER_NOTIFICATIONS = new Set(['booking_request', 'booking_withdrawn', 'load_booked', 'load_status', 'load_cancelled']);
 
-function isTab(value: string | null): value is Tab {
-  return value !== null && (TABS as string[]).includes(value);
-}
-
-function tabCount(tab: Tab, stats: ShipperStats | undefined): number | undefined {
-  if (!stats) return undefined;
-  switch (tab) {
-    case 'active':
-      return stats.open + stats.booked + stats.inTransit;
-    case 'open':
-      return stats.open;
-    case 'booked':
-      return stats.booked;
-    case 'in_transit':
-      return stats.inTransit;
-    case 'delivered':
-      return stats.delivered;
-    case 'cancelled':
-      return stats.cancelled;
-  }
-}
-
 function isLiveEvent(event: ServerEvent): boolean {
   if (event.type === 'notification') return SHIPPER_NOTIFICATIONS.has(event.notification.type);
   return event.type === 'booking_updated' || event.type === 'load_updated' || event.type === 'hello';
@@ -135,7 +103,14 @@ function StatsTiles({ stats, requestsHref, tabHref }: { stats: ShipperStats; req
         hint={pending > 0 ? `${plural(pending, 'driver request')} waiting on you` : 'You’re all caught up'}
         to={pending > 0 ? requestsHref : undefined}
       />
-      <StatTile label="Open" icon="boxes" tone="brand" value={stats.open} hint="On the board" to={tabHref('open')} />
+      <StatTile
+        label="Open"
+        icon="boxes"
+        tone="brand"
+        value={stats.open}
+        hint={stats.expired > 0 ? `On the board · ${stats.expired} past pickup` : 'On the board'}
+        to={tabHref('open')}
+      />
       <StatTile label="Booked" icon="check" tone="info" value={stats.booked} hint="Driver assigned" to={tabHref('booked')} />
       <StatTile label="In transit" icon="truck" value={stats.inTransit} hint="On the road" to={tabHref('in_transit')} />
       <StatTile label="Delivered" icon="route" tone="ok" value={stats.delivered} hint="All time" to={tabHref('delivered')} />
@@ -236,11 +211,16 @@ function RequestsPanel({ requests, error, onRetry, decisions, now }: RequestsPan
 // Load list
 // ---------------------------------------------------------------------------
 
-function LoadRowActions({ load }: { load: Load }) {
+function LoadRowActions({ load, now }: { load: Load; now: Date }) {
   const name = lane(load.origin, load.destination);
+  const passed = pickupWindowPassed(load, now);
   return (
     <>
-      {load.pendingRequestCount > 0 && load.status === 'open' ? (
+      {passed ? (
+        <ButtonLink size="sm" icon="edit" to={paths.shipperEditLoad(load.id)} aria-label={`Set a new pickup window for ${name}`}>
+          New window
+        </ButtonLink>
+      ) : load.pendingRequestCount > 0 && load.status === 'open' ? (
         <ButtonLink size="sm" icon="users" to={`${paths.shipperLoad(load.id)}#requests`} aria-label={`Review requests on ${name}`}>
           Review
         </ButtonLink>
@@ -249,7 +229,11 @@ function LoadRowActions({ load }: { load: Load }) {
           View
         </ButtonLink>
       )}
-      {load.status === 'open' ? (
+      {passed ? (
+        <ButtonLink size="sm" variant="ghost" to={paths.shipperLoad(load.id)} aria-label={`View ${name}`}>
+          View
+        </ButtonLink>
+      ) : load.status === 'open' ? (
         <ButtonLink size="sm" variant="ghost" icon="edit" to={paths.shipperEditLoad(load.id)} aria-label={`Edit ${name}`}>
           Edit
         </ButtonLink>
@@ -302,7 +286,7 @@ function LoadList({ tab, loads, error, onRetry, now }: LoadListProps) {
               variant="compact"
               href={paths.shipperLoad(load.id)}
               now={now}
-              actions={<LoadRowActions load={load} />}
+              actions={<LoadRowActions load={load} now={now} />}
             />
           </li>
         ))}

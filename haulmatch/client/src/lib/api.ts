@@ -403,10 +403,17 @@ export const api = {
 
   messages: {
     threads: (opts?: RequestOptions) => get<Thread[]>('/threads', undefined, opts),
-    /** Drivers omit driverId (their own thread); shippers must pass it. Marks the other side's messages read. */
-    list: (loadId: string, driverId?: string, opts?: RequestOptions) =>
-      get<Message[]>(`/loads/${enc(loadId)}/messages`, { driverId }, opts),
+    /**
+     * One page of a conversation, oldest first: the newest `limit` messages (server default 100,
+     * max 200), or with `before` (the id of the oldest message already shown) the ones just before
+     * it. A page shorter than `limit` reaches the start. Drivers omit driverId (their own thread);
+     * shippers must pass it. Reading marks nothing read: call markRead for that.
+     */
+    list: (loadId: string, driverId?: string, page: { before?: string; limit?: number } = {}, opts?: RequestOptions) =>
+      get<Message[]>(`/loads/${enc(loadId)}/messages`, { driverId, before: page.before, limit: page.limit }, opts),
+    /** 429 too_many_messages past 30 messages a minute. */
     send: (loadId: string, input: { body: string; driverId?: string }) => post<Message>(`/loads/${enc(loadId)}/messages`, input),
+    /** Marks the other side's messages in this conversation read (the only way to). */
     markRead: (loadId: string, driverId?: string) =>
       post<void>(`/loads/${enc(loadId)}/messages/read`, driverId ? { driverId } : {}),
   },

@@ -17,6 +17,7 @@ import { api, errorMessage } from '../../lib/api';
 import { useSignedInUser } from '../../lib/auth';
 import { lane, lbs, miles, money, pickupTime, plural, ratePerMile, timeAgo, timeWindow } from '../../lib/format';
 import { useAction, useApi, useIsDesktop, useNow } from '../../lib/hooks';
+import { PICKUP_PASSED_LABEL, pickupWindowPassed } from '../../lib/loads';
 import { paths } from '../../lib/routes';
 import { InviteDialog } from './components/InviteDialog';
 import { lengthLabel } from './components/loadForm';
@@ -86,7 +87,19 @@ function LoadSummary({ load, now, mapHeight }: { load: Load; now: Date; mapHeigh
   ].filter(Boolean);
 
   return (
-    <Card as="section" title="Load details" actions={<StatusBadge kind="load" status={load.status} />}>
+    <Card
+      as="section"
+      title="Load details"
+      actions={
+        pickupWindowPassed(load, now) ? (
+          <Badge tone="warn" icon="clock">
+            Pickup window passed
+          </Badge>
+        ) : (
+          <StatusBadge kind="load" status={load.status} />
+        )
+      }
+    >
       <div className="stack">
         <RouteMap origin={load.origin} destination={load.destination} height={mapHeight} />
         <div className="stack-xs">
@@ -191,6 +204,8 @@ function RequestsSection({ load, bookings, error, onRetry, decisions, now }: Req
   const past =
     bookings?.filter((b) => b.status !== 'pending' && !(b.status === 'accepted' && b.driverId === load.bookedDriverId)) ?? [];
   const open = load.status === 'open';
+  // Past its pickup window nothing can be accepted (the banner above says what to do instead).
+  const decidable = open && !pickupWindowPassed(load, now);
   // A covered load with no other requests: the driver card says it all.
   if (!open && bookings && pending.length === 0 && past.length === 0) return null;
 
@@ -225,7 +240,7 @@ function RequestsSection({ load, bookings, error, onRetry, decisions, now }: Req
             key={booking.id}
             booking={booking}
             load={load}
-            canDecide={open}
+            canDecide={decidable}
             busy={decisions.busyId === booking.id}
             locked={decisions.busyId !== null && decisions.busyId !== booking.id}
             onAccept={() => decisions.ask('accept', booking, load)}
@@ -404,6 +419,11 @@ function RecommendedSection({ load, drivers, error, onRetry, invited, onInvite }
 
 export default function ShipperLoadDetailPage() {
   const { id = '' } = useParams();
+  // One mount per load, so invites, dialogs and fetched data never carry over to the next load.
+  return <ShipperLoadDetail key={id} id={id} />;
+}
+
+function ShipperLoadDetail({ id }: { id: string }) {
   const user = useSignedInUser();
   const now = useNow();
   const isDesktop = useIsDesktop();
@@ -413,13 +433,15 @@ export default function ShipperLoadDetailPage() {
   const detail = useApi((signal) => api.loads.get(id, { signal }), [id]);
   const load = detail.data?.load;
   const isOpen = load?.status === 'open';
+  // Open but past its pickup window: off the board until the shipper sets a new window or cancels.
+  const passed = load ? pickupWindowPassed(load, now) : false;
   const bookings = useApi((signal) => api.loads.bookings(id, { signal }), [id]);
   const recommended = useApi((signal) => api.loads.recommendedDrivers(id, { signal }), [id, isOpen], {
-    enabled: isOpen && load?.shipperId === user.id,
+    enabled: isOpen && !passed && load?.shipperId === user.id,
   });
 
   const openRef = useRef(isOpen);
-  openRef.current = isOpen;
+  openRef.current = isOpen && !passed;
   const { reload: reloadDetail } = detail;
   const { reload: reloadBookings } = bookings;
   const { reload: reloadRecommended } = recommended;
@@ -530,7 +552,27 @@ export default function ShipperLoadDetailPage() {
         }
       />
 
-      {isOpen && pendingCount > 0 ? (
+      {passed ? (
+        <InlineAlert
+          tone="warn"
+          title={PICKUP_PASSED_LABEL}
+          action={
+            <div className="row">
+              <ButtonLink to={paths.shipperEditLoad(load.id)} size="sm" icon="edit">
+                Set a new window
+              </ButtonLink>
+              <Button size="sm" variant="secondary" icon="x" onClick={() => setConfirmCancel(true)}>
+                Cancel load
+              </Button>
+            </div>
+          }
+        >
+          The pickup window closed {timeAgo(load.pickupEnd, now)}, so drivers can’t find, book or be invited to it.
+          {pendingCount > 0
+            ? ` The ${plural(pendingCount, 'request')} waiting can’t be accepted; a new window cancels ${pendingCount === 1 ? 'it' : 'them'} and asks the ${pendingCount === 1 ? 'driver' : 'drivers'} to send a new one.`
+            : ''}
+        </InlineAlert>
+      ) : isOpen && pendingCount > 0 ? (
         <InlineAlert
           tone="warn"
           title={`${plural(pendingCount, 'driver')} ${pendingCount === 1 ? 'wants' : 'want'} this load`}
@@ -561,7 +603,7 @@ export default function ShipperLoadDetailPage() {
             decisions={decisions}
             now={now}
           />
-          {isOpen ? (
+          {isOpen && !passed ? (
             <RecommendedSection
               load={load}
               drivers={recommended.data}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link } from 'react-router';
 import type { LoadStatus, Message, Role, Thread, User } from '../../../../../shared/types';
 import { Chip, StatusBadge } from '../../../components/Badge';
-import { ButtonLink } from '../../../components/Button';
+import { Button, ButtonLink } from '../../../components/Button';
 import { Avatar } from '../../../components/DataDisplay';
 import { ErrorState, Skeleton } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
@@ -14,13 +14,24 @@ import { useRealtime, useServerEvent } from '../../../lib/realtime';
 import { loadPathFor, paths } from '../../../lib/routes';
 import { Composer } from './Composer';
 import { isPageVisible, markThreadNotificationsRead, useOnReconnect } from './live';
-import { appendMessage, counterpartRoleLabel, groupByDay, threadKey, type ThreadContext } from './threads';
+import {
+  appendMessage,
+  counterpartRoleLabel,
+  groupByDay,
+  prependOlder,
+  threadKey,
+  withNewestPage,
+  type ThreadContext,
+} from './threads';
 
 /** Unsent text per conversation, kept while the person hops between threads and pages. */
 const drafts = new Map<string, string>();
 
 /** Within this distance of the bottom the log counts as "at the latest message" and follows new ones. */
 const STICK_PX = 96;
+
+/** Messages per page; a page shorter than this reaches the start of the conversation. */
+export const MESSAGE_PAGE = 100;
 
 /** Tap-to-fill openers for an empty conversation (they fill the box; nothing sends until the person taps Send). */
 const STARTERS: Record<Role, string[]> = {
@@ -39,7 +50,7 @@ export interface ConversationProps {
   /** Phones: show a back button to the conversation list. */
   showBack: boolean;
   onSent: (message: Message) => void;
-  /** The server marked this conversation read. */
+  /** The person read this conversation (it is being marked read on the server); clear its unread count. */
   onRead: () => void;
 }
 
@@ -57,14 +68,21 @@ export function Conversation({ viewer, loadId, driverId, thread, listSettled, sh
   unreadRef.current = unreadCount;
   // Live messages that land while the first fetch is in flight.
   const early = useRef<Message[]>([]);
+  /** What is on screen, so a re-read (after a dropped connection) keeps the earlier pages loaded. */
+  const shownRef = useRef<Message[]>([]);
+  // Only the newest page loads at first; earlier ones load on request.
+  const [hasOlder, setHasOlder] = useState(false);
+  const olderLoaded = useRef(false);
 
   const messages = useApi(
     async (signal) => {
-      const list = await api.messages.list(loadId, queryDriverId, { signal });
-      return early.current.reduce(appendMessage, list);
+      const page = await api.messages.list(loadId, queryDriverId, { limit: MESSAGE_PAGE }, { signal });
+      if (!olderLoaded.current) setHasOlder(page.length >= MESSAGE_PAGE);
+      return early.current.reduce(appendMessage, withNewestPage(shownRef.current, page));
     },
     [loadId, queryDriverId],
   );
+  shownRef.current = messages.data ?? [];
   const loaded = messages.data !== undefined;
 
   const fallback = useApi((signal) => fetchContext(viewer.role, loadId, driverId, signal), [loadId, driverId, viewer.role], {
@@ -88,18 +106,29 @@ export function Conversation({ viewer, loadId, driverId, thread, listSettled, sh
   const pendingRead = useRef(false);
   const markSeen = useCallback(() => {
     pendingRead.current = false;
-    api.messages.markRead(loadId, queryDriverId).catch(() => {
-      // Harmless: the next time the thread opens it is marked read again.
-    });
     onReadRef.current();
+    api.messages
+      .markRead(loadId, queryDriverId)
+      // Again once the server agrees, in case the list was re-read in between.
+      .then(() => onReadRef.current())
+      .catch(() => {
+        // Harmless: the next time the thread opens it is marked read again.
+      });
   }, [loadId, queryDriverId]);
 
-  // GET /messages marks the thread read on the server; mirror that in the list and the bell.
+  // Reading the messages marks nothing on the server (a GET has no side effects), so opening the
+  // conversation tells it, then the list and the bell. A tab in the background waits until it is seen.
   useEffect(() => {
     if (!loaded) return;
-    onReadRef.current();
+    if (!isPageVisible()) {
+      pendingRead.current = shownRef.current.length > 0;
+      return;
+    }
+    if (shownRef.current.length > 0) markSeen();
     syncBell();
-  }, [loaded, syncBell]);
+    // Once per opening; later messages are marked as they arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   useEffect(() => {
     const onVisibility = () => {
@@ -118,6 +147,9 @@ export function Conversation({ viewer, loadId, driverId, thread, listSettled, sh
   const [unseen, setUnseen] = useState(0);
   const count = messages.data?.length ?? 0;
 
+  /** Distance from the bottom to keep while an earlier page is added above, so the view stays put. */
+  const keepFromBottom = useRef<number | null>(null);
+
   const scrollToBottom = (smooth = false) => {
     const el = logRef.current;
     if (!el) return;
@@ -126,10 +158,38 @@ export function Conversation({ viewer, loadId, driverId, thread, listSettled, sh
 
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (!el || (!forceScroll.current && !atBottom.current)) return;
+    if (!el) return;
+    if (keepFromBottom.current !== null) {
+      el.scrollTop = el.scrollHeight - keepFromBottom.current;
+      keepFromBottom.current = null;
+      return;
+    }
+    if (!forceScroll.current && !atBottom.current) return;
     forceScroll.current = false;
     el.scrollTop = el.scrollHeight;
   }, [count, loaded]);
+
+  // ---- Earlier pages ----
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [olderError, setOlderError] = useState<unknown>(null);
+  const loadOlder = async () => {
+    const oldest = messages.data?.[0];
+    if (!oldest || olderLoading) return;
+    setOlderLoading(true);
+    setOlderError(null);
+    try {
+      const page = await api.messages.list(loadId, queryDriverId, { before: oldest.id, limit: MESSAGE_PAGE });
+      olderLoaded.current = true;
+      const el = logRef.current;
+      if (el && page.length) keepFromBottom.current = el.scrollHeight - el.scrollTop;
+      messages.setData((prev) => (prev ? prependOlder(prev, page) : prev));
+      setHasOlder(page.length >= MESSAGE_PAGE);
+    } catch (err) {
+      setOlderError(err);
+    } finally {
+      setOlderLoading(false);
+    }
+  };
 
   // Stay pinned to the latest message when the box grows or the phone keyboard opens.
   useEffect(() => {
@@ -247,6 +307,19 @@ export function Conversation({ viewer, loadId, driverId, thread, listSettled, sh
             tabIndex={0}
             onScroll={onScroll}
           >
+            {hasOlder ? (
+              <div className="cm-older">
+                {olderError ? (
+                  <ErrorState compact error={olderError} title="Couldn’t load earlier messages" onRetry={() => void loadOlder()} />
+                ) : (
+                  <Button variant="ghost" size="sm" icon="chevronUp" loading={olderLoading} onClick={() => void loadOlder()}>
+                    Load earlier messages
+                  </Button>
+                )}
+              </div>
+            ) : olderLoaded.current ? (
+              <p className="cm-older muted text-xs">Start of the conversation</p>
+            ) : null}
             {count === 0 ? (
               <EmptyConversation role={viewer.role} recipient={recipient} onPick={fillStarter} />
             ) : (

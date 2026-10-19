@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../client/src/lib/api';
+import { PICKUP_PASSED_LABEL, pickupWindowPassed } from '../../client/src/lib/loads';
+import { tabCount } from '../../client/src/pages/shipper/components/dashboardTabs';
 import {
   apiErrorsToFields,
+  changesLaneOrSchedule,
   emptyLoadValues,
   hotshotFit,
   isOpenToHotshot,
@@ -12,10 +15,10 @@ import {
   toLoadUpdate,
   validateLoad,
 } from '../../client/src/pages/shipper/components/loadForm';
-import { shipperChecks } from '../../client/src/pages/shipper/components/shipperChecks';
+import { acceptBlocker, shipperChecks } from '../../client/src/pages/shipper/components/shipperChecks';
 import { placeForCityId } from '../../shared/cities';
 import { matchLoad, type MatchableDriver } from '../../shared/matching';
-import type { City, DriverSummary, Load } from '../../shared/types';
+import type { City, DriverSummary, Load, ShipperStats } from '../../shared/types';
 
 const now = new Date('2026-10-18T15:00:00Z');
 const houston: City = { id: 'houston-tx', name: 'Houston', state: 'TX', lat: 29.76, lng: -95.37 };
@@ -115,6 +118,22 @@ describe('post load form', () => {
     });
   });
 
+  it('knows which edits cancel the waiting requests: a new lane, pickup window or delivery deadline', () => {
+    // PATCH /api/loads/:id cancels pending requests on exactly these changes, so the form warns first.
+    const values = loadToValues(posted, 'edit', now);
+    expect(changesLaneOrSchedule(values, posted)).toBe(false);
+    expect(changesLaneOrSchedule({ ...values, rateUsd: 900, commodity: 'Casing', weightLbs: 8000 }, posted)).toBe(false);
+    // The same instant written another way is not a change.
+    expect(changesLaneOrSchedule({ ...values, pickupStart: '2026-10-19T08:00:00-05:00' }, posted)).toBe(false);
+
+    expect(changesLaneOrSchedule({ ...values, origin: odessa, destination: houston }, posted)).toBe(true);
+    expect(changesLaneOrSchedule({ ...values, destination: { ...houston, id: 'midland-tx' } }, posted)).toBe(true);
+    expect(changesLaneOrSchedule({ ...values, pickupEnd: '2026-10-19T19:00:00.000Z' }, posted)).toBe(true);
+    expect(changesLaneOrSchedule({ ...values, deliveryBy: null }, posted)).toBe(true);
+    // Half-filled while typing: a cleared city counts, and nothing throws.
+    expect(changesLaneOrSchedule({ ...values, origin: null }, posted)).toBe(true);
+  });
+
   it('reposts with fresh dates and the same reference', () => {
     const repost = loadToValues(posted, 'repost', now);
     expect(repost.pickupStart).not.toBe(posted.pickupStart);
@@ -183,5 +202,69 @@ describe('shipperChecks', () => {
     const match = matchLoad(heavy, { ...profile, maxPayloadLbs: 16_500 }, { now, ignoreDeadheadLimit: true });
     const cdl = shipperChecks(heavy, summary, match).find((c) => c.key === 'cdl');
     expect(cdl).toMatchObject({ ok: false, label: 'No Class A CDL for this weight or trailer' });
+  });
+});
+
+describe('requests a shipper can no longer accept', () => {
+  const driver: MatchableDriver = {
+    driverClass: 'hotshot',
+    equipmentTypes: ['HS_GOOSENECK'],
+    trailerLengthFt: 40,
+    maxPayloadLbs: 10000,
+    hasCdl: false,
+    endorsements: [],
+    teamDriver: false,
+    currentLocation: null,
+    homeBase: null,
+    availableFrom: null,
+    maxDeadheadMiles: 150,
+    minRatePerMile: 1.5,
+    preferredStates: [],
+    avoidStates: [],
+    mpg: 11,
+    fuelPricePerGallon: 3.75,
+  };
+  const fit = matchLoad(posted, driver, { now, ignoreDeadheadLimit: true });
+
+  it('blocks Accept on a pending request that no longer fits, or has no rig to check', () => {
+    // POST /bookings/:id/accept re-runs the booking checks and answers 422 for these.
+    expect(fit.eligible).toBe(true);
+    expect(acceptBlocker({ status: 'pending', match: fit })).toBeNull();
+    expect(acceptBlocker({ status: 'pending', match: { ...fit, eligible: false } })).toBe('Doesn’t fit this load as it is now');
+    expect(acceptBlocker({ status: 'pending', match: null })).toBe('Can’t be booked until their rig profile is finished');
+    // Settled requests have no Accept button to block.
+    expect(acceptBlocker({ status: 'declined', match: { ...fit, eligible: false } })).toBeNull();
+  });
+});
+
+describe('open loads past their pickup window', () => {
+  it('counts as passed only while still open after pickup closes', () => {
+    const late = new Date('2026-10-19T17:00:01Z');
+    expect(pickupWindowPassed(posted, now)).toBe(false);
+    expect(pickupWindowPassed(posted, new Date('2026-10-19T17:00:00Z'))).toBe(false);
+    expect(pickupWindowPassed(posted, late)).toBe(true);
+    expect(pickupWindowPassed({ ...posted, status: 'booked' }, late)).toBe(false);
+    expect(PICKUP_PASSED_LABEL).toBe('Pickup window passed: edit or cancel');
+  });
+
+  it('adds expired loads back into the Open and Active tab counts, which still list them', () => {
+    // ShipperStats.open leaves out loads past their pickup window (they are `expired`), but
+    // /shipper/loads?status=open and ?status=active still return them.
+    const stats: ShipperStats = {
+      open: 3,
+      expired: 2,
+      booked: 4,
+      inTransit: 1,
+      delivered: 9,
+      cancelled: 5,
+      pendingRequests: 0,
+    };
+    expect(tabCount('open', stats)).toBe(5);
+    expect(tabCount('active', stats)).toBe(10);
+    expect(tabCount('booked', stats)).toBe(4);
+    expect(tabCount('in_transit', stats)).toBe(1);
+    expect(tabCount('delivered', stats)).toBe(9);
+    expect(tabCount('cancelled', stats)).toBe(5);
+    expect(tabCount('open', undefined)).toBeUndefined();
   });
 });

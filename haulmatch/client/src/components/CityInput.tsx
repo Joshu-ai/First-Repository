@@ -38,6 +38,33 @@ export interface CityInputProps {
 
 const cityLabel = (c: City) => formatPlace(c);
 
+/** Shorter text does not search. */
+const MIN_QUERY = 2;
+
+/**
+ * What Enter does in the box. `resultsFor` is the search text the suggestion list belongs to, so a
+ * list left over from a shorter prefix ("San" while the box says "San Diego") is never picked:
+ * - pass: the box shows the picked city (or is empty), so Enter goes on to submit the form;
+ * - choose: take the highlighted suggestion, which belongs to the text in the box;
+ * - wait: the suggestions for this text are still coming; take the top one when they arrive;
+ * - ignore: half-typed text with nothing to pick; swallow Enter so the form does not submit.
+ */
+export type CityEnterAction = 'pass' | 'choose' | 'wait' | 'ignore';
+
+export function cityEnterAction(state: {
+  dirty: boolean;
+  text: string;
+  resultsFor: string | null;
+  /** A suggestion is highlighted in the open list. */
+  hasActive: boolean;
+}): CityEnterAction {
+  const q = state.text.trim();
+  if (!state.dirty || q === '') return 'pass';
+  if (q.length < MIN_QUERY) return 'ignore';
+  if (state.resultsFor === q) return state.hasActive ? 'choose' : 'ignore';
+  return 'wait';
+}
+
 /**
  * City autocomplete over GET /api/cities (ARIA 1.2 combobox with a listbox popup).
  * Typing clears the selection until a suggestion is picked; leaving the box restores the
@@ -69,6 +96,8 @@ export function CityInput({
   const [text, setText] = useState(value ? cityLabel(value) : '');
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<City[]>([]);
+  /** The trimmed text `results` were found for (null when there are none). */
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -78,6 +107,8 @@ export function CityInput({
   const valueId = value?.id ?? null;
   const valueRef = useRef(value);
   valueRef.current = value;
+  /** Enter was pressed before the suggestions for this text arrived: pick the top one when they do. */
+  const pendingPick = useRef<string | null>(null);
 
   // Keep the box in sync when the parent picks a different city or clears it. Keyed on the id
   // so callers can pass a fresh object every render (placeToCity(profile.currentLocation)).
@@ -88,8 +119,9 @@ export function CityInput({
 
   useEffect(() => {
     const q = query.trim();
-    if (!dirty || q.length < 2) {
+    if (!dirty || q.length < MIN_QUERY) {
       setResults([]);
+      setResultsFor(null);
       setLoading(false);
       return;
     }
@@ -99,12 +131,23 @@ export function CityInput({
     api.meta
       .searchCities(q, limit, { signal: controller.signal })
       .then((cities) => {
+        if (controller.signal.aborted) return;
+        if (pendingPick.current === q) {
+          pendingPick.current = null;
+          if (cities.length) {
+            chooseRef.current(cities[0]);
+            return;
+          }
+        }
         setResults(cities);
+        setResultsFor(q);
         setActive(cities.length ? 0 : -1);
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
+          if (pendingPick.current === q) pendingPick.current = null;
           setResults([]);
+          setResultsFor(null);
           setFailed(!(err instanceof DOMException));
         }
       })
@@ -115,14 +158,19 @@ export function CityInput({
   }, [query, limit, dirty]);
 
   const choose = (city: City) => {
+    pendingPick.current = null;
     setDirty(false);
     setText(cityLabel(city));
     setOpen(false);
     setResults([]);
+    setResultsFor(null);
     onChange(city);
   };
+  const chooseRef = useRef(choose);
+  chooseRef.current = choose;
 
   const restore = () => {
+    pendingPick.current = null;
     setOpen(false);
     if (text.trim() === '') {
       if (value) onChange(null);
@@ -141,9 +189,13 @@ export function CityInput({
       e.preventDefault();
       setActive((i) => (results.length ? (i <= 0 ? results.length - 1 : i - 1) : -1));
     } else if (e.key === 'Enter') {
-      if (open && active >= 0 && results[active]) {
-        e.preventDefault();
-        choose(results[active]);
+      const action = cityEnterAction({ dirty, text, resultsFor, hasActive: open && active >= 0 && Boolean(results[active]) });
+      if (action === 'pass') return;
+      e.preventDefault();
+      if (action === 'choose') choose(results[active]);
+      else if (action === 'wait') {
+        pendingPick.current = text.trim();
+        setOpen(true);
       }
     } else if (e.key === 'Escape') {
       if (open) {
@@ -153,7 +205,7 @@ export function CityInput({
     }
   };
 
-  const showList = open && dirty && text.trim().length >= 2;
+  const showList = open && dirty && text.trim().length >= MIN_QUERY;
   const describedBy = [hint ? hintId : '', error ? errorId : '', statusId].filter(Boolean).join(' ');
   const statusText = !showList
     ? ''
@@ -202,6 +254,7 @@ export function CityInput({
             disabled={disabled}
             autoFocus={autoFocus}
             onChange={(e) => {
+              pendingPick.current = null;
               setDirty(true);
               setText(e.target.value);
               setOpen(true);

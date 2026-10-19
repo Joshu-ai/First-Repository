@@ -1,6 +1,6 @@
 // The rig profile, one component per section. Setup shows them one step at a time; the
 // profile page stacks them. Each section edits a ProfileDraft and shows errors by API field name.
-import { DRIVER_CLASSES, NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS } from '../../../../../shared/equipment';
+import { DEFAULT_FUEL_PRICE_PER_GALLON, DRIVER_CLASSES, NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS } from '../../../../../shared/equipment';
 import type { DriverClass, Endorsement } from '../../../../../shared/types';
 import { CityInput } from '../../../components/CityInput';
 import { DateTimeInput } from '../../../components/DateTimeInput';
@@ -9,7 +9,7 @@ import { InlineAlert } from '../../../components/Feedback';
 import { Checkbox, NumberInput, RadioCards, Switch, TextInput, type RadioCardOption } from '../../../components/Form';
 import { Icon } from '../../../components/Icon';
 import { StateMultiSelect } from '../../../components/StateMultiSelect';
-import { endorsementLabel, feet, lbs, money, number } from '../../../lib/format';
+import { endorsementLabel, feet, lbs, marketMonth, money, number } from '../../../lib/format';
 import { HotshotArt, SemiArt } from '../../public/illustrations';
 import { rememberCity } from './cities';
 import {
@@ -43,7 +43,7 @@ const CLASS_OPTIONS: RadioCardOption<DriverClass>[] = [
   {
     value: 'semi',
     title: 'Semi',
-    description: 'Class 8 tractor-trailer: dry van, reefer, flatbed, step deck, RGN, tanker and more.',
+    description: 'Class 8 tractor-trailer: dry van, reefer, flatbed, step deck, RGN, tanker, dry bulk and more.',
     media: <SemiArt height={44} />,
   },
 ];
@@ -421,7 +421,24 @@ export function PreferencesSection({ draft, onChange, errors }: SectionProps) {
           decimal
           value={draft.fuelPricePerGallon}
           onChange={(fuelPricePerGallon) => onChange({ fuelPricePerGallon })}
-          hint="What you’re paying at the pump."
+          hint={
+            <>
+              What you’re paying at the pump. The national average was{' '}
+              <span className="num">{money(DEFAULT_FUEL_PRICE_PER_GALLON, { cents: true })}</span> in {marketMonth()}.
+              {draft.fuelPricePerGallon !== DEFAULT_FUEL_PRICE_PER_GALLON ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => onChange({ fuelPricePerGallon: DEFAULT_FUEL_PRICE_PER_GALLON })}
+                  >
+                    Use {money(DEFAULT_FUEL_PRICE_PER_GALLON, { cents: true })}
+                  </button>
+                </>
+              ) : null}
+            </>
+          }
           error={errors.fuelPricePerGallon}
           required
         />

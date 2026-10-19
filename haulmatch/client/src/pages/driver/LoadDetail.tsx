@@ -23,6 +23,7 @@ import {
   feet,
   lane,
   lbs,
+  marketDataLine,
   miles,
   money,
   pickupTime,
@@ -60,6 +61,12 @@ const BACKHAUL_RADIUS_MILES = 150;
 
 export default function DriverLoadDetailPage() {
   const { id = '' } = useParams();
+  // One mount per load: going from one load to another in the app (a backhaul card, a toast link)
+  // starts from a skeleton, never from the previous load's data, dialog or Book button.
+  return <DriverLoadDetail key={id} id={id} />;
+}
+
+function DriverLoadDetail({ id }: { id: string }) {
   const detail = useApi((signal) => api.loads.get(id, { signal }), [id]);
   const backTo = useMemo(() => lastBoardPath(), []);
 
@@ -93,7 +100,7 @@ export default function DriverLoadDetailPage() {
     return <DetailSkeleton backTo={backTo} />;
   }
 
-  return <LoadDetailView key={id} data={detail.data} reload={() => void detail.reload()} backTo={backTo} />;
+  return <LoadDetailView data={detail.data} reload={() => void detail.reload()} backTo={backTo} />;
 }
 
 function DetailSkeleton({ backTo }: { backTo: string }) {
@@ -245,6 +252,7 @@ function LoadDetailView({ data, reload, backTo }: { data: LoadDetailResponse; re
                   </span>
                 </p>
               ) : null}
+              <p className="muted text-xs">{marketDataLine()}</p>
             </div>
           </Card>
         </aside>

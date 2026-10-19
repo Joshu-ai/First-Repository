@@ -144,7 +144,14 @@ function ShipperLoadsCard() {
           <StatsSkeleton />
         ) : (
           <StatGrid>
-            <StatTile label="Open" value={number(stats.data.open)} hint="Waiting on a driver" icon="boxes" tone="brand" to={paths.shipperHome} />
+            <StatTile
+              label="Open"
+              value={number(stats.data.open)}
+              hint={stats.data.expired > 0 ? `${number(stats.data.expired)} past pickup: edit or cancel` : 'Waiting on a driver'}
+              icon="boxes"
+              tone={stats.data.expired > 0 ? 'warn' : 'brand'}
+              to={paths.shipperHome}
+            />
             <StatTile
               label="Requests"
               value={number(stats.data.pendingRequests)}

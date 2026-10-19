@@ -16,6 +16,7 @@ import { EquipmentChips, EquipmentPicker } from '../../components/Equipment';
 import { EmptyState, ErrorState, InlineAlert, Skeleton } from '../../components/Feedback';
 import { Checkbox, NumberInput, RadioCards, Switch, TextArea, TextInput, type RadioCardOption } from '../../components/Form';
 import { Icon } from '../../components/Icon';
+import { ConfirmDialog } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/Toast';
 import { api, ApiError, errorMessage, isApiError } from '../../lib/api';
@@ -23,11 +24,13 @@ import { useSignedInUser } from '../../lib/auth';
 import { cx } from '../../lib/cx';
 import { lane, lbs, loadStatusLabel, miles, money, place, plural, ratePerMile, timeWindow } from '../../lib/format';
 import { useApi, useIsDesktop } from '../../lib/hooks';
+import { pickupWindowPassed } from '../../lib/loads';
 import { useServerEvent } from '../../lib/realtime';
 import { paths } from '../../lib/routes';
 import {
   addHours,
   apiErrorsToFields,
+  changesLaneOrSchedule,
   emptyLoadValues,
   hasErrors,
   hotshotFit,
@@ -228,6 +231,8 @@ function LoadForm({ mode, source }: LoadFormProps) {
   /** Why saving is blocked: a driver booked (or you cancelled) the load while it was being edited. */
   const [locked, setLocked] = useState<string | null>(null);
   const [minPickup] = useState(() => new Date().toISOString());
+  /** The edit cancels waiting requests and the shipper is being asked to confirm it. */
+  const [confirmCancelRequests, setConfirmCancelRequests] = useState(false);
 
   useServerEvent((event) => {
     if (mode === 'edit' && source && event.type === 'load_updated' && event.loadId === source.id && event.status !== 'open') {
@@ -268,6 +273,9 @@ function LoadForm({ mode, source }: LoadFormProps) {
   const sameCity = values.origin !== null && values.destination !== null && values.origin.id === values.destination.id;
   const cancelTo = source ? paths.shipperLoad(source.id) : paths.shipperHome;
   const submitLabel = mode === 'edit' ? 'Save changes' : 'Post load';
+  const waiting = mode === 'edit' && source ? source.pendingRequestCount : 0;
+  // A new lane, pickup window or delivery deadline cancels the waiting requests (the server's rule).
+  const cancelsRequests = waiting > 0 && source !== null && changesLaneOrSchedule(values, source);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -280,7 +288,14 @@ function LoadForm({ mode, source }: LoadFormProps) {
       focusFirstError(formRef.current);
       return;
     }
+    if (cancelsRequests) {
+      setConfirmCancelRequests(true);
+      return;
+    }
+    await save();
+  };
 
+  const save = async () => {
     setSubmitting(true);
     try {
       let saved: Load;
@@ -294,9 +309,11 @@ function LoadForm({ mode, source }: LoadFormProps) {
         saved = await api.loads.update(source.id, update);
         toast.success(
           'Changes saved',
-          source.pendingRequestCount > 0
-            ? `We told the ${plural(source.pendingRequestCount, 'driver')} with requests what changed.`
-            : `${lane(saved.origin, saved.destination)} is updated on the board.`,
+          cancelsRequests
+            ? `The ${plural(waiting, 'request')} waiting ${waiting === 1 ? 'was' : 'were'} cancelled, and we asked the ${waiting === 1 ? 'driver' : 'drivers'} to send a new one.`
+            : waiting > 0
+              ? `We told the ${plural(waiting, 'driver')} with requests what changed.`
+              : `${lane(saved.origin, saved.destination)} is updated on the board.`,
         );
       } else {
         saved = await api.loads.create(toLoadInput(values));
@@ -317,13 +334,24 @@ function LoadForm({ mode, source }: LoadFormProps) {
       }
     } finally {
       setSubmitting(false);
+      setConfirmCancelRequests(false);
     }
   };
 
   const sections = (
     <div className="stack-lg">
-      {mode === 'edit' && source && source.pendingRequestCount > 0 ? (
-        <InlineAlert tone="info" title={`${plural(source.pendingRequestCount, 'driver')} asked for this load`}>
+      {mode === 'edit' && source && pickupWindowPassed(source) && !pickupWindowChanged(values, source) ? (
+        <InlineAlert tone="warn" title="The pickup window has passed">
+          Drivers can’t see or book this load until you set a new pickup window.
+        </InlineAlert>
+      ) : null}
+      {cancelsRequests ? (
+        <InlineAlert tone="warn" title={`Saving cancels ${plural(waiting, 'waiting request')}`}>
+          A new lane, pickup window or delivery deadline cancels the requests drivers already sent. We’ll ask{' '}
+          {waiting === 1 ? 'the driver' : 'each driver'} to send a new one if it still works for them.
+        </InlineAlert>
+      ) : waiting > 0 ? (
+        <InlineAlert tone="info" title={`${plural(waiting, 'driver')} asked for this load`}>
           They’ll get a heads-up with what changed when you save.
         </InlineAlert>
       ) : null}
@@ -594,6 +622,17 @@ function LoadForm({ mode, source }: LoadFormProps) {
           </div>
         </>
       )}
+      <ConfirmDialog
+        open={confirmCancelRequests}
+        title={`Cancel ${plural(waiting, 'waiting request')}?`}
+        message={`You changed the lane, pickup window or delivery deadline. Saving cancels the ${waiting === 1 ? 'request' : 'requests'} drivers already sent, and we ask ${waiting === 1 ? 'the driver' : 'each driver'} to send a new one.`}
+        confirmLabel="Save and cancel requests"
+        cancelLabel="Keep editing"
+        tone="danger"
+        pending={submitting}
+        onConfirm={() => void save()}
+        onCancel={() => setConfirmCancelRequests(false)}
+      />
     </form>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from '../../client/src/lib/filters';
 import * as f from '../../client/src/lib/format';
 import { allowedBeforeSetup, homePathFor, paths, safeNextPath } from '../../client/src/lib/routes';
+import { MARKET_SNAPSHOT } from '../../shared/equipment';
 import type { LoadSearchFilters } from '../../shared/types';
 
 // Dates below are built from local wall-clock strings, so the assertions hold in any time zone.
@@ -175,5 +176,19 @@ describe('ApiError.fieldErrors', () => {
       email: 'That email is already registered',
     });
     expect(new ApiError(500, 'internal', 'x').fieldErrors()).toEqual({});
+  });
+});
+
+describe('format: market data', () => {
+  it('names the snapshot the rates and default diesel price come from', () => {
+    expect(f.marketDataLine()).toBe(
+      `Market data: DAT national averages, Sept 2026 · diesel $${MARKET_SNAPSHOT.dieselUsdPerGallon.toFixed(2)}`,
+    );
+    expect(MARKET_SNAPSHOT.dieselUsdPerGallon).toBe(6.29);
+    expect(f.marketMonth({ asOf: '2027-03' })).toBe('March 2027');
+    expect(f.marketMonth({ asOf: '2026-12' })).toBe('Dec 2026');
+    expect(f.marketDataLine({ asOf: '2026-06', dieselUsdPerGallon: 4.5 })).toBe(
+      'Market data: DAT national averages, June 2026 · diesel $4.50',
+    );
   });
 });

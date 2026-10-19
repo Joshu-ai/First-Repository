@@ -80,6 +80,27 @@ export function appendMessage(messages: Message[], message: Message): Message[] 
   return next;
 }
 
+/** An older page joined in front of what is shown (pages never overlap, but skip repeats anyway). */
+export function prependOlder(messages: Message[], older: Message[]): Message[] {
+  const seen = new Set(messages.map((m) => m.id));
+  const fresh = older.filter((m) => !seen.has(m.id));
+  return fresh.length ? [...fresh, ...messages] : messages;
+}
+
+/**
+ * A fresh read of the newest page joined to what is shown: earlier pages the person loaded stay in
+ * front of it, the page replaces its own span, and live messages newer than it stay after it.
+ */
+export function withNewestPage(messages: Message[], page: Message[]): Message[] {
+  if (page.length === 0) return messages;
+  const inPage = new Set(page.map((m) => m.id));
+  const start = page[0].createdAt;
+  const rest = messages.filter((m) => !inPage.has(m.id));
+  const before = rest.filter((m) => m.createdAt < start);
+  const after = rest.filter((m) => m.createdAt >= start);
+  return after.reduce(appendMessage, [...before, ...page]);
+}
+
 export interface DayGroup {
   key: string;
   label: string;
