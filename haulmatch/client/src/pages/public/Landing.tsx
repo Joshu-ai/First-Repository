@@ -7,71 +7,16 @@ import { LoadCard } from '../../components/LoadCard';
 import { MatchChecks } from '../../components/MatchDetails';
 import { useDocumentTitle } from '../../lib/hooks';
 import { paths } from '../../lib/routes';
+import { exampleChecks, exampleLoad } from './exampleLoad';
 import { HotshotArt, SemiArt, ShipperArt } from './illustrations';
 
-/** An illustrative load for the hero, built around "tomorrow 8 AM" so the time label reads naturally. */
-function useExampleLoad(): LoadWithMatch {
+/** The illustrative load for the hero, built once per visit (see exampleLoad.ts). */
+function useExampleLoad(): { load: LoadWithMatch; checks: MatchCheck[] } {
   return useMemo(() => {
-    const now = new Date();
-    const pickup = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 8, 0);
-    const pickupEnd = new Date(pickup.getTime() + 4 * 3_600_000);
-    const iso = (d: Date) => d.toISOString();
-    return {
-      id: 'example',
-      shipperId: 'example',
-      shipperName: 'Example shipper',
-      shipperCompany: 'Example shipper',
-      status: 'open',
-      origin: { cityId: 'houston-tx', city: 'Houston', state: 'TX', lat: 29.7604, lng: -95.3698 },
-      destination: { cityId: 'odessa-tx', city: 'Odessa', state: 'TX', lat: 31.8457, lng: -102.3676 },
-      pickupStart: iso(pickup),
-      pickupEnd: iso(pickupEnd),
-      deliveryBy: null,
-      equipmentTypes: ['HS_GOOSENECK', 'FLATBED'],
-      weightLbs: 9_200,
-      lengthFt: 32,
-      commodity: 'Oilfield pipe',
-      notes: '',
-      loadSize: 'full',
-      hazmat: false,
-      tarpRequired: false,
-      teamRequired: false,
-      rateUsd: 1_400,
-      miles: 514,
-      ratePerMile: 2.72,
-      bookingMode: 'instant',
-      referenceNumber: null,
-      bookedDriverId: null,
-      bookedRateUsd: null,
-      pendingRequestCount: 0,
-      createdAt: iso(now),
-      updatedAt: iso(now),
-      pickedUpAt: null,
-      deliveredAt: null,
-      match: {
-        eligible: true,
-        score: 91,
-        deadheadMiles: 18,
-        loadedMiles: 514,
-        totalMiles: 532,
-        effectiveRatePerMile: 2.63,
-        fuelCostUsd: 181,
-        estimatedProfitUsd: 1_219,
-        matchedEquipment: ['HS_GOOSENECK'],
-        checks: [],
-        highlights: ['Pickup is close by', 'Pays above market'],
-        breakdown: { deadhead: 88, rate: 96, fit: 92, timing: 100, lane: 60 },
-      },
-    };
+    const load = exampleLoad(new Date());
+    return { load, checks: exampleChecks(load) };
   }, []);
 }
-
-const EXAMPLE_CHECKS: MatchCheck[] = [
-  { key: 'equipment', ok: true, hard: true, label: 'Your gooseneck works' },
-  { key: 'weight', ok: true, hard: true, label: '9,200 lbs of your 10,000 lbs capacity, no CDL needed' },
-  { key: 'length', ok: true, hard: true, label: '32 ft fits your 40 ft deck' },
-  { key: 'deadhead', ok: true, hard: true, label: '18 mi deadhead to pickup' },
-];
 
 interface EntryCardProps {
   to: string;
@@ -156,9 +101,9 @@ export default function Landing() {
               <Icon name="eye" size={16} />
               Example load, as a hotshot driver sees it
             </p>
-            <LoadCard load={example} match={example.match} showShipper={false} />
+            <LoadCard load={example.load} match={example.load.match} showShipper={false} />
             <div className="hero__checks">
-              <MatchChecks checks={EXAMPLE_CHECKS} />
+              <MatchChecks checks={example.checks} />
             </div>
           </div>
         </div>
