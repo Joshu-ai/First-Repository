@@ -332,12 +332,25 @@ export const api = {
     searchCities: (q: string, limit?: number, opts?: RequestOptions) => get<City[]>('/cities', { q, limit }, opts),
     city: (cityId: string, opts?: RequestOptions) => get<City>(`/cities/${enc(cityId)}`, undefined, opts),
     rateEstimate: (
-      input: { originCityId: string; destinationCityId: string; equipment: EquipmentCode[] },
+      input: {
+        originCityId: string;
+        destinationCityId: string;
+        equipment: EquipmentCode[];
+        /** The freight, when known, so hotshot types never price freight no hotshot can carry. */
+        weightLbs?: number | null;
+        lengthFt?: number | null;
+      },
       opts?: RequestOptions,
     ) =>
       get<RateEstimate>(
         '/rates/estimate',
-        { originCityId: input.originCityId, destinationCityId: input.destinationCityId, equipment: input.equipment.join(',') },
+        {
+          originCityId: input.originCityId,
+          destinationCityId: input.destinationCityId,
+          equipment: input.equipment.join(','),
+          weightLbs: input.weightLbs,
+          lengthFt: input.lengthFt,
+        },
         opts,
       ),
   },

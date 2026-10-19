@@ -1,5 +1,6 @@
 import { EQUIPMENT, NON_CDL_HOTSHOT_MAX_PAYLOAD_LBS } from './equipment';
-import { driveHours, roadMiles } from './geo';
+import { roadMiles, transitHours } from './geo';
+import { estimateRate } from './rates';
 import type { DriverProfile, EquipmentCode, Load, MatchBreakdown, MatchCheck, MatchResult } from './types';
 
 /** The load fields the matcher reads, so callers can match drafts that are not saved yet. */
@@ -67,15 +68,37 @@ const CLOSED_STATUS_LABELS: Record<Exclude<Load['status'], 'open'>, string> = {
 /** A load only "heads toward home" when it closes at least this share of the distance home. */
 const TOWARD_HOME_MIN_GAIN = 0.25;
 
+/** Pay at or under this share of the lane market scores 0 on rate. */
+const RATE_FLOOR_RATIO = 0.7;
+/** Pay exactly at the lane market scores this on rate. */
+const AT_MARKET_RATE_SCORE = 60;
+/** Steepness of the rate curve, set so pay at market lands on AT_MARKET_RATE_SCORE. */
+const RATE_CURVE = -Math.log(1 - AT_MARKET_RATE_SCORE / 100) / (1 - RATE_FLOOR_RATIO);
+/** "Pays above market" from this share of the lane market. */
+const ABOVE_MARKET_RATIO = 1.1;
+
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const fmtLbs = (n: number) => n.toLocaleString('en-US');
 const fmtRate = (n: number) => `$${n.toFixed(2)}/mi`;
 
-/** Market benchmark for a load, judged by the equipment this driver would use to haul it. */
-export function benchmarkFor(equipment: EquipmentCode[]): number {
-  if (equipment.length === 0) return 0;
-  return Math.max(...equipment.map((e) => EQUIPMENT[e].benchmarkRatePerMile));
+/**
+ * Rate component (0..100) for pay at `marketRatio` times the lane market: 0 at 70% of market, 60 at
+ * market, then still rising with diminishing returns (78 at 120%, 91 at 150%, 98 at 2x), so pay keeps
+ * counting well past market instead of flattening out.
+ */
+export function rateScoreFor(marketRatio: number): number {
+  return Math.round(100 * (1 - Math.exp(-RATE_CURVE * Math.max(0, marketRatio - RATE_FLOOR_RATIO))));
+}
+
+/**
+ * What the market pays for this driver's whole run, deadhead included: the rate estimate for the
+ * loaded plus deadhead miles, on the cheapest equipment the driver would use (as estimateRate
+ * picks it). Judging the trip, not a flat $/mi, keeps short hops with their minimum charge and
+ * short-haul premium on the same footing as long runs.
+ */
+export function marketRateFor(load: MatchableLoad, equipment: EquipmentCode[], totalMiles: number): number {
+  return estimateRate(totalMiles, equipment, load).suggestedUsd;
 }
 
 export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: MatchOptions = {}): MatchResult {
@@ -163,9 +186,10 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
     );
   }
 
-  // Timing: can the driver reach pickup before the window closes?
+  // Timing: can the driver reach pickup before the window closes? A long deadhead includes the
+  // 10-hour break hours of service require after 11 hours of driving.
   const readyAt = Math.max(now.getTime(), driver.availableFrom ? new Date(driver.availableFrom).getTime() : 0);
-  const arriveAt = readyAt + driveHours(deadheadMiles ?? 0) * HOUR_MS;
+  const arriveAt = readyAt + transitHours(deadheadMiles ?? 0) * HOUR_MS;
   let timingScore: number;
   if (arriveAt > pickupEnd) {
     const late = Math.round((arriveAt - pickupEnd) / HOUR_MS);
@@ -198,10 +222,10 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
   );
 
   // Scores.
-  const benchmark = benchmarkFor(usableEquipment) || 2;
+  const marketRatio = load.rateUsd / marketRateFor(load, usableEquipment, totalMiles);
   const deadheadScore =
     deadheadMiles === null ? 60 : Math.round(100 * clamp01(1 - deadheadMiles / maxDeadhead));
-  let rateScore = Math.round(100 * clamp01((effectiveRatePerMile / benchmark - 0.7) / 0.5));
+  let rateScore = rateScoreFor(marketRatio);
   if (!rateOk) rateScore = Math.min(rateScore, 30);
   const utilization = Math.max(load.weightLbs / Math.max(1, driver.maxPayloadLbs), load.lengthFt / Math.max(1, driver.trailerLengthFt));
   const fitScore = Math.round(100 * (0.6 + 0.4 * clamp01(utilization / 0.8)));
@@ -223,7 +247,7 @@ export function matchLoad(load: MatchableLoad, driver: MatchableDriver, opts: Ma
 
   if (eligible) {
     if (deadheadMiles !== null && deadheadMiles <= 25) highlights.push('Pickup is close by');
-    if (effectiveRatePerMile >= benchmark * 1.1) highlights.push('Pays above market');
+    if (marketRatio >= ABOVE_MARKET_RATIO) highlights.push('Pays above market');
     if (laneScore.towardHome) highlights.push('Heads toward home');
     if (laneScore.preferred) highlights.push(`Delivers to ${load.destination.state}, a preferred state`);
     if (driver.driverClass === 'hotshot' && matchedEquipment.some((e) => EQUIPMENT[e].driverClass === 'hotshot')) {

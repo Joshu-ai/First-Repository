@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getCity, placeForCityId } from '../../shared/cities';
 import { EQUIPMENT_CODES } from '../../shared/equipment';
-import { driveHours, roadMiles } from '../../shared/geo';
+import { roadMiles, transitHours } from '../../shared/geo';
 import { compareMatches, matchLoad } from '../../shared/matching';
 import type {
   BookLoadResponse,
@@ -505,11 +505,15 @@ function advanceTrip(ctx: AppContext, load: Load, driver: User, status: 'in_tran
 
 // ---- Driver and shipper helpers ----
 
-/** Open loads near this load's drop, matched as if the driver is empty there once it delivers. */
+/**
+ * Open loads near this load's drop, matched as if the driver is empty there once it delivers.
+ * With no delivery deadline, the drop is the run's transit time (hours-of-service breaks included)
+ * after pickup closes.
+ */
 function backhaulsFor(ctx: AppContext, load: Load, profile: DriverProfile, viewerId: string): LoadWithMatch[] {
   const droppedAt = load.deliveryBy
     ? Date.parse(load.deliveryBy)
-    : Date.parse(load.pickupEnd) + driveHours(load.miles) * HOUR_MS;
+    : Date.parse(load.pickupEnd) + transitHours(load.miles) * HOUR_MS;
   const ownReady = profile.availableFrom ? Date.parse(profile.availableFrom) : 0;
   const atDrop: DriverProfile = {
     ...profile,

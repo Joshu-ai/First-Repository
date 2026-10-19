@@ -22,8 +22,23 @@ export function roadMiles(a: LatLng, b: LatLng): number {
   return Math.round(haversineMiles(a, b) * ROAD_CIRCUITY_FACTOR);
 }
 
+/** Hours behind the wheel for a run at AVERAGE_SPEED_MPH, with no rest breaks. */
 export function driveHours(miles: number): number {
   return miles / AVERAGE_SPEED_MPH;
+}
+
+/** Hours-of-service limits for a property-carrying driver (49 CFR 395.3). */
+export const HOS_MAX_DRIVING_HOURS = 11;
+export const HOS_BREAK_HOURS = 10;
+
+/**
+ * Hours on the road for a run, counting the 10-hour break a driver must take after every 11 hours
+ * of driving. A run of exactly 11 hours needs no break; 11 h 1 min needs one.
+ */
+export function transitHours(miles: number): number {
+  const drive = driveHours(Math.max(0, miles));
+  const breaks = Math.max(0, Math.ceil(drive / HOS_MAX_DRIVING_HOURS) - 1);
+  return drive + breaks * HOS_BREAK_HOURS;
 }
 
 export const US_STATES: Record<string, string> = {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getCity } from '../../shared/cities';
-import { roadMiles } from '../../shared/geo';
+import { driveHours, roadMiles, transitHours } from '../../shared/geo';
 import { compareMatches } from '../../shared/matching';
 import type {
   Booking,
@@ -735,6 +735,22 @@ describe('GET /api/loads/:id/backhauls', () => {
     const ids = ((await driver.c.get(`/api/loads/${withDeadline.id}/backhauls`)).body as LoadWithMatch[]).map((l) => l.id);
     expect(ids).toContain(afterDrop.id);
     expect(ids).not.toContain(early.id);
+  });
+
+  it('counts the hours-of-service break on a long run with no delivery deadline', async () => {
+    // Regression: the drop was timed as non-stop driving. Houston -> El Paso is about 16 h behind
+    // the wheel, so the truck is legally empty about 26 h after pickup closes (+30h), not 16 h.
+    const longRun = insertLoad(t, shipper.user.id, { destinationCityId: 'el-paso-tx' });
+    expect(driveHours(longRun.miles)).toBeGreaterThan(11);
+    const nonStop = 30 + driveHours(longRun.miles);
+    const legal = 30 + transitHours(longRun.miles);
+    expect(legal - nonStop).toBe(10);
+    const elPaso = { originCityId: 'el-paso-tx', destinationCityId: 'odessa-tx' };
+    const beforeBreakEnds = insertLoad(t, shipper.user.id, { ...elPaso, pickupStart: at(t, nonStop - 2), pickupEnd: at(t, nonStop + 4) });
+    const afterBreak = insertLoad(t, shipper.user.id, { ...elPaso, pickupStart: at(t, legal), pickupEnd: at(t, legal + 8) });
+    const ids = ((await driver.c.get(`/api/loads/${longRun.id}/backhauls`)).body as LoadWithMatch[]).map((l) => l.id);
+    expect(ids).toContain(afterBreak.id);
+    expect(ids).not.toContain(beforeBreakEnds.id);
   });
 
   it('returns at most 10', async () => {

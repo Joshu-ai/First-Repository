@@ -12,14 +12,31 @@ export interface EquipmentInfo {
   typicalPayloadLbs: number;
   requiresEndorsement?: Endorsement;
   /**
-   * Demo market benchmark, all-in spot USD per loaded mile, in line with 2025 DAT national
-   * averages (van ~$2.00–2.30, reefer ~$2.35–2.70, flatbed ~$2.40–2.60) at diesel near
-   * DEFAULT_FUEL_PRICE_PER_GALLON. Illustrative figures for matching and rate suggestions, not live data.
+   * Market benchmark, all-in spot USD per loaded mile (fuel included), as of MARKET_SNAPSHOT.
+   * Dry van, reefer and flatbed are DAT's national spot averages (benchmarkFromDat); the rest are
+   * estimates derived from them. Used for matching and rate suggestions; not live data.
    */
   benchmarkRatePerMile: number;
+  /** True when benchmarkRatePerMile is DAT's published national average, not a derived estimate. */
+  benchmarkFromDat?: boolean;
   /** Lowest all-in charge a carrier typically accepts for a short run with this equipment. */
   minimumChargeUsd: number;
 }
+
+/**
+ * When the rate benchmarks were last set and where they come from. DAT's September 2026 national
+ * spot averages (fuel included): dry van $3.01/mi, reefer $3.62/mi, flatbed $3.61/mi, with record
+ * fuel shares (van $0.84, reefer $0.92, flatbed $1.01 per mile). EIA's weekly on-highway diesel
+ * averaged $6.29/gal over September 2026 (weekly record $6.53 on Sep 21). Hotshot, step deck, RGN,
+ * Conestoga, tanker, dry bulk and power-only figures are estimates scaled from those averages.
+ * Update every figure together, and asOf with them, when the market moves.
+ */
+export const MARKET_SNAPSHOT = {
+  /** Year and month the benchmarks describe (YYYY-MM). */
+  asOf: '2026-09',
+  label: 'DAT national spot averages, Sept 2026 (fuel included)',
+  dieselUsdPerGallon: 6.29,
+} as const;
 
 export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
   HS_GOOSENECK: {
@@ -30,8 +47,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: '1-ton dually pulling a 30–40 ft gooseneck flatbed. The standard hotshot setup.',
     typicalLengthFt: 40,
     typicalPayloadLbs: 16_500,
-    benchmarkRatePerMile: 1.85,
-    minimumChargeUsd: 300,
+    benchmarkRatePerMile: 2.4,
+    minimumChargeUsd: 400,
   },
   HS_BUMPER_PULL: {
     code: 'HS_BUMPER_PULL',
@@ -41,8 +58,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Pickup with a 20–32 ft tag-along flatbed. Lighter, shorter freight.',
     typicalLengthFt: 25,
     typicalPayloadLbs: 9_000,
-    benchmarkRatePerMile: 1.7,
-    minimumChargeUsd: 250,
+    benchmarkRatePerMile: 2.2,
+    minimumChargeUsd: 325,
   },
   HS_DOVETAIL: {
     code: 'HS_DOVETAIL',
@@ -52,8 +69,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Gooseneck with a dovetail and ramps for equipment you drive or winch on.',
     typicalLengthFt: 40,
     typicalPayloadLbs: 15_000,
-    benchmarkRatePerMile: 1.95,
-    minimumChargeUsd: 325,
+    benchmarkRatePerMile: 2.5,
+    minimumChargeUsd: 425,
   },
   HS_CAR_HAULER: {
     code: 'HS_CAR_HAULER',
@@ -63,8 +80,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: '2- or 3-car wedge or gooseneck trailer for vehicles.',
     typicalLengthFt: 40,
     typicalPayloadLbs: 12_000,
-    benchmarkRatePerMile: 1.9,
-    minimumChargeUsd: 300,
+    benchmarkRatePerMile: 2.45,
+    minimumChargeUsd: 375,
   },
   DRY_VAN: {
     code: 'DRY_VAN',
@@ -74,8 +91,9 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Enclosed 53 ft trailer for palletized and boxed freight.',
     typicalLengthFt: 53,
     typicalPayloadLbs: 45_000,
-    benchmarkRatePerMile: 2.1,
-    minimumChargeUsd: 450,
+    benchmarkRatePerMile: 3.01,
+    benchmarkFromDat: true,
+    minimumChargeUsd: 650,
   },
   REEFER: {
     code: 'REEFER',
@@ -85,8 +103,9 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Temperature-controlled 53 ft trailer.',
     typicalLengthFt: 53,
     typicalPayloadLbs: 43_500,
-    benchmarkRatePerMile: 2.45,
-    minimumChargeUsd: 500,
+    benchmarkRatePerMile: 3.62,
+    benchmarkFromDat: true,
+    minimumChargeUsd: 750,
   },
   FLATBED: {
     code: 'FLATBED',
@@ -96,8 +115,9 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: '48 ft open deck for steel, lumber, machinery and building materials.',
     typicalLengthFt: 48,
     typicalPayloadLbs: 48_000,
-    benchmarkRatePerMile: 2.55,
-    minimumChargeUsd: 500,
+    benchmarkRatePerMile: 3.61,
+    benchmarkFromDat: true,
+    minimumChargeUsd: 700,
   },
   STEP_DECK: {
     code: 'STEP_DECK',
@@ -107,8 +127,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Drop deck for taller freight that will not clear on a flatbed.',
     typicalLengthFt: 53,
     typicalPayloadLbs: 46_000,
-    benchmarkRatePerMile: 2.75,
-    minimumChargeUsd: 550,
+    benchmarkRatePerMile: 3.85,
+    minimumChargeUsd: 775,
   },
   RGN: {
     code: 'RGN',
@@ -118,8 +138,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Removable gooseneck lowboy for heavy and oversize equipment.',
     typicalLengthFt: 48,
     typicalPayloadLbs: 42_000,
-    benchmarkRatePerMile: 3.6,
-    minimumChargeUsd: 800,
+    benchmarkRatePerMile: 4.75,
+    minimumChargeUsd: 1_050,
   },
   CONESTOGA: {
     code: 'CONESTOGA',
@@ -129,20 +149,32 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Flatbed with a rolling tarp system for freight that must stay covered.',
     typicalLengthFt: 53,
     typicalPayloadLbs: 44_000,
-    benchmarkRatePerMile: 2.9,
-    minimumChargeUsd: 550,
+    benchmarkRatePerMile: 3.9,
+    minimumChargeUsd: 750,
   },
   TANKER: {
     code: 'TANKER',
     label: 'Tanker',
     shortLabel: 'Tanker',
     driverClass: 'semi',
-    description: 'Liquid or dry bulk tank trailer. Requires the tanker (N) endorsement.',
+    description: 'Liquid or gas tank trailer. Requires the tanker (N) endorsement.',
     typicalLengthFt: 45,
     typicalPayloadLbs: 45_000,
     requiresEndorsement: 'tanker',
-    benchmarkRatePerMile: 2.95,
-    minimumChargeUsd: 600,
+    benchmarkRatePerMile: 3.8,
+    minimumChargeUsd: 775,
+  },
+  DRY_BULK: {
+    code: 'DRY_BULK',
+    label: 'Dry bulk (pneumatic)',
+    shortLabel: 'Dry bulk',
+    driverClass: 'semi',
+    description: 'Pneumatic tank for frac sand, cement and other dry bulk. No tanker (N) endorsement needed.',
+    typicalLengthFt: 45,
+    typicalPayloadLbs: 48_000,
+    // Priced like a tanker: specialised equipment, mostly one-way runs.
+    benchmarkRatePerMile: 3.8,
+    minimumChargeUsd: 775,
   },
   POWER_ONLY: {
     code: 'POWER_ONLY',
@@ -152,8 +184,8 @@ export const EQUIPMENT: Record<EquipmentCode, EquipmentInfo> = {
     description: 'Tractor only. Hooks to the shipper’s preloaded trailer.',
     typicalLengthFt: 53,
     typicalPayloadLbs: 45_000,
-    benchmarkRatePerMile: 1.9,
-    minimumChargeUsd: 400,
+    benchmarkRatePerMile: 2.7,
+    minimumChargeUsd: 575,
   },
 };
 
@@ -199,7 +231,7 @@ export const DRIVER_CLASSES: Record<DriverClass, DriverClassInfo> = {
     description: 'Pickup and flatbed or gooseneck trailer. Fast, smaller, time-critical freight.',
     defaultMpg: 11,
     defaultMaxDeadheadMiles: 150,
-    defaultMinRatePerMile: 1.5,
+    defaultMinRatePerMile: 1.85,
   },
   semi: {
     driverClass: 'semi',
@@ -207,8 +239,9 @@ export const DRIVER_CLASSES: Record<DriverClass, DriverClassInfo> = {
     description: 'Class 8 tractor-trailer. Full truckload and heavy freight.',
     defaultMpg: 6.5,
     defaultMaxDeadheadMiles: 200,
-    defaultMinRatePerMile: 1.9,
+    defaultMinRatePerMile: 2.4,
   },
 };
 
-export const DEFAULT_FUEL_PRICE_PER_GALLON = 3.75;
+/** Starting diesel price for new driver profiles: the latest national average in MARKET_SNAPSHOT. */
+export const DEFAULT_FUEL_PRICE_PER_GALLON: number = MARKET_SNAPSHOT.dieselUsdPerGallon;

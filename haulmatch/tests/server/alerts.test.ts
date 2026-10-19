@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { placeForCityId } from '../../shared/cities';
+import { roadMiles } from '../../shared/geo';
 import { matchLoad } from '../../shared/matching';
+import { estimateRate } from '../../shared/rates';
 import type { Load, LoadSearchFilters } from '../../shared/types';
-import { alertDriversForLoad, HOT_MATCH_MIN_SCORE, MAX_HOT_MATCH_ALERTS } from '../../server/alerts';
+import { alertDriversForLoad, formatUsd, HOT_MATCH_MIN_SCORE, MAX_HOT_MATCH_ALERTS } from '../../server/alerts';
 import type { AppContext } from '../../server/context';
 import { bool } from '../../server/db';
 import { getDriverProfile } from '../../server/mappers';
@@ -120,7 +123,10 @@ describe('alertDriversForLoad', () => {
     const hot = cities.map((currentCityId) => seedUser(t, { role: 'driver', driver: { currentCityId } }));
     const offDuty = seedUser(t, { role: 'driver', driver: { available: false } });
     const cool = farishDriver();
-    const load = insertLoad(t, shipper.user.id);
+    // Twice the lane market, so drivers up to ~30 mi out still score as hot matches.
+    const miles = roadMiles(placeForCityId('houston-tx')!, placeForCityId('odessa-tx')!);
+    const rateUsd = 2 * estimateRate(miles, ['HS_GOOSENECK']).suggestedUsd;
+    const load = insertLoad(t, shipper.user.id, { rateUsd });
 
     const scores = new Map(hot.map((d) => [d.user.id, scoreOf(t, load, d.user.id).score]));
     expect([...scores.values()].every((s) => s >= HOT_MATCH_MIN_SCORE)).toBe(true);
@@ -136,9 +142,24 @@ describe('alertDriversForLoad', () => {
 
     const [note] = notificationsFor(t, alerted[0].user.id);
     expect(note).toMatchObject({ type: 'load_match', title: 'Hot match near you', link: `/driver/loads/${load.id}` });
-    expect(note.body).toContain('Houston, TX → Odessa, TX · $1,400');
+    expect(note.body).toContain(`Houston, TX → Odessa, TX · ${formatUsd(rateUsd)}`);
     expect(notificationsFor(t, offDuty.user.id)).toEqual([]);
     expect(notificationsFor(t, cool.user.id)).toEqual([]);
+  });
+
+  it('sends no hot match for a short hop posted at market, only for one that pays well over it', async () => {
+    // Regression: a flat $/mi benchmark scored every short hop at market as a near-perfect match.
+    const driver = seedUser(t, { role: 'driver' });
+    const miles = roadMiles(placeForCityId('houston-tx')!, placeForCityId('baytown-tx')!);
+    const market = estimateRate(miles, ['HS_GOOSENECK']).suggestedUsd;
+    const atMarket = insertLoad(t, shipper.user.id, { destinationCityId: 'baytown-tx', rateUsd: market });
+    expect(scoreOf(t, atMarket, driver.user.id)).toMatchObject({ eligible: true, highlights: expect.not.arrayContaining(['Pays above market']) });
+    expect(scoreOf(t, atMarket, driver.user.id).score).toBeLessThan(HOT_MATCH_MIN_SCORE);
+    expect(alertDriversForLoad(ctxOf(t), atMarket)).toBe(0);
+
+    const wellPaid = insertLoad(t, shipper.user.id, { destinationCityId: 'baytown-tx', rateUsd: 2 * market });
+    expect(scoreOf(t, wellPaid, driver.user.id).score).toBeGreaterThanOrEqual(HOT_MATCH_MIN_SCORE);
+    expect(alertDriversForLoad(ctxOf(t), wellPaid)).toBe(1);
   });
 
   it('gives saved-search drivers their alert without using up a hot-match slot', async () => {

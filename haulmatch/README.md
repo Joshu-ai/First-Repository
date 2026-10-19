@@ -19,7 +19,8 @@ request, and the shipper accepts it. Messages and status changes reach both side
 - **Ranked load board.** Loads you can't haul are hidden, and the rest are sorted by match score. Each card
   shows the lane, freight, posted rate and $/mi, deadhead, all-in $/mi, and estimated profit after fuel.
   - Filters for pickup near a city (with radius), destination states, equipment, minimum $/mi, max weight,
-    pickup dates and hazmat, plus a text search.
+    pickup dates and hazmat, plus a text search that reads places the way the city picker does
+    ("st louis", "ft worth texas", "winston salem").
   - Six sorts (best, rate, deadhead, pickup, newest, profit), and list and map views.
   - "Show loads I can't take" lists the loads that don't fit, each with the reasons.
 - **Load detail**:
@@ -39,7 +40,7 @@ request, and the shipper accepts it. Messages and status changes reach both side
 
 - **Post, edit, repost or cancel a load.**
   - Road miles appear as soon as both cities are picked, with a market rate estimate (low, suggested,
-    high, and $/mi).
+    high, and $/mi). Freight too heavy or long for a hotshot is priced on the semi equipment listed.
   - An *Open to hotshot* switch, with a warning when the freight is too big for a typical hotshot.
   - Instant-book or review-requests mode.
 - **Dashboard**: stat tiles, loads by status, and a *Requests waiting* panel with Accept and Decline on
@@ -74,11 +75,11 @@ eligibility, the score, every check, and the money.
 | equipment | The load accepts at least one trailer type the driver runs. |
 | weight / length | The load fits within the driver's max payload and deck length. |
 | cdl | Semi-only equipment needs a Class A CDL. A hotshot without a Class A CDL is capped at 10,000 lbs, because a combination of 26,001 lbs or more needs Class A. A Class B CDL does not cover combinations. |
-| hazmat / tanker | Needs a CDL with the H or N endorsement. |
+| hazmat / tanker | Needs a CDL with the H or N endorsement. N covers liquid or gas tanks (`TANKER`); pneumatic dry bulk such as frac sand or cement (`DRY_BULK`) needs none. |
 | team | A team load needs a team driver. |
 | avoid_state | The load delivers to a state the driver avoids. |
 | deadhead | The load is within the driver's max deadhead. This check becomes **soft** (scored, not enforced) on the load detail page, for backhauls, for shipper views, and when the driver searches "pickup near" another city, because then they are planning the next run. |
-| timing | The driver can reach pickup (at 50 mph from when they are free) before the window closes. |
+| timing | The driver can reach pickup before the window closes: 50 mph from when they are free, plus the 10 h break hours of service require after every 11 h of driving. |
 
 `rate` is a soft check. Pay under the driver's minimum all-in $/mi caps the rate component at 30.
 
@@ -86,14 +87,14 @@ eligibility, the score, every check, and the money.
 
 | Component | Weight | How it is scored |
 |---|---|---|
-| rate | 0.35 | All-in $/mi (rate ÷ loaded + deadhead miles) against the equipment benchmark: 70% of benchmark scores 0, and 120% or more scores 100. |
+| rate | 0.35 | The rate against what the market pays for the driver's whole run: `estimateRate` on loaded + deadhead miles, on the cheapest equipment the driver would use (the same pick as the shipper's estimate, so minimum charges and the short-haul premium count). 70% of market scores 0 and market scores 60; above market it keeps rising with diminishing returns (120% → 78, 150% → 91, 2× → 98). |
 | deadhead | 0.30 | 100 at the pickup, falling linearly to 0 at the driver's max deadhead. 60 if the driver has no location. |
 | timing | 0.15 | 100 if pickup opens within 12 h of when the driver is free, easing to 20 over the following 3½ days of waiting. |
 | fit | 0.10 | 60 to 100 depending on how well the freight uses the deck or payload (full at 80% use). |
 | lane | 0.10 | Higher when the load delivers to a preferred state, or closes at least 25% of the distance home. |
 
-Highlights ("Pickup is close by", "Pays above market", "Heads toward home", and others) explain the score
-in plain words. Estimated profit is the rate minus fuel for loaded plus deadhead miles, at the driver's
+Highlights ("Pickup is close by", "Pays above market" at 10% or more over that market, "Heads toward home",
+and others) explain the score in plain words. Estimated profit is the rate minus fuel for loaded plus deadhead miles, at the driver's
 mpg and diesel price.
 
 ## Quick start
@@ -213,18 +214,24 @@ brief:
 
 ## What is demo-grade (read before relying on it)
 
-- **Rates are benchmarks, not live market data.**
-  - Per-mile benchmarks per equipment type (dry van $2.10, reefer $2.45, flatbed $2.55, hotshot
-    $1.70–1.95) and the default diesel price ($3.75/gal) reflect 2025 to early-2026 national averages.
-  - They run well behind late-2026 spot rates.
-  - Estimates add a short-haul uplift and a minimum charge, then round to $25.
+- **Rates are a monthly snapshot, not live market data.** `MARKET_SNAPSHOT` in `shared/equipment.ts`
+  names the month every figure describes, and each rate estimate's basis cites it.
+  - Dry van $3.01, reefer $3.62 and flatbed $3.61 per mile are DAT's September 2026 national spot
+    averages, fuel included. Step deck, Conestoga, RGN, tanker, dry bulk, power only and the hotshot
+    rigs ($2.20–2.50) are estimates derived from them.
+  - The default diesel price, $6.29/gal, is EIA's September 2026 on-highway average. Driver minimums
+    default to $1.85/mi (hotshot) and $2.40/mi (semi).
+  - Estimates add a short-haul uplift and a minimum charge, then round to $25. Update every figure and
+    `asOf` together when the market moves.
 - **Miles are approximate.** Road miles are great-circle distance × 1.17 circuity, not routed miles. Drive
-  time assumes 50 mph and ignores hours-of-service rules (11 h driving, then a 10 h break), so very long
-  deadheads look more reachable than they are.
+  time assumes 50 mph with a 10 h break after every 11 h of driving; it does not know how many hours a
+  driver has already used today.
 - **Hazmat** checks treat every hazmat load as placarded. The avoid-state check looks only at the delivery
   state.
 - **City data.** Cities come from a static dataset of US freight hubs, with GeoNames populations and
-  coordinates.
+  coordinates, plus oilfield, ag and border towns added by hand. A few census names were corrected to the
+  names people use (Boise, Augusta, Athens, Lexington, Ventura, Weymouth, Barnstable); their ids keep the
+  old slugs so stored rows still resolve. City search takes a state as a code or spelled out.
 - **No payments, invoicing, quick-pay or factoring.**
 - **No ELD, GPS tracking or documents.** There is no BOL or POD upload. "Picked up" and "Delivered" are
   taps.

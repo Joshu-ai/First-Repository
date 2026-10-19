@@ -40,7 +40,7 @@ const allLoads = (db: Db): Load[] =>
   rows(db, 'SELECT id FROM loads ORDER BY id').map((r) => getLoadById(db, String(r.id))!);
 const ms = (iso: string | null): number => (iso === null ? NaN : Date.parse(iso));
 
-const SEMI_ONLY_CODES = new Set<EquipmentCode>(['DRY_VAN', 'REEFER', 'TANKER', 'POWER_ONLY']);
+const SEMI_ONLY_CODES = new Set<EquipmentCode>(['DRY_VAN', 'REEFER', 'TANKER', 'DRY_BULK', 'POWER_ONLY']);
 const OPEN_DECKS = new Set<EquipmentCode>(['FLATBED', 'STEP_DECK']);
 const HEAVY_MACHINERY = /Excavator \(CAT|Dozer|Motor grader|Wheel loader|Combine/;
 const NOTIFICATION_TYPES = new Set([
@@ -83,7 +83,8 @@ function loadProblems(load: Load, now: number): string[] {
   }
   if (hotshot && eq.some((e) => SEMI_ONLY_CODES.has(e))) bad('van/reefer/tank freight offered to hotshots');
   if (hotshot && load.teamRequired) bad('team hotshot load');
-  if (eq.includes('TANKER') && eq.length > 1) bad('tank freight mixed with other equipment');
+  if ((eq.includes('TANKER') || eq.includes('DRY_BULK')) && eq.length > 1) bad('tank freight mixed with other equipment');
+  if (/pneumatic|frac sand/i.test(load.commodity) && eq.join() !== 'DRY_BULK') bad('dry bulk not posted as DRY_BULK');
   if (load.weightLbs > Math.max(...eq.map((e) => EQUIPMENT[e].typicalPayloadLbs))) bad('heavier than any rig carries');
   if (load.lengthFt > Math.max(...eq.map((e) => EQUIPMENT[e].typicalLengthFt))) bad('longer than any accepted deck');
   if (HEAVY_MACHINERY.test(load.commodity) && !eq.includes('RGN')) bad('heavy machinery without RGN');
@@ -238,6 +239,7 @@ describe('seedDatabase', () => {
     const fleet = new Set(drivers.flatMap((p) => p.equipmentTypes));
     const expected: EquipmentCode[] = [
       'HS_GOOSENECK', 'HS_DOVETAIL', 'HS_CAR_HAULER', 'DRY_VAN', 'REEFER', 'FLATBED', 'STEP_DECK', 'RGN', 'TANKER',
+      'DRY_BULK',
     ];
     expect(expected.filter((code) => !fleet.has(code))).toEqual([]);
     expect(drivers.some((p) => p.teamDriver)).toBe(true);
@@ -256,12 +258,28 @@ describe('seedDatabase', () => {
     expect(hotshot.filter((l) => oilStates.has(l.origin.state)).length / hotshot.length).toBeGreaterThan(0.6);
     const alsoOnDecks = hotshot.filter((l) => l.equipmentTypes.some((e) => OPEN_DECKS.has(e)));
     expect(alsoOnDecks.length).toBeGreaterThan(20);
-    const posted: EquipmentCode[] = ['DRY_VAN', 'REEFER', 'FLATBED', 'STEP_DECK', 'RGN', 'TANKER', 'HS_CAR_HAULER'];
+    const posted: EquipmentCode[] = ['DRY_VAN', 'REEFER', 'FLATBED', 'STEP_DECK', 'RGN', 'TANKER', 'DRY_BULK', 'HS_CAR_HAULER'];
     expect(posted.filter((code) => !open.some((l) => l.equipmentTypes.includes(code)))).toEqual([]);
     expect(open.some((l) => l.hazmat && l.equipmentTypes.includes('TANKER'))).toBe(true);
     const pickupDays = new Set(open.map((l) => Math.floor((ms(l.pickupStart) - NOW.getTime()) / DAY)));
     expect(pickupDays.size).toBeGreaterThanOrEqual(5);
     expect(new Set(open.map((l) => l.shipperCompany)).size).toBe(5);
+  });
+
+  it('posts pneumatic frac sand as dry bulk, which needs no tanker endorsement', () => {
+    const open = allLoads(db).filter((l) => l.status === 'open');
+    const sand = open.filter((l) => /frac sand/i.test(l.commodity));
+    expect(sand.length).toBeGreaterThan(0);
+    expect(sand.every((l) => l.equipmentTypes.join() === 'DRY_BULK' && !l.hazmat)).toBe(true);
+    const hector = rows(db, "SELECT id FROM users WHERE email = 'hector.salinas@demo.haulmatch.app'").map(
+      (r) => getDriverProfile(db, String(r.id))!,
+    )[0];
+    expect(hector.equipmentTypes).toEqual(expect.arrayContaining(['TANKER', 'DRY_BULK']));
+    const noN = { ...hector, endorsements: [] };
+    for (const load of sand) {
+      const checks = matchLoad(load, noN, { now: NOW, ignoreDeadheadLimit: true }).checks;
+      expect(checks.find((c) => c.key === 'tanker')).toBeUndefined();
+    }
   });
 
   for (const [label, email] of [['hotshot', DEMO_EMAILS.hotshot], ['semi', DEMO_EMAILS.semi]] as const) {

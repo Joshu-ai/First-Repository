@@ -93,7 +93,7 @@ export function EquipmentSection({ draft, onChange, errors }: SectionProps) {
 
 const ENDORSEMENT_HINTS: Record<Endorsement, string> = {
   hazmat: 'Placarded hazardous materials.',
-  tanker: 'Liquid or bulk tank loads.',
+  tanker: 'Liquid or gas tank loads. Pneumatic dry bulk needs none.',
   doubles_triples: 'Pulling doubles or triples.',
   twic: 'Port and terminal access card. No CDL needed.',
 };

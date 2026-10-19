@@ -11,10 +11,35 @@ const slug = (text: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
+/**
+ * Cities whose census name was corrected to the name people use. Their ids keep the old slug so
+ * stored profiles, loads and saved searches keep resolving.
+ */
+const RENAMED: Record<string, string> = {
+  'lexington-fayette-ky': 'Lexington',
+  'boise-city-id': 'Boise',
+  'augusta-richmond-county-ga': 'Augusta',
+  'athens-clarke-county-ga': 'Athens',
+  'san-buenaventura-ventura-ca': 'Ventura',
+  'weymouth-town-ma': 'Weymouth',
+  'barnstable-town-ma': 'Barnstable',
+};
+
 describe('city dataset', () => {
   it('has unique ids derived from name and state', () => {
     expect(new Set(CITIES.map((c) => c.id)).size).toBe(CITIES.length);
-    for (const c of CITIES) expect(c.id).toBe(`${slug(c.name)}-${c.state.toLowerCase()}`);
+    for (const c of CITIES.filter((city) => !(city.id in RENAMED))) expect(c.id).toBe(`${slug(c.name)}-${c.state.toLowerCase()}`);
+  });
+
+  it('shows the names drivers use, not census consolidated-government names', () => {
+    for (const [id, name] of Object.entries(RENAMED)) expect(getCity(id)?.name, id).toBe(name);
+    const gazetteer = /-County|County$|\(|\)|-Fayette| Town$/;
+    expect(CITIES.filter((c) => gazetteer.test(c.name)).map(label)).toEqual([]);
+    expect(labels('boise', 1)).toEqual(['Boise, ID']);
+    expect(labels('augusta, ga')).toEqual(['Augusta, GA']);
+    expect(labels('lexington ky')).toEqual(['Lexington, KY']);
+    expect(labels('ventura')).toContain('Ventura, CA');
+    expect(placeForCityId('boise-city-id')).toMatchObject({ cityId: 'boise-city-id', city: 'Boise', state: 'ID' });
   });
 
   it('uses valid state codes, US coordinates and populations', () => {
@@ -164,6 +189,31 @@ describe('searchCities: query forms', () => {
 
   it('reads a trailing state code before any abbreviation', () => {
     expect(labels('billings mt')).toEqual(['Billings, MT']);
+  });
+
+  it('narrows to a state typed out in full', () => {
+    // Regression: only two-letter codes were read as states, so these all returned nothing.
+    expect(labels('Houston, Texas')).toEqual(['Houston, TX']);
+    expect(labels('el paso, texas')).toEqual(['El Paso, TX']);
+    expect(labels('Albuquerque, New Mexico')).toEqual(['Albuquerque, NM']);
+    expect(labels('springfield missouri')).toEqual(['Springfield, MO']);
+    expect(labels('williston north dakota')).toEqual(['Williston, ND']);
+    expect(labels('charleston west virginia')).toEqual(['Charleston, WV']);
+    expect(labels('charleston, south carolina')).toEqual(['Charleston, SC', 'North Charleston, SC']);
+    expect(labels('kansas city kansas')).toEqual(['Kansas City, KS']);
+    expect(labels('washington district of columbia')).toEqual(['Washington, DC']);
+    expect(searchCities('dallas, oklahoma')).toEqual([]);
+  });
+
+  it('lists the cities of a state for a bare state name, after cities named like it', () => {
+    const texas = labels('texas', 5);
+    expect(texas[0]).toBe('Texas City, TX');
+    expect(texas.slice(1)).toEqual(searchCities('TX', 4).map(label));
+    expect(searchCities('new mexico', 25).every((c) => c.state === 'NM')).toBe(true);
+    expect(searchCities('new mexico', 25).length).toBeGreaterThan(5);
+    // A state name that is also a city still finds the city first.
+    expect(labels('new york', 3)).toEqual(['New York, NY', 'West New York, NJ', 'Buffalo, NY']);
+    expect(labels('washington', 1)).toEqual(['Washington, DC']);
   });
 });
 

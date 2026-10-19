@@ -11,6 +11,9 @@ export interface RateEstimatePanelProps {
   origin: City | null;
   destination: City | null;
   equipment: EquipmentCode[];
+  /** The freight on the form, so a load too big for a hotshot is priced on the semi equipment. */
+  weightLbs: number | null;
+  lengthFt: number | null;
   /** The rate typed into the form, compared against the market range. */
   rateUsd: number | null;
   onUseSuggested: (usd: number) => void;
@@ -21,9 +24,15 @@ interface Keyed {
   estimate: RateEstimate;
 }
 
-function laneKey(origin: City | null, destination: City | null, equipment: EquipmentCode[]): string | null {
+function laneKey(
+  origin: City | null,
+  destination: City | null,
+  equipment: EquipmentCode[],
+  weightLbs: number | null,
+  lengthFt: number | null,
+): string | null {
   if (!origin || !destination || origin.id === destination.id) return null;
-  return [origin.id, destination.id, [...equipment].sort().join(',')].join('|');
+  return [origin.id, destination.id, [...equipment].sort().join(','), weightLbs ?? '', lengthFt ?? ''].join('|');
 }
 
 /** Where the posted rate sits against the estimate. */
@@ -63,14 +72,28 @@ function RatePosition({ rateUsd, estimate }: { rateUsd: number | null; estimate:
  * Live market estimate (GET /api/rates/estimate) for the lane and equipment on the form, with a
  * "Use suggested" shortcut. Refetches as the lane or equipment changes, debounced.
  */
-export function RateEstimatePanel({ origin, destination, equipment, rateUsd, onUseSuggested }: RateEstimatePanelProps) {
-  const key = laneKey(origin, destination, equipment);
+export function RateEstimatePanel({
+  origin,
+  destination,
+  equipment,
+  weightLbs,
+  lengthFt,
+  rateUsd,
+  onUseSuggested,
+}: RateEstimatePanelProps) {
+  const key = laneKey(origin, destination, equipment, weightLbs, lengthFt);
   const debouncedKey = useDebounced(key, 300);
   const { data, error, loading, reload } = useApi<Keyed>(
     async (signal) => {
-      const [originCityId, destinationCityId, codes] = debouncedKey!.split('|');
+      const [originCityId, destinationCityId, codes, weight, length] = debouncedKey!.split('|');
       const estimate = await api.meta.rateEstimate(
-        { originCityId, destinationCityId, equipment: (codes ? codes.split(',') : []) as EquipmentCode[] },
+        {
+          originCityId,
+          destinationCityId,
+          equipment: (codes ? codes.split(',') : []) as EquipmentCode[],
+          weightLbs: weight ? Number(weight) : null,
+          lengthFt: length ? Number(length) : null,
+        },
         { signal },
       );
       return { key: debouncedKey!, estimate };
@@ -121,7 +144,7 @@ export function RateEstimatePanel({ origin, destination, equipment, rateUsd, onU
           { label: 'High', value: `${money(estimate.highUsd)} · ${ratePerMile(rpm.high)}` },
         ]}
       />
-      <p className="muted text-xs">{estimate.basis}. Demo benchmark, not live market data.</p>
+      <p className="muted text-xs">{estimate.basis}. A monthly snapshot, not live market data.</p>
       <Button
         variant="secondary"
         icon="dollar"

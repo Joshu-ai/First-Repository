@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { CITIES, placeForCityId } from '../../shared/cities';
 import { EQUIPMENT } from '../../shared/equipment';
-import { roadMiles } from '../../shared/geo';
+import { driveHours, roadMiles, transitHours } from '../../shared/geo';
 import {
-  benchmarkFor,
   compareMatches,
+  marketRateFor,
   matchLoad,
+  rateScoreFor,
   SCORE_WEIGHTS,
   type MatchableDriver,
   type MatchableLoad,
   type MatchOptions,
 } from '../../shared/matching';
+import { estimateRate } from '../../shared/rates';
 import type { MatchBreakdown, MatchCheck, MatchCheckKey, MatchResult } from '../../shared/types';
 
 const HOUR_MS = 3_600_000;
@@ -341,6 +343,19 @@ describe('matchLoad: tanker', () => {
     expect(failed(m)).toEqual(['cdl', 'tanker']);
   });
 
+  it('hauls pneumatic dry bulk (frac sand) without the N endorsement', () => {
+    // Regression: dry bulk was posted as TANKER, but a tank vehicle under 49 CFR 383.5 carries
+    // liquid or gas, so a pneumatic trailer needs no N endorsement.
+    const sand = makeLoad({ equipmentTypes: ['DRY_BULK'], weightLbs: 45_000, lengthFt: 42 });
+    const m = match(sand, tanker({ equipmentTypes: ['DRY_BULK'], endorsements: [] }));
+    expect(check(m, 'tanker')).toBeUndefined();
+    expect(m.matchedEquipment).toEqual(['DRY_BULK']);
+    expect(m.eligible).toBe(true);
+    expect(EQUIPMENT.DRY_BULK.driverClass).toBe('semi');
+    expect(EQUIPMENT.DRY_BULK.requiresEndorsement).toBeUndefined();
+    expect(EQUIPMENT.TANKER.description).not.toMatch(/dry bulk/i);
+  });
+
   it('skips the tanker check when the driver can take the load on a non-tank trailer', () => {
     const mixed = makeLoad({ equipmentTypes: ['TANKER', 'FLATBED'], weightLbs: 40_000, lengthFt: 40 });
     const m = match(mixed, semi({ equipmentTypes: ['FLATBED', 'TANKER'] }));
@@ -510,6 +525,33 @@ describe('matchLoad: timing', () => {
     expect(far.breakdown.timing).toBe(near.breakdown.timing);
   });
 
+  it('adds the 10-hour break hours of service require after 11 hours of driving', () => {
+    // Regression: the deadhead was timed as non-stop driving, so pickups that need a mandatory
+    // break were called reachable.
+    const fromElPaso = hotshot({ currentLocation: place('el-paso-tx'), maxDeadheadMiles: 1_000 });
+    const miles = roadMiles(place('el-paso-tx'), place('houston-tx'));
+    expect(driveHours(miles)).toBeGreaterThan(11);
+    expect(driveHours(miles)).toBeLessThan(22);
+    expect(transitHours(miles)).toBe(driveHours(miles) + 10);
+
+    const sameDay = makeLoad({ pickupStart: at(2), pickupEnd: at(Math.ceil(driveHours(miles)) + 1) });
+    const m = match(sameDay, fromElPaso, { ignoreDeadheadLimit: true });
+    expect(check(m, 'timing')).toMatchObject({ ok: false, hard: true });
+    expect(m.eligible).toBe(false);
+
+    const nextDay = makeLoad({ pickupStart: at(2), pickupEnd: at(Math.ceil(transitHours(miles)) + 1) });
+    expect(check(match(nextDay, fromElPaso, { ignoreDeadheadLimit: true }), 'timing')).toMatchObject({
+      ok: true,
+      label: 'You can make the pickup window',
+    });
+  });
+
+  it('needs no break for a deadhead of 11 hours or less', () => {
+    // Dallas is about 5 hours out, so a window closing in 6 hours is reachable.
+    expect(transitHours(roadMiles(place('dallas-tx'), place('houston-tx')))).toBe(driveHours(263));
+    expect(check(match(makeLoad({ pickupStart: at(-5), pickupEnd: at(6) }), fromDallas), 'timing')!.ok).toBe(true);
+  });
+
   it('prefers a driver who frees up close to pickup over one sitting idle', () => {
     const load = makeLoad({ pickupStart: at(50), pickupEnd: at(60) });
     const idle = match(load, hotshot());
@@ -585,29 +627,123 @@ describe('matchLoad: money', () => {
 });
 
 describe('matchLoad: score components', () => {
-  const benchmark = EQUIPMENT.HS_GOOSENECK.benchmarkRatePerMile;
-  const rateScoreAt = (ratePerMile: number, minRatePerMile = 0) =>
-    match(makeLoad({ miles: 1_000, rateUsd: Math.round(ratePerMile * 1_000) }), hotshot({ minRatePerMile })).breakdown.rate;
+  /** What the market pays for a run of this many miles on a gooseneck (the hotshot fixture's rig). */
+  const gooseneckMarket = (miles: number) => estimateRate(miles, ['HS_GOOSENECK']).suggestedUsd;
+  /** Rate component for a 1,000 mi load posted at `ratio` times the lane market, driver at pickup. */
+  const rateScoreAt = (ratio: number, minRatePerMile = 0) =>
+    match(makeLoad({ miles: 1_000, rateUsd: Math.round(ratio * gooseneckMarket(1_000)) }), hotshot({ minRatePerMile })).breakdown
+      .rate;
 
-  it('scores the rate against the market benchmark from 70% (0) to 120% (100)', () => {
-    expect(rateScoreAt(benchmark * 0.6)).toBe(0);
-    // The effective rate is rounded to cents first, so stay a cent under 70%.
-    expect(rateScoreAt(Math.floor(benchmark * 70) / 100)).toBe(0);
-    expect(rateScoreAt(benchmark)).toBe(60);
-    expect(rateScoreAt(benchmark * 1.2)).toBe(100);
-    expect(rateScoreAt(benchmark * 2)).toBe(100);
+  it('scores pay against the lane market: 0 at 70%, 60 at market', () => {
+    expect(rateScoreAt(0.6)).toBe(0);
+    expect(rateScoreAt(0.7)).toBe(0);
+    expect(rateScoreAt(0.9)).toBe(46);
+    expect(rateScoreAt(1)).toBe(60);
+    expect(rateScoreFor(0)).toBe(0);
+    expect(rateScoreFor(1)).toBe(60);
+  });
+
+  it('keeps rewarding pay well past 120% of market instead of flattening out', () => {
+    // Regression: the component used to max out at 120%, so pay above that stopped counting.
+    expect(rateScoreAt(1.2)).toBe(78);
+    expect(rateScoreAt(1.5)).toBe(91);
+    expect(rateScoreAt(2)).toBe(98);
+    expect(rateScoreAt(3)).toBe(100);
+    const scores = [1, 1.1, 1.2, 1.4, 1.6, 1.8, 2].map((ratio) => rateScoreAt(ratio));
+    for (let i = 1; i < scores.length; i += 1) expect(scores[i]).toBeGreaterThan(scores[i - 1]);
   });
 
   it('caps the rate score at 30 when the load pays under the driver minimum', () => {
-    expect(rateScoreAt(benchmark * 2, 5)).toBe(30);
-    expect(rateScoreAt(benchmark * 0.6, 5)).toBe(0);
+    expect(rateScoreAt(2, 5)).toBe(30);
+    expect(rateScoreAt(0.6, 5)).toBe(0);
+  });
+
+  it('prices the market for the whole run, deadhead included', () => {
+    const load = makeLoad({ miles: 400, rateUsd: 1_200 });
+    const driver = hotshot({ currentLocation: place('beaumont-tx') });
+    const m = match(load, driver);
+    expect(marketRateFor(load, ['HS_GOOSENECK'], m.totalMiles)).toBe(gooseneckMarket(m.totalMiles));
+    expect(m.breakdown.rate).toBe(rateScoreFor(1_200 / gooseneckMarket(m.totalMiles)));
+    expect(m.breakdown.rate).toBeLessThan(match(load, hotshot()).breakdown.rate);
+  });
+
+  it('scores a short hop and a long run posted at the suggested price the same', () => {
+    // Regression: a flat $/mi benchmark ignored the minimum charge and short-haul premium, so every
+    // short hop posted at market scored 100 on rate, said "Pays above market" and topped the board.
+    for (const destination of ['pasadena-tx', 'baytown-tx', 'beaumont-tx', 'austin-tx', 'dallas-tx', 'odessa-tx', 'el-paso-tx']) {
+      const draft = makeLoad({ destination: place(destination) });
+      const atMarket = { ...draft, rateUsd: estimateRate(draft.miles, draft.equipmentTypes, draft).suggestedUsd };
+      const m = match(atMarket, hotshot({ minRatePerMile: 0 }));
+      expect(m.breakdown.rate, destination).toBe(60);
+      expect(m.highlights, destination).not.toContain('Pays above market');
+    }
+  });
+
+  it('ranks a long run above a short hop when both pay the same share of market', () => {
+    const shortHop = makeLoad({ destination: place('baytown-tx') });
+    const longRun = makeLoad({ destination: place('el-paso-tx') });
+    const at = (load: MatchableLoad, ratio: number) => ({
+      ...load,
+      rateUsd: Math.round(ratio * estimateRate(load.miles, ['HS_GOOSENECK']).suggestedUsd),
+    });
+    const hop = match(at(shortHop, 1.15), hotshot());
+    const run = match(at(longRun, 1.15), hotshot());
+    expect(hop.breakdown.rate).toBe(run.breakdown.rate);
+    expect(compareMatches(run, hop)).toBeLessThan(0);
+  });
+
+  it('never calls a short hop under the market low "above market"', () => {
+    // Odessa -> Midland is a 23 mi hop: $150 is half of the minimum charge.
+    const hop = makeLoad({ origin: place('odessa-tx'), destination: place('midland-tx'), rateUsd: 150 });
+    expect(hop.rateUsd).toBeLessThan(estimateRate(hop.miles, ['HS_GOOSENECK']).lowUsd);
+    const m = match(hop, hotshot({ currentLocation: place('odessa-tx'), minRatePerMile: 0 }));
+    expect(m.breakdown.rate).toBe(0);
+    expect(m.highlights).not.toContain('Pays above market');
+    const sanAntonio = makeLoad({ origin: place('odessa-tx'), destination: place('san-antonio-tx') });
+    const wellPaid = { ...sanAntonio, rateUsd: Math.round(1.15 * estimateRate(sanAntonio.miles, ['HS_GOOSENECK']).suggestedUsd) };
+    const run = match(wellPaid, hotshot({ currentLocation: place('odessa-tx'), minRatePerMile: 0 }));
+    expect(run.highlights).toContain('Pays above market');
+    expect(run.score).toBeGreaterThan(m.score);
+  });
+
+  it('ranks a load paying far more above one a few deadhead miles closer', () => {
+    // Regression: both maxed the rate component, so the closer, poorer load won on deadhead.
+    const cody = hotshot({ currentLocation: place('odessa-tx'), minRatePerMile: 0 });
+    const fromOdessa = makeLoad({ origin: place('odessa-tx'), destination: place('houston-tx') });
+    const fromMidland = makeLoad({ origin: place('midland-tx'), destination: place('houston-tx') });
+    const near = match({ ...fromOdessa, rateUsd: Math.round(1.25 * gooseneckMarket(fromOdessa.miles)) }, cody);
+    const richer = match({ ...fromMidland, rateUsd: Math.round(1.75 * gooseneckMarket(fromMidland.miles)) }, cody);
+    expect(richer.deadheadMiles).toBeGreaterThan(near.deadheadMiles!);
+    expect(richer.estimatedProfitUsd).toBeGreaterThan(near.estimatedProfitUsd + 500);
+    expect(compareMatches(richer, near)).toBeLessThan(0);
   });
 
   it('judges the rate by the equipment the driver would use', () => {
-    const load = makeLoad({ miles: 1_000, rateUsd: 1_850 });
+    const load = makeLoad({ miles: 1_000, rateUsd: gooseneckMarket(1_000) });
     expect(match(load, hotshot()).breakdown.rate).toBe(60);
-    const flatbed = EQUIPMENT.FLATBED.benchmarkRatePerMile;
-    expect(match(load, semi()).breakdown.rate).toBe(Math.round(100 * Math.min(1, Math.max(0, (1.85 / flatbed - 0.7) / 0.5))));
+    const flatbedMarket = estimateRate(1_000, ['FLATBED']).suggestedUsd;
+    expect(match(load, semi({ minRatePerMile: 0 })).breakdown.rate).toBe(rateScoreFor(load.rateUsd / flatbedMarket));
+  });
+
+  it('judges the rate on the cheapest of the matched equipment, like the rate estimate', () => {
+    // Regression: the priciest matched trailer set the bar, so a load that took both of the driver's
+    // trailers scored lower than an otherwise identical load that took only one.
+    const marcus = semi({
+      equipmentTypes: ['FLATBED', 'STEP_DECK'],
+      trailerLengthFt: 48,
+      currentLocation: place('dallas-tx'),
+      minRatePerMile: 0,
+    });
+    const freight = { origin: place('dallas-tx'), destination: place('houston-tx'), weightLbs: 40_000, lengthFt: 45 };
+    const flatbedOnly = makeLoad({ ...freight, equipmentTypes: ['FLATBED'] });
+    const rateUsd = estimateRate(flatbedOnly.miles, ['FLATBED']).suggestedUsd;
+    const either = match(makeLoad({ ...freight, equipmentTypes: ['FLATBED', 'STEP_DECK'], rateUsd }), marcus);
+    const one = match({ ...flatbedOnly, rateUsd }, marcus);
+    expect(either.matchedEquipment).toEqual(['FLATBED', 'STEP_DECK']);
+    expect(either.breakdown.rate).toBe(60);
+    expect(either.breakdown).toEqual(one.breakdown);
+    expect(either.eligible).toBe(true);
+    expect(either.score).toBe(one.score);
   });
 
   it('scores fit from 60 for a small load up to 100 at 80% of capacity', () => {
@@ -616,17 +752,6 @@ describe('matchLoad: score components', () => {
     expect(fit(1_000, 32)).toBe(100);
     expect(fit(2_000, 8)).toBe(70);
     expect(fit(1, 1)).toBe(61);
-  });
-});
-
-describe('benchmarkFor', () => {
-  it('returns 0 for no equipment', () => {
-    expect(benchmarkFor([])).toBe(0);
-  });
-
-  it('returns the benchmark for one type and the highest of several', () => {
-    expect(benchmarkFor(['DRY_VAN'])).toBe(EQUIPMENT.DRY_VAN.benchmarkRatePerMile);
-    expect(benchmarkFor(['HS_GOOSENECK', 'HS_DOVETAIL', 'HS_BUMPER_PULL'])).toBe(EQUIPMENT.HS_DOVETAIL.benchmarkRatePerMile);
   });
 });
 
@@ -656,8 +781,9 @@ describe('matchLoad: monotonicity', () => {
   });
 
   it('never scores a farther driver above a closer one when the deadhead limit is ignored', () => {
-    // A well-paid load that opens in two days: every driver maxes the rate score and is over
-    // a 100 mi limit, so only timing could tell them apart.
+    // A well-paid load that opens in two days, for drivers over a 100 mi limit: the deadhead
+    // component is 0 for most of them, so only the rate (market for the whole run) and timing
+    // could tell them apart.
     const load = makeLoad({ pickupStart: at(50), pickupEnd: at(80), rateUsd: 4_000 });
     const rows = scoresByDeadhead(
       load,
@@ -752,10 +878,10 @@ describe('matchLoad: lane and highlights', () => {
     expect(match(makeLoad(), hotshot({ currentLocation: null })).highlights).not.toContain('Pickup is close by');
   });
 
-  it('calls out a rate at least 10% above the market benchmark', () => {
-    // Gooseneck benchmark is $1.85/mi, so the line is $2.035/mi.
-    expect(match(makeLoad({ miles: 400, rateUsd: 816 }), hotshot()).highlights).toContain('Pays above market');
-    expect(match(makeLoad({ miles: 400, rateUsd: 812 }), hotshot()).highlights).not.toContain('Pays above market');
+  it('calls out pay at least 10% above the lane market', () => {
+    const line = (estimateRate(400, ['HS_GOOSENECK']).suggestedUsd * 11) / 10;
+    expect(match(makeLoad({ miles: 400, rateUsd: Math.ceil(line) }), hotshot()).highlights).toContain('Pays above market');
+    expect(match(makeLoad({ miles: 400, rateUsd: Math.ceil(line) - 1 }), hotshot()).highlights).not.toContain('Pays above market');
   });
 
   it('calls out hotshot-ready freight for hotshot drivers only', () => {

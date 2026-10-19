@@ -82,11 +82,11 @@ Both: `maxDeadheadMiles`, `minRatePerMile`, `mpg` from `DRIVER_CLASSES`, fuel `D
 | GET | `/:id` | signed in | – | `DriverSummary` (phone nulled unless relationship, see conventions); 404 if not a driver |
 
 ### Meta — `routes/meta.ts` (mounted at `/api`)
-| GET | `/cities?q=&limit=` | public | limit default 8, max 25 | `City[]` via `searchCities` |
+| GET | `/cities?q=&limit=` | public | limit default 8, max 25 | `City[]` via `searchCities` (a trailing state may be a code or a full name: "Houston, Texas") |
 |---|---|---|---|---|
 | GET | `/cities/:id` | public | – | `City` or 404 |
 | GET | `/meta` | public | – | `MetaResponse` |
-| GET | `/rates/estimate?originCityId=&destinationCityId=&equipment=A,B` | public | – | `RateEstimate` (miles = `roadMiles`) |
+| GET | `/rates/estimate?originCityId=&destinationCityId=&equipment=A,B&weightLbs=&lengthFt=` | public | `weightLbs` (1–200000) and `lengthFt` (1–100) optional | `estimateRate(roadMiles, equipment, {weightLbs, lengthFt})` |
 
 ### Notifications + live events — `routes/notifications.ts` (mounted at `/api`)
 | GET | `/notifications?unread=1&limit=50` | signed in | – | `NotificationsResponse` newest first |
@@ -104,14 +104,14 @@ Both: `maxDeadheadMiles`, `minRatePerMile`, `mpg` from `DRIVER_CLASSES`, fuel `D
 ### Loads — `routes/loads.ts` (`/api/loads`)
 | Method | Path | Who | Notes |
 |---|---|---|---|
-| GET | `/` | signed in | Query = `LoadSearchFilters` as strings (`equipment` and `destinationStates` comma-separated, booleans `true/false/1/0`) + `limit` (default 50, max 200) + `offset`. Only `status='open'` and `pickup_end >= now`. Drivers: each load gets `match = matchLoad(load, profile, {now})`; ineligible loads dropped unless `includeIneligible`; `originCityId+originRadiusMiles` filters by road miles from that city (and then the deadhead limit is soft, `ignoreDeadheadLimit: true`, because the driver is planning a run from there); `minRatePerMile` compares the posted `ratePerMile`; `q` matches commodity/city/notes/reference case-insensitively. Sorts: `best` (default for drivers, `compareMatches`), `rate` (ratePerMile desc), `deadhead` (asc, nulls last), `pickup` (pickupStart asc), `newest` (default for shippers), `profit` (estimatedProfitUsd desc). If the driver profile is incomplete, matches are null and `driverProfileComplete=false`. Response `LoadListResponse`. |
+| GET | `/` | signed in | Query = `LoadSearchFilters` as strings (`equipment` and `destinationStates` comma-separated, booleans `true/false/1/0`) + `limit` (default 50, max 200) + `offset`. Only `status='open'` and `pickup_end >= now`. Drivers: each load gets `match = matchLoad(load, profile, {now})`; ineligible loads dropped unless `includeIneligible`; `originCityId+originRadiusMiles` filters by road miles from that city (and then the deadhead limit is soft, `ignoreDeadheadLimit: true`, because the driver is planning a run from there); `minRatePerMile` compares the posted `ratePerMile`; `q` matches commodity/notes/reference/shipper/origin/destination after `normalizeSearchText` (case, punctuation and apostrophes ignored), with places in every `cityNameForms` spelling plus state code or name ("st louis", "saint louis missouri", "ft worth tx"); a match never spans two fields, and a `q` with nothing searchable left is no filter. Sorts: `best` (default for drivers, `compareMatches`), `rate` (ratePerMile desc), `deadhead` (asc, nulls last), `pickup` (pickupStart asc), `newest` (default for shippers), `profit` (estimatedProfitUsd desc). If the driver profile is incomplete, matches are null and `driverProfileComplete=false`. Response `LoadListResponse`. |
 | GET | `/:id` | signed in | `LoadDetailResponse`. Open loads are visible to everyone signed in. Non-open loads only to the owning shipper, the booked driver, and drivers who have a booking row on it; otherwise 404. Drivers get `match` (with `ignoreDeadheadLimit: true`) and `myBooking`; the booked driver also gets `shipperPhone`. |
 | POST | `/` | shipper | Body: `{originCityId, destinationCityId, pickupStart, pickupEnd, deliveryBy?, equipmentTypes (≥1), weightLbs (1–200000), lengthFt (1–100), commodity (1–120), notes? (≤2000), loadSize = 'full', hazmat = false, tarpRequired = false, teamRequired = false, rateUsd (50–100000), bookingMode = 'request', referenceNumber? (≤40)}`. Rules: origin ≠ destination; pickupEnd ≥ pickupStart; pickupEnd > now; deliveryBy ≥ pickupStart. `miles = roadMiles(origin, destination)`. After insert call `alertDriversForLoad(ctx, load)` (server/alerts.ts). 201 `Load`. |
 | PATCH | `/:id` | owning shipper | Same fields, all optional. Only while `open`. Recompute miles. Notify drivers with pending requests that the load changed (`load_status`). |
 | POST | `/:id/cancel` | owning shipper | `open` or `booked` only (409 otherwise). Pending/accepted bookings → `cancelled`, notify those drivers (`load_cancelled`). Returns `Load`. |
 | POST | `/:id/book` | driver | Body `{message? (≤500), offerRateUsd? (50–100000)}`. Load must be open (409), profile complete (422 `profile_incomplete`), and every hard check of `matchLoad(..., {ignoreDeadheadLimit: true})` must pass (422 `not_eligible`, `details` = failed checks). One live booking per driver per load (409). **Instant** mode with no counter-offer → booking `accepted`, load `booked` (`booked_driver_id`, `booked_rate_usd = rateUsd`), other pending requests → `declined` + notified, shipper notified `load_booked`. Otherwise → booking `pending`, shipper notified `booking_request`. 201 `BookLoadResponse`. All in one transaction that re-checks status. |
 | POST | `/:id/status` | booked driver | `{status: 'in_transit' | 'delivered'}`; allowed `booked→in_transit` (sets `picked_up_at`) and `in_transit→delivered` (sets `delivered_at`, driver `completed_loads + 1`). Notify shipper `load_status`. Returns `Load`. |
-| GET | `/:id/backhauls` | driver | Open loads whose origin is within 150 road miles of this load's destination, matched as if the driver is at the destination and available at `deliveryBy ?? pickupEnd + driveHours(miles)`, `ignoreDeadheadLimit: true`; eligible only; best first; max 10. `LoadWithMatch[]`. |
+| GET | `/:id/backhauls` | driver | Open loads whose origin is within 150 road miles of this load's destination, matched as if the driver is at the destination and available at `deliveryBy ?? pickupEnd + transitHours(miles)`, `ignoreDeadheadLimit: true`; eligible only; best first; max 10. `LoadWithMatch[]`. |
 | GET | `/:id/recommended-drivers` | owning shipper | Drivers with complete profiles and `available`, `matchLoad(load, driver, {ignoreDeadheadLimit: true})`, eligible only, best first, max 20, excluding drivers with a live booking on the load. `RecommendedDriver[]`. |
 | POST | `/:id/invite` | owning shipper | `{driverId, message?}` → notify that driver (`load_match`, link to the load). Load must be open. 204. |
 | GET | `/:id/bookings` | owning shipper | `Booking[]` newest first, each with `driver` (summary incl. phone) and `match`. |
@@ -142,6 +142,35 @@ A thread is one load + one driver. Shippers see threads on loads they own; drive
 **and** the driver is eligible (`matchLoad` hard checks pass; a search with `originCityId` treats the deadhead limit as soft, like the board), notify once per driver (`load_match`,
 "New load: Houston, TX → Odessa, TX · $1,400", link `/driver/loads/:id`). Also notify up to 5 other
 available drivers with score ≥ 85 ("Hot match near you"). Never notify the same driver twice for one load.
+
+## Matching, rates and market data (shared/)
+
+- `MARKET_SNAPSHOT` (`shared/equipment.ts`): `{ asOf: '2026-09', label: 'DAT national spot averages, Sept 2026
+  (fuel included)', dieselUsdPerGallon: 6.29 }`. `EQUIPMENT[code].benchmarkRatePerMile` is all-in $/loaded mi as
+  of that month: DRY_VAN 3.01, REEFER 3.62, FLATBED 3.61 are DAT averages (`benchmarkFromDat: true`); STEP_DECK
+  3.85, CONESTOGA 3.90, RGN 4.75, TANKER 3.80, DRY_BULK 3.80, POWER_ONLY 2.70, HS_GOOSENECK 2.40,
+  HS_BUMPER_PULL 2.20, HS_DOVETAIL 2.50, HS_CAR_HAULER 2.45 are derived. Minimum charges scale with the
+  benchmarks in $25 steps. `DEFAULT_FUEL_PRICE_PER_GALLON = MARKET_SNAPSHOT.dieselUsdPerGallon`;
+  `DRIVER_CLASSES` minimums default to hotshot 1.85, semi 2.40. Update all of these and `asOf` together.
+- Equipment: `TANKER` is a liquid or gas tank and needs the N endorsement. `DRY_BULK` (pneumatic: frac sand,
+  cement) is a semi type with no endorsement.
+- `marketEquipment(equipment, {weightLbs?, lengthFt?})` (`shared/rates.ts`): the cheapest listed type (first on
+  ties, DRY_VAN when none), skipping hotshot types for freight over `HOTSHOT_MAX_PAYLOAD_LBS` or
+  `HOTSHOT_MAX_LENGTH_FT` unless only hotshot types are listed. `estimateRate(miles, equipment, freight?)`
+  prices on it: benchmark × miles × short-haul uplift (up to +60% under 300 mi), never under the minimum
+  charge, rounded to $25; `basis` names the benchmark and `MARKET_SNAPSHOT.label` ("estimated from …" for
+  derived benchmarks).
+- `matchLoad` rate component: `ratio = rateUsd / marketRateFor(load, usableEquipment, totalMiles)`, where
+  `marketRateFor` is `estimateRate(loaded + deadhead miles, usableEquipment, load).suggestedUsd`.
+  `rateScoreFor(ratio) = round(100 × (1 − e^(−k·max(0, ratio − 0.7))))` with k set so ratio 1 scores 60
+  (0.7 → 0, 1.2 → 78, 1.5 → 91, 2 → 98, 2.5+ → 100); capped at 30 under the driver's minimum $/mi.
+  "Pays above market" when ratio ≥ 1.1.
+- Timing: `transitHours(miles)` (`shared/geo.ts`) = `driveHours(miles)` (50 mph) plus a 10 h break for every
+  11 h of driving after the first 11 (`HOS_MAX_DRIVING_HOURS`, `HOS_BREAK_HOURS`). `matchLoad` arrives at
+  `readyAt + transitHours(deadhead)`; backhauls and the seed use it for runs.
+- Cities: `searchCities` and the board's `q` share `normalizeSearchText` and `cityNameForms`
+  (`shared/cities.ts`). A few census names were corrected (e.g. `boise-city-id` is "Boise"); ids never
+  change, so stored rows keep resolving.
 
 ## Client routes (react-router)
 
@@ -183,7 +212,7 @@ Drivers use this on a phone in the cab, often in sun glare, often with gloves; s
 - `semi@demo.haulmatch.app` — CDL-A flatbed/step deck, 48', 47,000 lbs, Dallas TX, hazmat endorsement
 - `shipper@demo.haulmatch.app` — Lone Star Oilfield Supply, Houston TX (broker-style shipper)
 Plus ~4 more shippers and ~10 more drivers (mix of hotshot gooseneck/dovetail/car hauler and semi dry
-van/reefer/flatbed/step deck/RGN/tanker/team) spread across the US, ~160 open loads over the next 1–7
+van/reefer/flatbed/step deck/RGN/tanker + dry bulk/team) spread across the US, ~160 open loads over the next 1–7
 days weighted to real freight corridors and to oilfield/ag hotshot lanes, many accepting both hotshot
 and semi flatbed, rates near `estimateRate` ±15%; some booked/in-transit/delivered history, pending
 requests on the demo shipper's loads, a few message threads, notifications and saved searches.

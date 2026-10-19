@@ -126,9 +126,9 @@ describe('city dataset', () => {
 });
 
 describe('freight hub towns (extra-cities.json)', () => {
-  it('adds 60 to 90 towns that the base list does not have', () => {
+  it('adds 60 to 120 towns that the base list does not have', () => {
     expect(extra.length).toBeGreaterThanOrEqual(60);
-    expect(extra.length).toBeLessThanOrEqual(90);
+    expect(extra.length).toBeLessThanOrEqual(120);
     const baseIds = new Set(base.map((c) => c.id));
     const baseKeys = new Set(base.map(key));
     expect(extra.filter((c) => baseIds.has(c.id) || baseKeys.has(key(c))).map((c) => c.id)).toEqual([]);
@@ -147,6 +147,9 @@ describe('freight hub towns (extra-cities.json)', () => {
       'watford-city-nd', 'sidney-mt', 'elk-city-ok', 'woodward-ok', 'carthage-tx', 'houma-la', 'morgan-city-la',
       'gillette-wy', 'fort-morgan-co', 'dodge-city-ks', 'scottsbluff-ne', 'aberdeen-sd', 'eagle-pass-tx',
       'nogales-az', 'elko-nv', 'tucumcari-nm', 'kingman-az',
+      // Permian, Bakken, Anadarko/SCOOP and Panhandle towns the demo's own basins run through.
+      'jal-nm', 'denver-city-tx', 'crane-tx', 'stanton-tx', 'van-horn-tx', 'tioga-nd', 'stanley-nd', 'killdeer-nd',
+      'kingfisher-ok', 'hennessey-ok', 'hereford-tx', 'dumas-tx', 'borger-tx', 'texarkana-ar',
     ];
     expect(expected.filter((id) => !ids.has(id))).toEqual([]);
   });
@@ -177,5 +180,22 @@ describe('freight hub towns (extra-cities.json)', () => {
     expect(miles('midland-tx', 'big-spring-tx')).toBeLessThan(45);
     expect(miles('williston-nd', 'watford-city-nd')).toBeLessThan(40);
     expect(miles('houma-la', 'thibodaux-la')).toBeLessThan(20);
+    // The basin towns added later, against neighbours already in the list.
+    expect(miles('jal-nm', 'hobbs-nm')).toBeGreaterThan(30);
+    expect(miles('jal-nm', 'hobbs-nm')).toBeLessThan(45);
+    expect(miles('crane-tx', 'odessa-tx')).toBeLessThan(40);
+    expect(miles('stanton-tx', 'midland-tx')).toBeLessThan(25);
+    expect(miles('denver-city-tx', 'seminole-tx')).toBeLessThan(25);
+    expect(miles('van-horn-tx', 'pecos-tx')).toBeGreaterThan(80);
+    expect(miles('van-horn-tx', 'pecos-tx')).toBeLessThan(105);
+    expect(miles('tioga-nd', 'williston-nd')).toBeLessThan(50);
+    expect(miles('stanley-nd', 'tioga-nd')).toBeLessThan(40);
+    expect(miles('killdeer-nd', 'dickinson-nd')).toBeLessThan(45);
+    expect(miles('hennessey-ok', 'kingfisher-ok')).toBeLessThan(20);
+    expect(miles('kingfisher-ok', 'el-reno-ok')).toBeLessThan(35);
+    expect(miles('hereford-tx', 'amarillo-tx')).toBeLessThan(45);
+    expect(miles('dumas-tx', 'amarillo-tx')).toBeLessThan(55);
+    expect(miles('borger-tx', 'pampa-tx')).toBeLessThan(30);
+    expect(miles('texarkana-ar', 'texarkana-tx')).toBeLessThan(5);
   });
 });

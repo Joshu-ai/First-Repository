@@ -27,6 +27,9 @@ const estimateQuerySchema = z.object({
     .optional()
     .transform((v) => [...new Set((v ?? '').split(',').map((s) => s.trim()).filter(Boolean))])
     .pipe(z.array(equipmentCodeSchema)),
+  // The freight, when known, so hotshot types never price freight no hotshot can carry.
+  weightLbs: z.coerce.number().int().min(1).max(200_000).optional(),
+  lengthFt: z.coerce.number().min(1).max(100).optional(),
 });
 
 function buildMeta(): MetaResponse {
@@ -58,8 +61,11 @@ export function metaRouter(_ctx: AppContext): Router {
   });
 
   router.get('/rates/estimate', (req, res) => {
-    const { originCityId: origin, destinationCityId: destination, equipment } = parse(estimateQuerySchema, req.query);
-    res.json(estimateRate(roadMiles(origin, destination), equipment));
+    const { originCityId: origin, destinationCityId: destination, equipment, weightLbs, lengthFt } = parse(
+      estimateQuerySchema,
+      req.query,
+    );
+    res.json(estimateRate(roadMiles(origin, destination), equipment, { weightLbs, lengthFt }));
   });
 
   return router;

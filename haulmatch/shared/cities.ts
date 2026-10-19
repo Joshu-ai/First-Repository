@@ -1,5 +1,5 @@
 import type { City, Place } from './types';
-import { isStateCode } from './geo';
+import { isStateCode, US_STATES } from './geo';
 import baseCities from './data/cities.json';
 import extraCities from './data/extra-cities.json';
 
@@ -30,8 +30,19 @@ function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Every spelling a name can be typed as: "Lee's Summit" -> "lees summit", "lee s summit". */
-function nameForms(name: string): string[] {
+/**
+ * Search text in the form every HaulMatch search compares: lower case, apostrophes dropped, other
+ * punctuation as spaces, single-spaced. "St. Louis, MO" -> "st louis mo", "Lee's Summit" -> "lees summit".
+ */
+export function normalizeSearchText(text: string): string {
+  return normalize(text.replace(APOSTROPHES, ''));
+}
+
+/**
+ * Every spelling a city name can be typed as, normalized: "Lee's Summit" -> "lees summit",
+ * "lee s summit"; "St. Louis" -> "st louis", "saint louis"; "Fort Worth" -> "fort worth", "ft worth".
+ */
+export function cityNameForms(name: string): string[] {
   const plain = [name.replace(APOSTROPHES, ''), name].map(normalize);
   const respelled = plain.map((n) =>
     n
@@ -42,7 +53,28 @@ function nameForms(name: string): string[] {
   return [...new Set([...plain, ...respelled])];
 }
 
-const INDEX = CITIES.map((city) => ({ city, names: nameForms(city.name) }));
+const INDEX = CITIES.map((city) => ({ city, names: cityNameForms(city.name) }));
+
+/** Full state names as words, longest first so "west virginia" wins over "virginia". */
+const STATE_NAMES = Object.entries(US_STATES)
+  .map(([code, name]) => ({ code, words: normalize(name).split(' ') }))
+  .sort((a, b) => b.words.length - a.words.length);
+
+/**
+ * The state a query ends with, typed as a USPS code ("dallas tx") or spelled out ("dallas texas",
+ * "fargo north dakota"), and the words before it.
+ */
+function trailingState(parts: string[]): { state: string; rest: string[] } | null {
+  const code = parts[parts.length - 1].toUpperCase();
+  if (isStateCode(code)) return { state: code, rest: parts.slice(0, -1) };
+  for (const { code: stateCode, words } of STATE_NAMES) {
+    const start = parts.length - words.length;
+    if (start >= 0 && words.every((word, i) => parts[start + i] === word)) {
+      return { state: stateCode, rest: parts.slice(0, start) };
+    }
+  }
+  return null;
+}
 
 /** 0 = exact name, 1 = name prefix, 2 = prefix of a later word ("worth" -> Fort Worth). */
 function nameRank(names: string[], query: string): number {
@@ -56,20 +88,21 @@ function nameRank(names: string[], query: string): number {
 }
 
 /**
- * Autocomplete search. Accepts "dallas", "dal", "dallas tx", "dallas, tx" or "TX" style queries.
- * Name matches rank exact, then prefix, then word prefix, then cities in a bare state query;
- * ties go to the larger city.
+ * Autocomplete search. Accepts "dallas", "dal", "dallas tx", "dallas, tx", "dallas, texas", "TX"
+ * or "texas" style queries. Name matches rank exact, then prefix, then word prefix, then cities in
+ * a bare state query; ties go to the larger city.
  */
 export function searchCities(query: string, limit = 10): City[] {
-  const q = normalize(query.replace(APOSTROPHES, ''));
+  const q = normalizeSearchText(query);
   if (!q) return [];
   const parts = q.split(' ');
-  const last = parts[parts.length - 1].toUpperCase();
-  // A trailing state code narrows the name to that state. The whole query is still tried as a
-  // name too, so a half-typed "el pa" or "san ma" finds El Paso or San Marcos.
-  const state = parts.length > 1 && isStateCode(last) ? last : null;
-  const nameInState = parts.slice(0, -1).join(' ');
-  const bareState = parts.length === 1 && isStateCode(last) ? last : null;
+  // A trailing state (code or full name) narrows the name to that state. The whole query is still
+  // tried as a name too, so a half-typed "el pa" or "san ma" finds El Paso or San Marcos, and
+  // "new york" finds the city as well as the state.
+  const trailing = trailingState(parts);
+  const state = trailing && trailing.rest.length > 0 ? trailing.state : null;
+  const nameInState = trailing ? trailing.rest.join(' ') : '';
+  const bareState = trailing && trailing.rest.length === 0 ? trailing.state : null;
 
   const scored: { city: City; rank: number }[] = [];
   for (const { city, names } of INDEX) {

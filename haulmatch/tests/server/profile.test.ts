@@ -511,12 +511,26 @@ describe('reference data', () => {
     expect(noEquipment.body).toEqual(estimateRate(miles, []));
   });
 
+  it('prices freight too heavy or long for a hotshot on the semi equipment', async () => {
+    const c = client(t.app);
+    const miles = roadMiles(getCity('houston-tx')!, getCity('odessa-tx')!);
+    const lane = '/api/rates/estimate?originCityId=houston-tx&destinationCityId=odessa-tx&equipment=FLATBED,HS_GOOSENECK';
+    const heavy = await c.get(`${lane}&weightLbs=45000&lengthFt=45`);
+    expect(heavy.status).toBe(200);
+    expect(heavy.body).toEqual(estimateRate(miles, ['FLATBED']));
+    expect(heavy.body.basis).toContain('Flatbed');
+    const light = await c.get(`${lane}&weightLbs=9000&lengthFt=30`);
+    expect(light.body).toEqual(estimateRate(miles, ['HS_GOOSENECK']));
+  });
+
   it.each([
     ['unknown origin', 'originCityId=atlantis-xx&destinationCityId=odessa-tx'],
     ['unknown destination', 'originCityId=houston-tx&destinationCityId=nowhere-zz'],
     ['missing origin', 'destinationCityId=odessa-tx'],
     ['missing destination', 'originCityId=houston-tx'],
     ['bad equipment code', 'originCityId=houston-tx&destinationCityId=odessa-tx&equipment=FLATBED,HOVERCRAFT'],
+    ['a weight that is not a number', 'originCityId=houston-tx&destinationCityId=odessa-tx&weightLbs=heavy'],
+    ['a zero length', 'originCityId=houston-tx&destinationCityId=odessa-tx&lengthFt=0'],
   ])('rejects a rate estimate with %s', async (_label, query) => {
     const res = await client(t.app).get(`/api/rates/estimate?${query}`);
     expect(res.status).toBe(400);

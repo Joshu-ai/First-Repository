@@ -179,7 +179,7 @@ export default function Landing() {
               flagged before you waste a call.
             </EntryCard>
             <EntryCard to={paths.signup('driver', 'semi')} title="I drive a semi" cta="Set up my truck" art={<SemiArt />}>
-              Dry van, reefer, flatbed, step deck, RGN, Conestoga, tanker or power only. Hazmat and tanker loads only
+              Dry van, reefer, flatbed, step deck, RGN, Conestoga, tanker, dry bulk or power only. Hazmat and tanker loads only
               show when your endorsements are on file.
             </EntryCard>
             <EntryCard to={paths.signup('shipper')} title="I ship freight" cta="Start posting loads" art={<ShipperArt />}>

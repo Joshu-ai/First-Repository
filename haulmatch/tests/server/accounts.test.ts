@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_COOKIE } from '../../shared/api';
-import { DEFAULT_FUEL_PRICE_PER_GALLON } from '../../shared/equipment';
+import { DEFAULT_FUEL_PRICE_PER_GALLON, DRIVER_CLASSES } from '../../shared/equipment';
 import type { MeResponse } from '../../shared/types';
 import { verifyPassword } from '../../server/auth';
 import { client, createTestApp, seedUser, signUp, type TestApp } from '../helpers';
@@ -68,7 +68,7 @@ describe('POST /api/auth/register', () => {
       cdlClass: null,
       endorsements: [],
       maxDeadheadMiles: 150,
-      minRatePerMile: 1.5,
+      minRatePerMile: DRIVER_CLASSES.hotshot.defaultMinRatePerMile,
       mpg: 11,
       fuelPricePerGallon: DEFAULT_FUEL_PRICE_PER_GALLON,
       available: true,
@@ -99,7 +99,7 @@ describe('POST /api/auth/register', () => {
       hasCdl: true,
       cdlClass: 'A',
       maxDeadheadMiles: 200,
-      minRatePerMile: 1.9,
+      minRatePerMile: DRIVER_CLASSES.semi.defaultMinRatePerMile,
       mpg: 6.5,
       fuelPricePerGallon: DEFAULT_FUEL_PRICE_PER_GALLON,
       available: true,

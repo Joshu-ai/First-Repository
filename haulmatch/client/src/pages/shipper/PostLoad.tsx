@@ -525,6 +525,8 @@ function LoadForm({ mode, source }: LoadFormProps) {
             origin={values.origin}
             destination={values.destination}
             equipment={values.equipmentTypes}
+            weightLbs={values.weightLbs}
+            lengthFt={values.lengthFt}
             rateUsd={values.rateUsd}
             onUseSuggested={(usd) => set('rateUsd', usd)}
           />

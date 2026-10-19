@@ -4,10 +4,13 @@ import {
   AVERAGE_SPEED_MPH,
   driveHours,
   haversineMiles,
+  HOS_BREAK_HOURS,
+  HOS_MAX_DRIVING_HOURS,
   isStateCode,
   ROAD_CIRCUITY_FACTOR,
   roadMiles,
   STATE_CODES,
+  transitHours,
   US_STATES,
 } from '../../shared/geo';
 
@@ -99,6 +102,37 @@ describe('driveHours', () => {
     expect(driveHours(50)).toBe(1);
     expect(driveHours(500)).toBe(10);
     expect(driveHours(125)).toBe(2.5);
+  });
+});
+
+describe('transitHours', () => {
+  it('uses the hours-of-service limits: 11 h of driving, then a 10 h break', () => {
+    expect(HOS_MAX_DRIVING_HOURS).toBe(11);
+    expect(HOS_BREAK_HOURS).toBe(10);
+  });
+
+  it('adds no break to a run of 11 hours of driving or less', () => {
+    expect(transitHours(0)).toBe(0);
+    expect(transitHours(263)).toBe(driveHours(263));
+    expect(transitHours(550)).toBe(11);
+  });
+
+  it('adds a 10 h break after every 11 h of driving', () => {
+    expect(transitHours(551)).toBeCloseTo(driveHours(551) + 10, 10);
+    expect(transitHours(664)).toBeCloseTo(13.28 + 10, 10);
+    expect(transitHours(1_100)).toBe(22 + 10);
+    expect(transitHours(1_101)).toBeCloseTo(driveHours(1_101) + 20, 10);
+    // Houston -> Williston: about 31 h of driving, two breaks.
+    expect(transitHours(1_572)).toBeCloseTo(31.44 + 20, 10);
+  });
+
+  it('never goes down for a longer run and treats negative miles as none', () => {
+    let previous = 0;
+    for (let miles = 0; miles <= 3_000; miles += 13) {
+      expect(transitHours(miles)).toBeGreaterThanOrEqual(previous);
+      previous = transitHours(miles);
+    }
+    expect(transitHours(-50)).toBe(0);
   });
 });
 

@@ -284,6 +284,43 @@ describe('loadPassesFilters', () => {
       expect(passes({ q: 'lumber' })).toBe(false);
       expect(passes({ q: 'po-' }, makeLoad({ referenceNumber: null }))).toBe(false);
     });
+
+    it('finds cities typed the common way, like the city picker', () => {
+      // Regression: a raw substring test missed "st louis", "ft worth" and "winston salem".
+      const stlToFortWorth = makeLoad({ origin: place('st-louis-mo'), destination: place('fort-worth-tx') });
+      for (const q of ['st louis', 'saint louis', 'St. Louis', 'st. louis, mo', 'st louis mo', 'saint louis missouri']) {
+        expect(passes({ q }, stlToFortWorth), q).toBe(true);
+      }
+      for (const q of ['fort worth', 'ft worth', 'ft. worth', 'fort worth texas', 'Fort Worth, TX']) {
+        expect(passes({ q }, stlToFortWorth), q).toBe(true);
+      }
+      const carolina = makeLoad({ origin: place('winston-salem-nc'), destination: place('lee-s-summit-mo') });
+      for (const q of ['winston salem', 'winston-salem nc', 'lees summit', "lee's summit", 'lee s summit missouri']) {
+        expect(passes({ q }, carolina), q).toBe(true);
+      }
+      expect(passes({ q: 'houston, texas' })).toBe(true);
+      expect(passes({ q: 'saint paul' }, stlToFortWorth)).toBe(false);
+      expect(passes({ q: 'louis tx' }, stlToFortWorth)).toBe(false);
+    });
+
+    it('ignores punctuation and spacing in the other fields too', () => {
+      expect(passes({ q: 'po 77812' })).toBe(true);
+      expect(passes({ q: 'PO-77812' })).toBe(true);
+      expect(passes({ q: '  oilfield   pipe ' })).toBe(true);
+      expect(passes({ q: 'forklift on site, call' })).toBe(true);
+      expect(passes({ q: "driller's mud" }, makeLoad({ commodity: "Driller's mud" }))).toBe(true);
+      expect(passes({ q: 'drillers mud' }, makeLoad({ commodity: "Driller's mud" }))).toBe(true);
+    });
+
+    it('never matches across two fields', () => {
+      // Commodity "Oilfield pipe" is followed by the notes "Forklift on site."
+      expect(passes({ q: 'pipe forklift' })).toBe(false);
+      expect(passes({ q: 'tx odessa' })).toBe(false);
+    });
+
+    it('applies no text filter when the search is only punctuation', () => {
+      expect(passes({ q: '?!' })).toBe(true);
+    });
   });
 
   it('keeps loads that accept any of the wanted equipment', () => {

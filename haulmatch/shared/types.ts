@@ -18,6 +18,8 @@ export type EquipmentCode =
   | 'RGN'
   | 'CONESTOGA'
   | 'TANKER'
+  /** Pneumatic dry bulk (frac sand, cement). Unlike TANKER it needs no N endorsement. */
+  | 'DRY_BULK'
   | 'POWER_ONLY';
 
 export type Endorsement = 'hazmat' | 'tanker' | 'doubles_triples' | 'twic';

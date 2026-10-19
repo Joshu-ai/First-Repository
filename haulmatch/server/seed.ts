@@ -12,7 +12,7 @@ import {
   HOTSHOT_MAX_LENGTH_FT,
   HOTSHOT_MAX_PAYLOAD_LBS,
 } from '../shared/equipment';
-import { driveHours, roadMiles } from '../shared/geo';
+import { roadMiles, transitHours } from '../shared/geo';
 import { compareMatches, matchLoad, type MatchableLoad } from '../shared/matching';
 import { estimateRate } from '../shared/rates';
 import type {
@@ -342,6 +342,7 @@ type GroupKey =
   | 'van'
   | 'reefer'
   | 'tanker'
+  | 'dryBulk'
   | 'powerOnly';
 
 interface Freight {
@@ -688,6 +689,8 @@ const REEFER: Freight[] = [
 ];
 
 const TANK: EquipmentCode[][] = [['TANKER']];
+/** Pneumatic dry bulk: no tanker (N) endorsement needed, since the trailer carries no liquid or gas. */
+const DRY_BULK: EquipmentCode[][] = [['DRY_BULK']];
 const TANKER: Freight[] = [
   {
     commodity: 'Hydrochloric acid, 15% (UN1789, Class 8)', weight: [40_000, 45_000], length: [42, 45],
@@ -710,25 +713,29 @@ const TANKER: Freight[] = [
     lanes: [lane(1, ['enid-ok', 'beaumont-tx', 'houston-tx'], PLAINS_AG)],
   },
   {
-    commodity: 'Frac sand, 40/70 mesh (pneumatic)',
-    weight: [44_000, 45_000],
-    length: [42, 45],
-    equipment: TANK,
-    lanes: [
-      lane(
-        1,
-        ['kermit-tx', 'monahans-tx'],
-        ['pecos-tx', 'carlsbad-nm', 'andrews-tx', 'midland-tx', 'hobbs-nm', 'big-spring-tx', 'fort-stockton-tx'],
-      ),
-    ],
-  },
-  {
     commodity: 'Food-grade soybean oil', weight: [42_000, 45_000], length: [42, 45], equipment: TANK,
     lanes: [lane(1, ['des-moines-ia', 'decatur-il', 'kansas-city-mo'], NATIONAL_DC)],
   },
   {
     commodity: 'Drilling mud, water-based', weight: [40_000, 45_000], length: [42, 45], equipment: TANK,
     lanes: [lane(1, HOUSTON_SUPPLY, [...PERMIAN, ...HAYNESVILLE, ...EAGLE_FORD])],
+  },
+];
+
+/** Permian frac sand mines and the pads and yards they feed. */
+const SAND_MINES: CityList = ['kermit-tx', 'monahans-tx', 'crane-tx'];
+const SAND_PADS: CityList = [
+  'pecos-tx', 'carlsbad-nm', 'andrews-tx', 'midland-tx', 'hobbs-nm', 'big-spring-tx', 'fort-stockton-tx', 'jal-nm',
+  'stanton-tx', 'denver-city-tx',
+];
+const DRY_BULK_FREIGHT: Freight[] = [
+  {
+    commodity: 'Frac sand, 40/70 mesh (pneumatic)', weight: [44_000, 47_000], length: [42, 45], equipment: DRY_BULK,
+    lanes: [lane(1, SAND_MINES, SAND_PADS)],
+  },
+  {
+    commodity: 'Oil well cement, Class H (pneumatic)', weight: [42_000, 46_000], length: [42, 45], equipment: DRY_BULK,
+    lanes: [lane(1, ['odessa-tx', 'midland-tx'], SAND_PADS)],
   },
 ];
 
@@ -945,6 +952,19 @@ const GROUPS: Record<GroupKey, GroupInfo> = {
       'TWIC card needed at the terminal.',
     ],
   },
+  dryBulk: {
+    freight: DRY_BULK_FREIGHT,
+    hotshot: false,
+    shippers: [['permian', 2], ['lonestar', 1]],
+    instantShare: 0.3,
+    minMiles: 40,
+    maxMiles: 400,
+    notes: [
+      'Blower on the tractor required; unload into the sand box at the pad.',
+      'Dry product, no wash-out needed.',
+      'Scale ticket at the mine before you leave.',
+    ],
+  },
   powerOnly: {
     freight: POWER_ONLY,
     hotshot: false,
@@ -975,6 +995,7 @@ const OPEN_LOAD_MIX: [GroupKey, number][] = [
   ['reefer', 10],
   ['tanker', 6],
   ['powerOnly', 3],
+  ['dryBulk', 3],
 ];
 
 type DriverKey =
@@ -1106,8 +1127,9 @@ const DRIVERS: DriverSpec[] = [
   },
   {
     key: 'hector', email: 'hector.salinas@demo.haulmatch.app', name: 'Hector Salinas', company: 'Salinas Tank Lines',
-    phone: '361-555-0144', driverClass: 'semi', equipment: ['TANKER'], trailerLengthFt: 45, maxPayloadLbs: 45_000,
-    truck: "2021 Mack Anthem + 9,000 gal stainless tank", cdlClass: 'A', endorsements: ['hazmat', 'tanker', 'twic'],
+    phone: '361-555-0144', driverClass: 'semi', equipment: ['TANKER', 'DRY_BULK'], trailerLengthFt: 45,
+    maxPayloadLbs: 45_000, truck: '2021 Mack Anthem + 9,000 gal stainless tank or 1,600 cu ft pneumatic',
+    cdlClass: 'A', endorsements: ['hazmat', 'tanker', 'twic'],
     currentCityId: 'pasadena-tx', homeCityId: 'corpus-christi-tx', preferredStates: ['TX', 'LA'], rating: 4.7,
     completedLoads: 289, mcNumber: '812094', dotNumber: '2276650',
   },
@@ -1233,12 +1255,6 @@ const laneLabel = (load: Pick<LoadDraft, 'originCityId' | 'destCityId'>): string
 const driverLoadLink = (loadId: string): string => `/driver/loads/${loadId}`;
 const shipperLoadLink = (loadId: string): string => `/shipper/loads/${loadId}`;
 const threadLink = (loadId: string, driverId: string): string => `/messages/${loadId}/${driverId}`;
-
-/** Hours on the road for a run, counting a 10-hour break for every 11 hours of driving. */
-function transitHours(miles: number): number {
-  const drive = driveHours(miles);
-  return drive + Math.floor(drive / 11) * 10;
-}
 
 function insertAccount(
   ctx: SeedCtx,

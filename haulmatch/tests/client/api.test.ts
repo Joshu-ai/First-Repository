@@ -101,6 +101,18 @@ describe('client api endpoint shapes', () => {
     expect(last().url).toBe('/api/notifications?unread=1&limit=1');
     await api.meta.rateEstimate({ originCityId: 'houston-tx', destinationCityId: 'odessa-tx', equipment: ['HS_GOOSENECK', 'FLATBED'] });
     expect(last().url).toBe('/api/rates/estimate?originCityId=houston-tx&destinationCityId=odessa-tx&equipment=HS_GOOSENECK%2CFLATBED');
+    await api.meta.rateEstimate({
+      originCityId: 'houston-tx',
+      destinationCityId: 'odessa-tx',
+      equipment: ['FLATBED', 'HS_GOOSENECK'],
+      weightLbs: 45_000,
+      lengthFt: 45,
+    });
+    expect(last().url).toBe(
+      '/api/rates/estimate?originCityId=houston-tx&destinationCityId=odessa-tx&equipment=FLATBED%2CHS_GOOSENECK&weightLbs=45000&lengthFt=45',
+    );
+    await api.meta.rateEstimate({ originCityId: 'houston-tx', destinationCityId: 'odessa-tx', equipment: [], weightLbs: null, lengthFt: null });
+    expect(last().url).toBe('/api/rates/estimate?originCityId=houston-tx&destinationCityId=odessa-tx');
     await api.messages.list('l1');
     expect(last().url).toBe('/api/loads/l1/messages');
     await api.messages.list('l1', 'd1');

@@ -88,5 +88,19 @@
 {"id":"vernal-ut","name":"Vernal","state":"UT","lat":40.4555,"lng":-109.5288,"population":11200},
 {"id":"weatherford-tx","name":"Weatherford","state":"TX","lat":32.7593,"lng":-97.7973,"population":28742},
 {"id":"williamsport-pa","name":"Williamsport","state":"PA","lat":41.2412,"lng":-77.0011,"population":29201},
-{"id":"washington-pa","name":"Washington","state":"PA","lat":40.174,"lng":-80.2462,"population":13497}
+{"id":"washington-pa","name":"Washington","state":"PA","lat":40.174,"lng":-80.2462,"population":13497},
+{"id":"jal-nm","name":"Jal","state":"NM","lat":32.1132,"lng":-103.1935,"population":2202},
+{"id":"denver-city-tx","name":"Denver City","state":"TX","lat":32.9645,"lng":-102.8291,"population":4470},
+{"id":"crane-tx","name":"Crane","state":"TX","lat":31.3974,"lng":-102.3501,"population":3478},
+{"id":"stanton-tx","name":"Stanton","state":"TX","lat":32.1293,"lng":-101.7885,"population":2657},
+{"id":"van-horn-tx","name":"Van Horn","state":"TX","lat":31.0399,"lng":-104.8307,"population":1941},
+{"id":"tioga-nd","name":"Tioga","state":"ND","lat":48.3972,"lng":-102.9382,"population":2202},
+{"id":"stanley-nd","name":"Stanley","state":"ND","lat":48.3172,"lng":-102.3905,"population":2321},
+{"id":"killdeer-nd","name":"Killdeer","state":"ND","lat":47.3717,"lng":-102.754,"population":939},
+{"id":"kingfisher-ok","name":"Kingfisher","state":"OK","lat":35.8614,"lng":-97.9314,"population":4903},
+{"id":"hennessey-ok","name":"Hennessey","state":"OK","lat":36.1092,"lng":-97.8992,"population":2151},
+{"id":"hereford-tx","name":"Hereford","state":"TX","lat":34.8151,"lng":-102.3977,"population":14972},
+{"id":"dumas-tx","name":"Dumas","state":"TX","lat":35.8625,"lng":-101.9639,"population":14501},
+{"id":"borger-tx","name":"Borger","state":"TX","lat":35.6678,"lng":-101.3974,"population":12551},
+{"id":"texarkana-ar","name":"Texarkana","state":"AR","lat":33.4418,"lng":-94.0377,"population":29387}
 ]
