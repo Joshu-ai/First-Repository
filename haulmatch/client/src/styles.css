@@ -17,7 +17,11 @@
   --ink-2: #2b3a52;
   --muted: #586477;
   --line: #dce1e8;
+  /* Decorative dividers and card edges. Too faint to be the only outline of a control. */
   --line-strong: #b8c1cd;
+  /* Outlines of inputs, checkboxes, radio marks, chips and the off switch: 3:1 or more against
+     --bg, --surface, --surface-2 and --surface-3 (WCAG 1.4.11), so they hold up in sun glare. */
+  --control-border: #768392;
 
   /* Safety orange. Text on it is navy (white on orange fails contrast). */
   --brand: #ff6b1a;
@@ -26,6 +30,8 @@
   /* Orange dark enough to use as text on light surfaces. */
   --brand-text: #c2410c;
   --brand-soft: #fff0e6;
+  /* Edge of a checked or selected control. --brand itself is 2.85:1 on white, under 3:1. */
+  --brand-line: #d9530b;
 
   --accent: #1d5fd1;
   --accent-soft: #e7effc;
@@ -37,6 +43,10 @@
   --bad-soft: #fde7e7;
   --on-bad: #ffffff;
   --focus: #1d5fd1;
+
+  /* Switch track when on; the knob is white in both states (3:1 or more on either track). */
+  --switch-on: #137333;
+  --switch-knob: #ffffff;
 
   --score-great: #137333;
   --score-good: #0f766e;
@@ -86,12 +96,14 @@
     --muted: #98a5b6;
     --line: #253142;
     --line-strong: #3a495c;
+    --control-border: #6b7a8f;
 
     --brand: #ff7a2e;
     --brand-hover: #ff9152;
     --brand-ink: #0a1018;
     --brand-text: #ff9a5c;
     --brand-soft: rgb(255 122 46 / 0.14);
+    --brand-line: #ff7a2e;
 
     --accent: #7db3ff;
     --accent-soft: rgb(125 179 255 / 0.14);
@@ -103,6 +115,9 @@
     --bad-soft: rgb(255 125 125 / 0.14);
     --on-bad: #0a1018;
     --focus: #8fbcff;
+
+    /* --ok (#52d189) is too light for a white knob; this green keeps both above 3:1. */
+    --switch-on: #1e8f4e;
 
     --score-great: #52d189;
     --score-good: #3cc8b4;
@@ -141,6 +156,21 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-padding-top: calc(var(--topbar-h) + 12px);
+  /* A field that takes focus must scroll clear of whatever is pinned to the bottom of the viewport
+     (WCAG 2.4.11): the phone tab bar (--tabbar-inset) or a sticky action or save bar, which reports
+     how far it reaches up in --pinned-bar-inset (lib/pinnedBar.ts). */
+  scroll-padding-bottom: calc(max(var(--tabbar-inset, 0px), var(--pinned-bar-inset, 0px)) + 12px);
+}
+
+/* The bottom tab bar shows below 1024px on signed-in pages. */
+html:has(.app--tabbed) {
+  --tabbar-inset: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  html:has(.app--tabbed) {
+    --tabbar-inset: 0px;
+  }
 }
 
 body {
@@ -775,6 +805,18 @@ hr {
   .btn--icon.btn--sm {
     width: var(--tap);
   }
+
+  /* The city field's clear (×) button: a full 44px target inside the 48px field, and the text
+     stops short of it. (Selectors outrank the base rules further down.) */
+  .input-wrap > .input-wrap__clear {
+    right: 2px;
+    width: var(--tap);
+    height: var(--tap);
+  }
+
+  .combobox .input-wrap > .input {
+    padding-right: 52px;
+  }
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -848,7 +890,7 @@ legend.field__label {
   padding: 10px 14px;
   background: var(--surface);
   color: var(--ink);
-  border: 1.5px solid var(--line-strong);
+  border: 1.5px solid var(--control-border);
   border-radius: var(--radius-sm);
   font-size: 1rem;
   line-height: 1.35;
@@ -1032,7 +1074,7 @@ fieldset {
   place-items: center;
   width: 24px;
   height: 24px;
-  border: 2px solid var(--line-strong);
+  border: 2px solid var(--control-border);
   border-radius: 6px;
   background: var(--surface);
   color: transparent;
@@ -1044,7 +1086,7 @@ fieldset {
 .check__input:checked + .check__label .check__box,
 .option-card__input:checked + .option-card__label .option-card__box {
   background: var(--brand);
-  border-color: var(--brand);
+  border-color: var(--brand-line);
   color: var(--brand-ink);
 }
 
@@ -1110,16 +1152,16 @@ fieldset {
   height: 32px;
   margin: 0;
   border-radius: var(--radius-pill);
-  background-color: var(--line-strong);
-  background-image: radial-gradient(circle at 16px 50%, #fff 0 11px, transparent 11.5px);
+  background-color: var(--control-border);
+  background-image: radial-gradient(circle at 16px 50%, var(--switch-knob) 0 11px, transparent 11.5px);
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
 .switch__input:checked {
-  background-color: var(--ok);
-  background-image: radial-gradient(circle at 36px 50%, #fff 0 11px, transparent 11.5px);
+  background-color: var(--switch-on);
+  background-image: radial-gradient(circle at 36px 50%, var(--switch-knob) 0 11px, transparent 11.5px);
 }
 
 .switch__input:disabled {
@@ -1194,21 +1236,21 @@ fieldset {
   place-items: center;
   width: 24px;
   height: 24px;
-  border: 2px solid var(--line-strong);
+  border: 2px solid var(--control-border);
   border-radius: 50%;
   color: transparent;
   background: var(--surface);
 }
 
 .radio-card__input:checked + .radio-card__label {
-  border-color: var(--brand);
+  border-color: var(--brand-line);
   background: var(--brand-soft);
-  box-shadow: 0 0 0 1px var(--brand);
+  box-shadow: 0 0 0 1px var(--brand-line);
 }
 
 .radio-card__input:checked + .radio-card__label .radio-card__mark {
   background: var(--brand);
-  border-color: var(--brand);
+  border-color: var(--brand-line);
   color: var(--brand-ink);
 }
 
@@ -1327,7 +1369,7 @@ fieldset {
 }
 
 .option-card__input:checked + .option-card__label {
-  border-color: var(--brand);
+  border-color: var(--brand-line);
   background: var(--brand-soft);
 }
 
@@ -1608,7 +1650,7 @@ fieldset {
   padding: 0 14px;
   background: var(--surface);
   color: var(--ink);
-  border: 1.5px solid var(--line-strong);
+  border: 1.5px solid var(--control-border);
   border-radius: var(--radius-pill);
   font-size: 0.9375rem;
   font-weight: 600;
@@ -1624,8 +1666,21 @@ fieldset {
 
 .chip--selected {
   background: var(--brand-soft);
-  border-color: var(--brand);
+  border-color: var(--brand-line);
   color: var(--ink);
+}
+
+/* A pressed toggle chip (List / Map) is filled, not just re-coloured, so the state reads without
+   colour and on an icon-only chip too. */
+.chip[aria-pressed='true'] {
+  background: var(--brand);
+  border-color: var(--brand-line);
+  color: var(--brand-ink);
+}
+
+.chip[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-line);
 }
 
 .chip--removable {
@@ -2781,7 +2836,7 @@ fieldset {
    ------------------------------------------------------------------------------------------ */
 
 /* Under the top bar on every screen size: at the bottom on phones a toast would cover the sticky
-   action bar (Book now, Picked up) and the message composer right when the driver needs them. */
+   action bar (Book now, Mark picked up) and the message composer right when the driver needs them. */
 .toast-region {
   position: fixed;
   z-index: 1000;
@@ -3469,11 +3524,12 @@ fieldset {
   line-height: 1;
 }
 
-/* Leaflet positions .map-pin-anchor absolutely, so the bubble anchors to it. */
+/* Leaflet positions .map-pin-anchor absolutely, so the bubble anchors to it. It sits off the pin's
+   shoulder so it never covers the score digits. */
 .map-pin__count {
   position: absolute;
-  top: -8px;
-  right: -10px;
+  top: -14px;
+  right: -16px;
   min-width: 22px;
   padding: 1px 5px;
   border: 2px solid #fff;
@@ -3514,6 +3570,30 @@ fieldset {
   box-shadow:
     0 0 0 3px rgb(255 107 26 / 0.35),
     0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+/* Several pickup cities too close to tap apart: a second ring reads as a stack; tapping zooms in. */
+.map-pin--cluster {
+  box-shadow:
+    0 0 0 2px var(--pin),
+    0 0 0 4px #fff,
+    0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+/* The driver's own spot: a round badge centred on it (pins stand on their tip above it). */
+.map-badge {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+}
+
+.map-badge--driver {
+  background: #1d5fd1;
+  color: #fff;
 }
 
 .map .map-line--route {

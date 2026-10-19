@@ -193,6 +193,32 @@ const sameTime = (a: string | null, b: string | null) =>
 const sameSet = (a: EquipmentCode[], b: EquipmentCode[]) =>
   a.length === b.length && a.every((code) => b.includes(code));
 
+/**
+ * True when the form still holds what it started with, so leaving loses nothing. Text is compared
+ * trimmed (a stray space is not work to lose) and times as instants.
+ */
+export function sameLoadValues(a: LoadFormValues, b: LoadFormValues): boolean {
+  return (
+    (a.origin?.id ?? null) === (b.origin?.id ?? null) &&
+    (a.destination?.id ?? null) === (b.destination?.id ?? null) &&
+    sameTime(a.pickupStart, b.pickupStart) &&
+    sameTime(a.pickupEnd, b.pickupEnd) &&
+    sameTime(a.deliveryBy, b.deliveryBy) &&
+    a.commodity.trim() === b.commodity.trim() &&
+    a.weightLbs === b.weightLbs &&
+    a.lengthFt === b.lengthFt &&
+    a.loadSize === b.loadSize &&
+    a.hazmat === b.hazmat &&
+    a.tarpRequired === b.tarpRequired &&
+    a.teamRequired === b.teamRequired &&
+    a.notes.trim() === b.notes.trim() &&
+    sameSet(a.equipmentTypes, b.equipmentTypes) &&
+    a.rateUsd === b.rateUsd &&
+    a.bookingMode === b.bookingMode &&
+    a.referenceNumber.trim() === b.referenceNumber.trim()
+  );
+}
+
 /** True when the edit touches the pickup window (the server then re-checks it is in the future). */
 export function pickupWindowChanged(v: LoadFormValues, original: Load): boolean {
   return !sameTime(v.pickupStart, original.pickupStart) || !sameTime(v.pickupEnd, original.pickupEnd);

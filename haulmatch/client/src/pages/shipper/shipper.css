@@ -201,6 +201,11 @@
    Post load form
    ------------------------------------------------------------------------------------------ */
 
+/* Phone action bar: Post load takes the width, Cancel is a text-weight button beside it. */
+.action-bar > .btn.sh-cancel {
+  flex: 0 1 auto;
+}
+
 .sh-hotshot {
   display: flex;
   flex-direction: column;

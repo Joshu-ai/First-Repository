@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   HOTSHOT_MAX_LENGTH_FT,
   HOTSHOT_MAX_PAYLOAD_LBS,
@@ -25,6 +25,7 @@ import { cx } from '../../lib/cx';
 import { lane, lbs, loadStatusLabel, miles, money, place, plural, ratePerMile, timeWindow } from '../../lib/format';
 import { useApi, useIsDesktop } from '../../lib/hooks';
 import { pickupWindowPassed } from '../../lib/loads';
+import { pinnedBarRef } from '../../lib/pinnedBar';
 import { useServerEvent } from '../../lib/realtime';
 import { paths } from '../../lib/routes';
 import {
@@ -39,6 +40,7 @@ import {
   lengthLabel,
   loadToValues,
   pickupWindowChanged,
+  sameLoadValues,
   setOpenToHotshot,
   toLoadInput,
   toLoadUpdate,
@@ -222,9 +224,10 @@ function LoadForm({ mode, source }: LoadFormProps) {
   const toast = useToast();
   const isDesktop = useIsDesktop();
   const formRef = useRef<HTMLFormElement>(null);
-  const [values, setValues] = useState<LoadFormValues>(() =>
+  const [initial] = useState<LoadFormValues>(() =>
     source ? loadToValues(source, mode === 'edit' ? 'edit' : 'repost', new Date()) : emptyLoadValues(new Date()),
   );
+  const [values, setValues] = useState<LoadFormValues>(initial);
   const [errors, setErrors] = useState<LoadFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -233,6 +236,22 @@ function LoadForm({ mode, source }: LoadFormProps) {
   const [minPickup] = useState(() => new Date().toISOString());
   /** The edit cancels waiting requests and the shipper is being asked to confirm it. */
   const [confirmCancelRequests, setConfirmCancelRequests] = useState(false);
+  /** Set once the load is saved, so the page can move to it without asking. */
+  const leaving = useRef(false);
+
+  // Cancel, the tab bar, Back and closing the tab all drop a half-entered load: ask first.
+  const dirty = !sameLoadValues(values, initial);
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => dirty && !leaving.current && currentLocation.pathname !== nextLocation.pathname,
+  );
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!leaving.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   useServerEvent((event) => {
     if (mode === 'edit' && source && event.type === 'load_updated' && event.loadId === source.id && event.status !== 'open') {
@@ -303,6 +322,7 @@ function LoadForm({ mode, source }: LoadFormProps) {
         const update = toLoadUpdate(values, source);
         if (Object.keys(update).length === 0) {
           toast.info('Nothing changed', 'The load is the same as before.');
+          leaving.current = true;
           navigate(paths.shipperLoad(source.id));
           return;
         }
@@ -322,6 +342,7 @@ function LoadForm({ mode, source }: LoadFormProps) {
           `${lane(saved.origin, saved.destination)} is live. Drivers whose rigs fit are being matched now.`,
         );
       }
+      leaving.current = true;
       navigate(paths.shipperLoad(saved.id));
     } catch (err) {
       const fields = err instanceof ApiError ? apiErrorsToFields(err) : {};
@@ -612,11 +633,12 @@ function LoadForm({ mode, source }: LoadFormProps) {
               {alert}
             </InlineAlert>
           ) : null}
-          <div className="action-bar">
+          <div className="action-bar" ref={pinnedBarRef}>
             <Button type="submit" size="lg" loading={submitting} disabled={locked !== null}>
               {submitLabel}
             </Button>
-            <ButtonLink to={cancelTo} variant="secondary" size="lg">
+            {/* Lighter than the submit button, so a slip of the thumb lands on Post load, not on Cancel. */}
+            <ButtonLink to={cancelTo} variant="ghost" size="lg" className="sh-cancel">
               Cancel
             </ButtonLink>
           </div>
@@ -632,6 +654,16 @@ function LoadForm({ mode, source }: LoadFormProps) {
         pending={submitting}
         onConfirm={() => void save()}
         onCancel={() => setConfirmCancelRequests(false)}
+      />
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        tone="danger"
+        title="Leave without saving?"
+        message={mode === 'edit' ? 'Your changes to this load haven’t been saved.' : 'This load hasn’t been posted yet, and what you entered will be lost.'}
+        confirmLabel="Leave without saving"
+        cancelLabel="Keep editing"
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
       />
     </form>
   );

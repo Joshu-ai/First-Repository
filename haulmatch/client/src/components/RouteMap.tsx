@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
 import type { Place } from '../../../shared/types';
 import { lane, place } from '../lib/format';
-import { BaseMap, FitToPoints, pinIcon, type LatLngLike, type MapPin } from './MapBase';
+import { BaseMap, FitToPoints, pinIcon, truckIcon, type LatLngLike, type MapPin } from './MapBase';
 
 export type { MapPin, PinKind } from './MapBase';
 
@@ -44,9 +44,10 @@ export function RouteMap({ origin, destination, driverLocation, extraPins = [], 
           />
           <Marker
             position={[driverLocation.lat, driverLocation.lng]}
-            icon={pinIcon('driver')}
+            icon={truckIcon()}
             keyboard={false}
             title={`You: ${place(driverLocation)}`}
+            zIndexOffset={2000}
           />
         </>
       ) : null}

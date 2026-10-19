@@ -59,10 +59,10 @@ test('shipper posts a hotshot load, a driver requests it, and they run it to del
 
   // The driver's page flips to booked without a reload, then they run the trip.
   await expect(driverPage.getByText('You’re booked on this load', { exact: true })).toBeVisible();
-  await driverPage.getByRole('button', { name: 'Picked up' }).click();
+  await driverPage.getByRole('button', { name: 'Mark picked up' }).click();
   await driverPage.getByRole('dialog', { name: 'Mark as picked up?' }).getByRole('button', { name: 'Yes, picked up' }).click();
   await expect(driverPage.getByText('On your truck', { exact: true })).toBeVisible();
-  await driverPage.getByRole('button', { name: 'Delivered' }).click();
+  await driverPage.getByRole('button', { name: 'Mark delivered' }).click();
   await driverPage.getByRole('dialog', { name: 'Mark as delivered?' }).getByRole('button', { name: 'Yes, delivered' }).click();
   await expect(driverPage.getByRole('button', { name: 'Find a backhaul' })).toBeVisible();
 

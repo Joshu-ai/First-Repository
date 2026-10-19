@@ -23,7 +23,10 @@ export function nextTripStatus(load: Pick<Load, 'status'>): 'in_transit' | 'deli
   return null;
 }
 
-/** "Picked up" for a booked load, "Delivered" once it is in transit. Renders nothing otherwise. */
+/**
+ * "Mark picked up" for a booked load, "Mark delivered" once it is in transit. Renders nothing otherwise.
+ * The label is the action, never the status word, so it cannot be read as "already delivered".
+ */
 export function TripStatusButton({
   load,
   onDone,
@@ -57,13 +60,13 @@ export function TripStatusButton({
         size={size}
         block={block}
         className={className}
-        icon={pickedUp ? 'truck' : 'check'}
+        icon={pickedUp ? 'truck' : 'pin'}
         onClick={() => {
           action.reset();
           setConfirming(true);
         }}
       >
-        {pickedUp ? 'Picked up' : 'Delivered'}
+        {pickedUp ? 'Mark picked up' : 'Mark delivered'}
       </Button>
       <ConfirmDialog
         open={confirming}

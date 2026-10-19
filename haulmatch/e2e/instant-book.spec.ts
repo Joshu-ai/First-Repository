@@ -37,7 +37,7 @@ test('the demo semi driver instant-books a load in one tap', async ({ page, play
   await dialog.getByRole('button', { name: 'Book now · $1,150' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('You’re booked on this load', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Picked up' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark picked up' })).toBeVisible();
 
   // It is now on the driver's trips and off the board.
   await page.goto('/driver/trips');

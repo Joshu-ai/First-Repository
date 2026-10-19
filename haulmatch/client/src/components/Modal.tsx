@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { cx } from '../lib/cx';
+import { focusPageHeading, rescueFocus } from '../lib/focusKeeper';
 import { Button } from './Button';
 import { Icon } from './Icon';
 
@@ -27,7 +28,8 @@ const FOCUSABLE =
 
 /**
  * Modal dialog on the native <dialog> element: the page behind is inert, Escape closes,
- * focus is trapped inside and returns to the opener on close.
+ * focus is trapped inside and returns to the opener on close (or, when the opener is gone, to what
+ * now sits in its place: see lib/focusKeeper.ts).
  */
 export function Modal({
   open,
@@ -65,8 +67,12 @@ export function Modal({
       target?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
-      opener.current?.focus();
+      const back = opener.current;
       opener.current = null;
+      if (back?.isConnected) back.focus();
+      // The action may have removed the button that opened the dialog (an accepted request's row, a
+      // withdrawn trip), or turned it off: focus what now sits there instead of dropping to <body>.
+      if (back && document.activeElement !== back && !rescueFocus()) focusPageHeading();
     }
   }, [open, initialFocusRef]);
 

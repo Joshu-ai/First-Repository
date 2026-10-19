@@ -10,6 +10,7 @@ import {
   isOpenToHotshot,
   loadToValues,
   pickupWindowChanged,
+  sameLoadValues,
   setOpenToHotshot,
   toLoadInput,
   toLoadUpdate,
@@ -266,5 +267,32 @@ describe('open loads past their pickup window', () => {
     expect(tabCount('delivered', stats)).toBe(9);
     expect(tabCount('cancelled', stats)).toBe(5);
     expect(tabCount('open', undefined)).toBeUndefined();
+  });
+});
+
+describe('sameLoadValues (leaving Post load asks first once something was entered)', () => {
+  it('sees a fresh form, and an edit form as loaded, as unchanged', () => {
+    const fresh = emptyLoadValues(now);
+    expect(sameLoadValues(fresh, emptyLoadValues(now))).toBe(true);
+    const edit = loadToValues(posted, 'edit', now);
+    expect(sameLoadValues(edit, loadToValues(posted, 'edit', now))).toBe(true);
+  });
+
+  it('notices any field the shipper filled or changed', () => {
+    const start = emptyLoadValues(now);
+    expect(sameLoadValues({ ...start, commodity: 'Drill pipe, 40 joints' }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, origin: odessa }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, rateUsd: 900 }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, equipmentTypes: ['FLATBED'] }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, hazmat: true }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, bookingMode: start.bookingMode === 'instant' ? 'request' : 'instant' }, start)).toBe(false);
+    expect(sameLoadValues({ ...start, pickupStart: '2026-10-30T13:00:00.000Z' }, start)).toBe(false);
+  });
+
+  it('ignores stray spaces, the order trailers were ticked in, and how a time is written', () => {
+    const edit = loadToValues(posted, 'edit', now);
+    expect(sameLoadValues({ ...edit, commodity: ` ${edit.commodity} `, notes: `${edit.notes}  ` }, edit)).toBe(true);
+    expect(sameLoadValues({ ...edit, equipmentTypes: [...edit.equipmentTypes].reverse() }, edit)).toBe(true);
+    expect(sameLoadValues({ ...edit, pickupStart: '2026-10-19T08:00:00-05:00' }, edit)).toBe(true);
   });
 });

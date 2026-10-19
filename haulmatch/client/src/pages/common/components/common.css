@@ -589,6 +589,68 @@ a.cm-thread:focus-visible {
   }
 }
 
+/* Short phone screens (an iPhone SE with Safari's bars showing, a phone on its side): the load card
+   shrinks to one row (status, lane, View load; the pickup time, rate and freight are one tap away on
+   the load page), so the message log keeps room for more than one message. */
+@media (max-width: 899.98px) and (max-height: 740px) {
+  .cm-messages--open .cm-convo__head {
+    gap: var(--space-2);
+  }
+
+  .cm-messages--open .cm-context {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    padding-block: 6px;
+  }
+
+  .cm-messages--open .cm-context__top {
+    order: 2;
+    flex: 1;
+  }
+
+  .cm-messages--open .cm-context__facts {
+    order: 1;
+    flex: none;
+  }
+
+  .cm-messages--open .cm-context__facts > li:not(:has(.badge)) {
+    display: none;
+  }
+
+  .cm-messages--open .cm-context__lane {
+    font-size: 0.9375rem;
+  }
+
+  /* A link-weight "View load ›" leaves the lane room to sit on two lines at most. */
+  .cm-messages--open .cm-context__link {
+    padding-inline: 6px;
+    border-color: transparent;
+    background: none;
+    color: var(--accent);
+  }
+}
+
+/* Shorter still, the tab bar steps aside while a conversation is open (as in phone messaging apps):
+   the back arrow in the conversation header leads out, and the tab bar is back on the list. */
+@media (max-width: 899.98px) and (max-height: 700px) {
+  html:has(.cm-messages--open) {
+    --tabbar-inset: 0px;
+  }
+
+  .app--tabbed:has(.cm-messages--open) .tabbar {
+    display: none;
+  }
+
+  .app--tabbed:has(.cm-messages--open) .app__main {
+    padding-bottom: 0;
+  }
+
+  .app--tabbed .cm-messages--open {
+    --cm-tabbar: 0px;
+  }
+}
+
 @media (min-width: 900px) {
   .cm-convo__head {
     padding: var(--space-4) var(--space-5);

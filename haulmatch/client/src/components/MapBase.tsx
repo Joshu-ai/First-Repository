@@ -42,14 +42,15 @@ const iconCache = new Map<string, L.DivIcon>();
 
 /**
  * A teardrop pin. `text` replaces the default glyph (the match score on the load map) and `count`
- * adds a small "×3" bubble so a score and a number of loads never look alike.
+ * adds a small "×3" bubble so a score and a number of loads never look alike. `cluster` draws a
+ * ringed pin that stands for several nearby pickup cities (tapping it zooms in).
  */
-export function pinIcon(kind: PinKind, text?: string, selected = false, count = 1): L.DivIcon {
-  const key = `${kind}|${text === undefined ? '-' : `t:${text}`}|${selected}|${count}`;
+export function pinIcon(kind: PinKind, text?: string, selected = false, count = 1, cluster = false): L.DivIcon {
+  const key = `${kind}|${text === undefined ? '-' : `t:${text}`}|${selected}|${count}|${cluster}`;
   let icon = iconCache.get(key);
   if (!icon) {
     const glyph = text !== undefined ? escapeHtml(text) : GLYPHS[kind];
-    const classes = `map-pin map-pin--${kind}${selected ? ' map-pin--selected' : ''}`;
+    const classes = `map-pin map-pin--${kind}${selected ? ' map-pin--selected' : ''}${cluster ? ' map-pin--cluster' : ''}`;
     const bubble = count > 1 ? `<span class="map-pin__count">×${count}</span>` : '';
     icon = L.divIcon({
       className: 'map-pin-anchor',
@@ -62,6 +63,29 @@ export function pinIcon(kind: PinKind, text?: string, selected = false, count = 
   }
   return icon;
 }
+
+let truckBadge: L.DivIcon | null = null;
+
+/**
+ * The driver's own position: a round truck badge centred on the spot, not a pin. A pickup pin in the
+ * same city stands on that spot with its head above it, so both stay visible (draw the badge on top).
+ */
+export function truckIcon(): L.DivIcon {
+  truckBadge ??= L.divIcon({
+    className: 'map-pin-anchor',
+    html: `<span class="map-badge map-badge--driver">${GLYPHS.driver}</span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
+  });
+  return truckBadge;
+}
+
+/** Keeps a popup clear of the zoom buttons (top left) and the attribution line. */
+export const POPUP_PAN_PADDING = {
+  autoPanPaddingTopLeft: [64, 16] as L.PointTuple,
+  autoPanPaddingBottomRight: [16, 28] as L.PointTuple,
+};
 
 /** Fits the view to the given points whenever they change, and keeps Leaflet sized to its box. */
 export function FitToPoints({ points, maxZoom = 9 }: { points: LatLngLike[]; maxZoom?: number }) {
@@ -102,7 +126,9 @@ export function BaseMap({ height, className, ariaLabel, interactive, children }:
   // One-finger drags on phones should scroll the page, not pan a preview map.
   const touch = L.Browser.mobile;
   return (
-    <div className={cx('map', className)} style={{ height }} role={interactive ? 'region' : 'img'} aria-label={ariaLabel}>
+    // Not role="img": the OpenStreetMap attribution must stay a working link, and an image cannot
+    // contain links (axe: nested-interactive). A labelled group keeps the map's description.
+    <div className={cx('map', className)} style={{ height }} role={interactive ? 'region' : 'group'} aria-label={ariaLabel}>
       <MapContainer
         center={US_CENTER}
         zoom={4}

@@ -11,6 +11,7 @@ import { ApiError, api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { cx } from '../../lib/cx';
 import { useApi } from '../../lib/hooks';
+import { pinnedBarRef } from '../../lib/pinnedBar';
 import { paths } from '../../lib/routes';
 import {
   CapacitySection,
@@ -228,7 +229,7 @@ function SetupWizard({ profile }: { profile: DriverProfile }) {
           </div>
         </Card>
 
-        <div className="action-bar">
+        <div className="action-bar" ref={pinnedBarRef}>
           {stepIndex > 0 ? (
             <Button
               variant="secondary"

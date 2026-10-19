@@ -14,6 +14,7 @@ import { ApiError, api, errorMessage } from '../../lib/api';
 import { useAuth, useSignedInUser } from '../../lib/auth';
 import { driverClassLabel, equipmentList, place, plural, rating } from '../../lib/format';
 import { useApi } from '../../lib/hooks';
+import { pinnedBarRef } from '../../lib/pinnedBar';
 import { paths } from '../../lib/routes';
 import {
   CapacitySection,
@@ -169,7 +170,10 @@ function ProfileEditor({ profile }: { profile: DriverProfile }) {
     }
   };
 
+  /** Discard sits next to Save and throws away every edit at once, so it asks first. */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const discard = () => {
+    setConfirmDiscard(false);
     setDraft(original);
     setErrors({});
     setFormError(null);
@@ -227,13 +231,13 @@ function ProfileEditor({ profile }: { profile: DriverProfile }) {
         ))}
 
         {dirty ? (
-          <div className="drv-savebar" role="region" aria-label="Unsaved changes">
+          <div className="drv-savebar" role="region" aria-label="Unsaved changes" ref={pinnedBarRef}>
             <p className="drv-savebar__text">
               <Icon name="warning" size={18} />
               Unsaved changes
             </p>
             <div className="drv-savebar__actions">
-              <Button variant="secondary" onClick={discard} disabled={saving}>
+              <Button variant="secondary" onClick={() => setConfirmDiscard(true)} disabled={saving}>
                 Discard
               </Button>
               <Button type="submit" icon="check" loading={saving}>
@@ -244,6 +248,16 @@ function ProfileEditor({ profile }: { profile: DriverProfile }) {
         ) : null}
       </form>
 
+      <ConfirmDialog
+        open={confirmDiscard && dirty}
+        tone="danger"
+        title="Discard your changes?"
+        message="Everything you changed since the last save goes back to how it was."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onConfirm={discard}
+        onCancel={() => setConfirmDiscard(false)}
+      />
       <ConfirmDialog
         open={blocker.state === 'blocked'}
         tone="danger"

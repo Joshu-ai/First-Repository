@@ -35,6 +35,7 @@ import {
   timeWindow,
 } from '../../lib/format';
 import { useApi, useIsDesktop, useNow } from '../../lib/hooks';
+import { pinnedBarRef } from '../../lib/pinnedBar';
 import { useServerEvent } from '../../lib/realtime';
 import { paths } from '../../lib/routes';
 import { lastBoardPath } from './components/boardMemory';
@@ -260,7 +261,11 @@ function LoadDetailView({ data, reload, backTo }: { data: LoadDetailResponse; re
 
       <BackhaulSection load={load} state={backhauls} now={now} initialCount={isDesktop ? 6 : 3} />
 
-      {!isDesktop ? <div className="action-bar">{actions}</div> : null}
+      {!isDesktop ? (
+        <div className="action-bar" ref={pinnedBarRef}>
+          {actions}
+        </div>
+      ) : null}
 
       <BookDialog
         open={bookOpen}
@@ -316,14 +321,14 @@ function SituationNotice({
           }
         >
           Pick up in {place(load.origin)}, {timeWindow(load.pickupStart, load.pickupEnd, now)}. Rate {money(rate)}. Tap
-          “Picked up” once it’s loaded.
+          “Mark picked up” once it’s loaded.
         </InlineAlert>
       );
     case 'in_transit':
       return (
         <InlineAlert tone="info" title="On your truck">
           {load.pickedUpAt ? `Picked up ${timeAgo(load.pickedUpAt, now)}. ` : ''}Deliver to {place(load.destination)}
-          {load.deliveryBy ? ` by ${pickupTime(load.deliveryBy, now)}` : ''}. Tap “Delivered” once it’s signed for.
+          {load.deliveryBy ? ` by ${pickupTime(load.deliveryBy, now)}` : ''}. Tap “Mark delivered” once it’s signed for.
         </InlineAlert>
       );
     case 'delivered':

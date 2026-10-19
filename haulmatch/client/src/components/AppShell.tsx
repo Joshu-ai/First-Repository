@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 import type { Role } from '../../../shared/types';
 import { useAuth } from '../lib/auth';
 import { cx } from '../lib/cx';
+import { installFocusKeeper } from '../lib/focusKeeper';
 import { useRealtime } from '../lib/realtime';
 import { homePathFor, paths } from '../lib/routes';
 import { CountBubble } from './Badge';
@@ -70,6 +71,14 @@ export function AppShell() {
     lastPath.current = pathname;
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
+
+  // When an action removes the button that had focus (Request load, Withdraw, Accept), keep focus
+  // on the page instead of letting it fall to <body>. See lib/focusKeeper.ts.
+  const signedIn = Boolean(user);
+  useEffect(() => {
+    if (!signedIn || !mainRef.current) return;
+    return installFocusKeeper(mainRef.current);
+  }, [signedIn]);
 
   if (!user) return null;
   const settingUp = user.role === 'driver' && !driverProfile?.profileComplete;
