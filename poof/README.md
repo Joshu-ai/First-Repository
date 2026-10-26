@@ -19,10 +19,17 @@ screens, and pops up with a "Poof!" when you send a snap or one disappears.
 Right after sign-up, people build an avatar: face shape, skin tone, 8 hair
 styles in 10 colours, eyes, mouth, extras (glasses, shades, cap, beanie,
 headphones, freckles, blush), top and background, or tap 🎲 to shuffle.
-That's over 2.4 million combinations. Avatars show everywhere a person
+That's about 26 million combinations. Avatars show everywhere a person
 appears. Drawn in code (`public/avatar.js`); the server stores only small
 numbers and rejects anything that isn't a real option. Edit any time
 from the profile.
+
+## Marketing art
+
+`brand/` holds a social banner (1200×630), a story/phone poster
+(1080×1920) and a large Puff (1024×1024). They're drawn from the same
+code as the app, so they always match it. Change the cast or the tagline
+in `brand/render.js`, then run `node brand/render.js` to redraw them.
 
 ## Run it
 
