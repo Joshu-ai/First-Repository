@@ -289,5 +289,5 @@
  <circle cx="633.7" cy="561.0" r="13" fill="#ff8ad0" filter="url(#glow)"/>
  <circle cx="631.6" cy="346.0" r="9" fill="#ffffff" filter="url(#glow)"/>
 </g>
-<text x="400.0" y="622" text-anchor="middle" font-family="Montserrat, 'DejaVu Sans', sans-serif" font-weight="800" font-size="62" letter-spacing="4" fill="#ffffff" filter="url(#glow)">UNIVERSE</text>
+<text x="400.0" y="622" text-anchor="middle" font-family="Montserrat, 'DejaVu Sans', sans-serif" font-weight="800" font-size="58" letter-spacing="3" filter="url(#glow)"><tspan fill="#ffc24a">YOU</tspan><tspan fill="#ffffff">NIVERSE</tspan></text>
 <text x="400.0" y="672" text-anchor="middle" font-family="Montserrat, 'DejaVu Sans', sans-serif" font-weight="600" font-size="34" letter-spacing="12" fill="#8fe9ff">EXPLAINED</text></svg>
