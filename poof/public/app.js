@@ -73,6 +73,21 @@
     }, (user.displayName || user.username).slice(0, 1));
   }
 
+  // Puff, the mascot (see mascot.js). Decorative unless given a label.
+  function puff(mood, size, label) {
+    const el = h('span', { class: 'mascot', 'aria-hidden': label ? null : 'true' });
+    el.innerHTML = window.mascotSVG(mood, size, label || ''); // static markup, no user input
+    if (!label) el.firstElementChild.removeAttribute('role');
+    return el;
+  }
+
+  // a quick celebratory pop: Puff appears, then vanishes in a puff
+  function puffPop(text, mood = 'wink') {
+    const pop = h('div', { class: 'puff-pop', role: 'status' }, puff(mood, 150), h('strong', {}, text));
+    document.body.append(pop);
+    setTimeout(() => pop.remove(), 1300);
+  }
+
   function ago(ms) {
     const s = Math.max(1, Math.round((Date.now() - ms) / 1000));
     if (s < 60) return 'just now';
@@ -100,7 +115,7 @@
         btn.disabled = false;
       }
     } },
-      h('img', { class: 'logo', src: '/icon.svg', alt: '' }),
+      h('div', { class: 'logo float' }, puff('happy', 150, 'Puff, the Poof mascot')),
       h('h1', {}, 'Poof'),
       h('p', {}, signup ? 'Make an account. It takes ten seconds.' : 'Photos that vanish once they are seen.'),
       signup && h('label', { class: 'field' }, h('span', {}, 'Your name'),
@@ -389,7 +404,7 @@
       sendBtn.textContent = 'Sending…';
       try {
         await api('/api/snaps', { to: [...picked], story, image, duration: state.editor.timer });
-        toast(story && !picked.size ? 'Posted to your story' : 'Sent!');
+        puffPop(story && !picked.size ? 'Posted to your story' : 'Poof! Sent');
         go('chat');
       } catch (e) {
         toast(e.message);
@@ -407,7 +422,7 @@
     h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'));
     list.replaceChildren(storyRow, h('h2', { class: 'section-title' }, 'Friends'));
     if (!data.friends.length) {
-      list.append(h('div', { class: 'empty' }, h('strong', {}, 'No friends yet'),
+      list.append(h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'No friends yet'),
         'Add someone by username to send them snaps. You can still post to your story.',
         h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn ghost small', onclick: () => go('friends') }, 'Add friends'))));
     }
@@ -446,7 +461,7 @@
       state.unread = rows.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
       app.querySelector('.nav')?.replaceWith(nav('chat'));
       if (!rows.length) {
-        list.replaceChildren(h('div', { class: 'empty' }, h('strong', {}, 'Nobody to talk to yet'),
+        list.replaceChildren(h('div', { class: 'empty' }, puff('sleepy', 120), h('strong', {}, 'Nobody to talk to yet'),
           'Add friends by username, then snap them from the camera.',
           h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn small', onclick: () => go('friends') }, 'Add friends'))));
         return;
@@ -490,7 +505,11 @@
     svg.append(track, bar);
     let timer = null;
     let raf = null;
-    const close = () => { clearTimeout(timer); cancelAnimationFrame(raf); go('chat'); };
+    let viewed = 0;
+    const close = () => {
+      clearTimeout(timer); cancelAnimationFrame(raf); go('chat');
+      if (viewed) puffPop('Poof! Gone for good', 'wow');
+    };
     const next = async () => {
       clearTimeout(timer);
       cancelAnimationFrame(raf);
@@ -499,6 +518,7 @@
       let snap;
       try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) { toast(e.message); return next(); }
       img.src = snap.image;
+      viewed++;
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
       if (snap.duration) {
         const startAt = performance.now();
@@ -545,7 +565,7 @@
           onclick: async () => { try { await api(`/api/messages/${m.id}/save`, {}); load(); } catch (e) { toast(e.message); } },
         }, m.text, h('small', {}, ago(m.createdAt) + (m.saved ? ' · kept' : '') +
           (m.from === state.me.id ? (m.readAt ? ' · read' : ' · sent') : '')))));
-      if (!data.messages.length) thread.append(h('div', { class: 'empty' }, 'Say hi to ' + friend.displayName + ' 👋'));
+      if (!data.messages.length) thread.append(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to ' + friend.displayName + ' 👋'));
       if (atBottom || !thread.dataset.loaded) thread.scrollTop = thread.scrollHeight;
       thread.dataset.loaded = '1';
     }
@@ -574,7 +594,7 @@
             h('div', { class: 'sub' }, ago(g.stories.at(-1).createdAt) + (seen ? ' · watched' : ''))));
       });
       list.replaceChildren(mineRow, h('h2', { class: 'section-title' }, 'Friends'),
-        ...(rows.length ? rows : [h('div', { class: 'empty' }, h('strong', {}, 'Nothing new'),
+        ...(rows.length ? rows : [h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'Nothing new'),
           'When friends post to their story it shows up here for 24 hours.')]));
     };
     state.refresh = load;
@@ -675,7 +695,7 @@
         ...data.outgoing.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username + ' · pending')))),
         !data.incoming.length && !data.outgoing.length && q.length < 2
-          ? h('div', { class: 'empty' }, h('strong', {}, 'Find your friends'), 'Type a username to send a request.') : null,
+          ? h('div', { class: 'empty' }, puff('wow', 110), h('strong', {}, 'Find your friends'), 'Type a username to send a request.') : null,
       ].filter(Boolean));
     }
     state.refresh = () => Promise.all([runSearch(), loadRequests()]);

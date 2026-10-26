@@ -7,6 +7,13 @@ after they open it. Plus disappearing chat, 24-hour stories and streaks.
 Built clean-room with the [replica](https://github.com/Jakeschincariol/replica-skill)
 method; the planning files are in [`replica/`](replica/).
 
+## Meet Puff
+
+Puff is the Poof mascot: a little cloud that vanishes, the way your snaps
+do. Drawn in code (`public/mascot.js`) in four moods (happy, wink, sleepy,
+wow). Puff is the app icon, greets you on the login screen, naps on empty
+screens, and pops up with a "Poof!" when you send a snap or one disappears.
+
 ## Run it
 
 Needs Node 18 or newer. Nothing to install.

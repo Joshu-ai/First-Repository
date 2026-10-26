@@ -53,7 +53,22 @@ button { cursor: pointer; }
 
 /* Auth */
 .auth { justify-content: center; padding: var(--space-6); gap: var(--space-4); }
-.auth .logo { width: 96px; height: 96px; margin: 0 auto; }
+.auth .logo { margin: 0 auto; }
+.mascot { display: inline-block; line-height: 0; }
+.mascot svg { display: block; }
+.empty .mascot { display: block; width: fit-content; margin: 0 auto var(--space-3); }
+.float { animation: float 3.2s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-8px); } }
+.puff-pop { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); pointer-events: none; color: var(--text); font-size: 1.3rem; text-shadow: 0 2px 8px rgb(0 0 0 / .6); animation: puff-pop 1.3s ease-out forwards; }
+@keyframes puff-pop {
+  0% { opacity: 0; transform: scale(.4); }
+  25% { opacity: 1; transform: scale(1.08); }
+  70% { opacity: 1; transform: scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.5); filter: blur(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .float, .puff-pop { animation: none; }
+}
 .auth h1 { text-align: center; margin: 0; font-size: 2.2rem; }
 .auth p { text-align: center; color: var(--text-dim); margin: 0; }
 .field { display: flex; flex-direction: column; gap: var(--space-1); }
