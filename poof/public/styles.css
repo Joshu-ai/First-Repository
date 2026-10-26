@@ -113,6 +113,8 @@ button { cursor: pointer; }
 .row .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .sub { font-size: .85rem; color: var(--text-dim); display: flex; gap: var(--space-2); align-items: center; }
 .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; text-transform: uppercase; }
+.avatar.has-art { overflow: hidden; }
+.avatar.has-art svg { display: block; width: 100%; height: 100%; }
 .avatar.ring { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--story); }
 .avatar.ring.seen { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--surface-2); }
 .status-icon { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
@@ -156,3 +158,17 @@ button { cursor: pointer; }
 .hint { font-size: .8rem; color: var(--text-dim); text-align: center; margin: var(--space-2) 0; }
 
 #toast { position: fixed; left: 50%; top: max(var(--space-4), env(safe-area-inset-top)); transform: translateX(-50%); z-index: 50; background: var(--surface); border: 1px solid var(--surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-pill); font-weight: 600; box-shadow: 0 8px 24px rgb(0 0 0 / .4); max-width: calc(100% - var(--space-6)); }
+
+/* Avatar maker */
+.avatar-preview { display: flex; justify-content: center; margin: var(--space-2) 0 var(--space-4); }
+.avatar-preview svg { border-radius: 50%; box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+.chips { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: none; }
+.chip { flex: none; min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-pill); border: 0; background: var(--surface-2); font-weight: 600; }
+.chip[aria-selected="true"] { background: var(--brand); color: var(--brand-ink); }
+.option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.option { aspect-ratio: 1; border-radius: 50%; border: 3px solid transparent; background: none; padding: 0; display: grid; place-items: center; }
+.option svg { width: 100%; height: 100%; }
+.option[aria-checked="true"] { border-color: var(--accent); }
+.swatch-opt { border-color: rgb(255 255 255 / .15); }
+.maker-foot { padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); background: var(--surface); display: flex; justify-content: center; }
+.maker-foot .btn { width: 100%; }

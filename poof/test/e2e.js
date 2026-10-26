@@ -42,8 +42,23 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       await page.getByLabel('Username').fill(user);
       await page.getByLabel('Password').fill('password123');
       await page.getByRole('button', { name: 'Create account' }).click();
+      // S11 avatar maker runs once, right after sign up
+      await page.getByRole('heading', { name: 'Make your avatar' }).waitFor();
+      if (page === ava) {
+        await page.getByRole('tab', { name: 'Hair', exact: true }).click();
+        await page.getByRole('radio', { name: 'Curly' }).click();
+        await page.getByRole('tab', { name: 'Extras' }).click();
+        await page.getByRole('radio', { name: 'Glasses' }).click();
+        await shot(page, 'S11-avatar-maker');
+        await page.getByRole('button', { name: 'Looks like me' }).click();
+      } else {
+        await page.getByRole('button', { name: 'Skip' }).click();
+      }
       await page.getByRole('button', { name: 'Take photo' }).waitFor();
     }
+    // Ava's avatar is real art; Ben (skipped) keeps a letter
+    assert.equal(await ava.locator('.bar .avatar.has-art').count(), 1);
+    assert.equal(await ben.locator('.bar .avatar.has-art').count(), 0);
 
     // S09 add friend, accept
     await ava.getByRole('button', { name: 'Add friends' }).click();

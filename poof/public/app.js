@@ -66,10 +66,15 @@
     for (const c of text) n = (n * 31 + c.charCodeAt(0)) % 360;
     return n;
   }
-  function avatar(user, extra = '') {
+  function avatar(user, extra = '', size = 44) {
+    if (user.avatar) {
+      const el = h('span', { class: 'avatar has-art ' + extra, 'aria-hidden': 'true', style: `width:${size}px;height:${size}px` });
+      el.innerHTML = window.PoofAvatar.avatarSVG(user.avatar, size); // built from validated integers only
+      return el;
+    }
     return h('span', {
       class: 'avatar ' + extra, 'aria-hidden': 'true',
-      style: `background:hsl(${hue(user.username)} 55% 45%)`,
+      style: `background:hsl(${hue(user.username)} 55% 45%);width:${size}px;height:${size}px;font-size:${size / 2.4}px`,
     }, (user.displayName || user.username).slice(0, 1));
   }
 
@@ -109,7 +114,7 @@
       err.textContent = '';
       try {
         state.me = await api(signup ? '/api/signup' : '/api/login', data);
-        start();
+        start(signup ? 'avatar' : 'camera');
       } catch (e2) {
         err.textContent = e2.message;
         btn.disabled = false;
@@ -152,6 +157,7 @@
     else if (tab === 'stories') renderStories();
     else if (tab === 'friends') renderFriends();
     else if (tab === 'profile') renderProfile();
+    else if (tab === 'avatar') renderAvatarMaker();
   }
 
   function header(title, left, right) {
@@ -702,6 +708,58 @@
     loadRequests();
   }
 
+  // ---------- avatar maker (S11) ----------
+  const TABS = [
+    ['face', 'Face'], ['skin', 'Skin'], ['hair', 'Hair'], ['hairColor', 'Hair colour'], ['eyes', 'Eyes'],
+    ['mouth', 'Mouth'], ['acc', 'Extras'], ['shirt', 'Top'], ['bg', 'Background'],
+  ];
+  function renderAvatarMaker() {
+    const A = window.PoofAvatar;
+    const onboarding = !state.me.avatar;
+    let cfg = { ...(state.me.avatar || A.random()) };
+    let tab = 'hair';
+    const preview = h('div', { class: 'avatar-preview' });
+    const tabs = h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Avatar parts' });
+    const grid = h('div', { class: 'option-grid', role: 'radiogroup' });
+    const saveBtn = h('button', { class: 'btn', onclick: save }, onboarding ? 'Looks like me' : 'Save');
+
+    function draw() {
+      preview.innerHTML = A.avatarSVG(cfg, 180, 'Your avatar');
+      tabs.replaceChildren(...TABS.map(([k, label]) => h('button', {
+        class: 'chip', role: 'tab', 'aria-selected': String(k === tab), onclick: () => { tab = k; draw(); },
+      }, label)));
+      grid.setAttribute('aria-label', TABS.find(([k]) => k === tab)[1]);
+      const isColour = A.PARTS[tab][0].startsWith('#');
+      grid.replaceChildren(...A.PARTS[tab].map((v, i) => {
+        const btn = h('button', {
+          class: 'option' + (isColour ? ' swatch-opt' : ''), role: 'radio', 'aria-checked': String(cfg[tab] === i),
+          'aria-label': isColour ? `${TABS.find(([k]) => k === tab)[1]} ${i + 1}` : v,
+          style: isColour ? `background:${v}` : null,
+          onclick: () => { cfg = { ...cfg, [tab]: i }; draw(); },
+        });
+        if (!isColour) btn.innerHTML = A.avatarSVG({ ...cfg, [tab]: i }, 64);
+        return btn;
+      }));
+    }
+    async function save() {
+      saveBtn.disabled = true;
+      try {
+        state.me = await api('/api/me/avatar', { avatar: cfg });
+        puffPop(onboarding ? 'Hey, you!' : 'Looking good', 'wink');
+        go(onboarding ? 'camera' : 'profile');
+      } catch (e) { toast(e.message); saveBtn.disabled = false; }
+    }
+    const left = onboarding
+      ? h('button', { class: 'link', onclick: () => go('camera') }, 'Skip')
+      : h('button', { class: 'icon-btn plain', 'aria-label': 'Back', onclick: () => go('profile') }, '‹');
+    const shuffle = h('button', { class: 'icon-btn plain', 'aria-label': 'Shuffle', onclick: () => { cfg = A.random(); draw(); } }, '🎲');
+    show(h('section', { class: 'screen', 'aria-label': 'Avatar maker' },
+      header(onboarding ? 'Make your avatar' : 'Your avatar', left, shuffle),
+      h('div', { class: 'scroll', style: 'padding-bottom:var(--space-4)' }, preview, tabs, grid),
+      h('div', { class: 'maker-foot' }, saveBtn)));
+    draw();
+  }
+
   // ---------- profile (S10) ----------
   async function renderProfile() {
     const body = h('div', { class: 'scroll' });
@@ -712,7 +770,8 @@
       try { friends = await api('/api/friends'); } catch (e) { body.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
       body.replaceChildren(
         h('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:8px;margin:16px 0' },
-          h('span', { style: 'transform:scale(1.8);margin:16px' }, avatar(state.me)),
+          avatar(state.me, '', 120),
+          h('button', { class: 'btn ghost small', onclick: () => go('avatar') }, state.me.avatar ? 'Edit avatar' : 'Make your avatar'),
           h('div', { class: 'name', style: 'font-size:1.3rem;font-weight:800' }, state.me.displayName),
           h('div', { class: 'sub', style: 'color:var(--text-dim)' }, '@' + state.me.username)),
         h('h2', { class: 'section-title' }, `Friends (${friends.friends.length})`),
@@ -752,13 +811,13 @@
     };
   }
 
-  async function start() {
+  async function start(first = 'camera') {
     listen();
     try {
       const inbox = await api('/api/inbox');
       state.unread = inbox.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
     } catch {}
-    go('camera');
+    go(first);
   }
 
   (async () => {

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { Store } = require('./store');
+const Avatar = require('./public/avatar');
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
@@ -37,7 +38,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
 
   // ---------- helpers ----------
   const user = (id) => db.users.find((u) => u.id === id);
-  const publicUser = (u) => u && { id: u.id, username: u.username, displayName: u.displayName };
+  const publicUser = (u) => u && { id: u.id, username: u.username, displayName: u.displayName, avatar: u.avatar || null };
   const pairKey = (a, b) => [a, b].sort().join('|');
   const friendship = (a, b) => db.friendships.find(
     (f) => (f.a === a && f.b === b) || (f.a === b && f.b === a));
@@ -186,6 +187,15 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
   });
 
   route('GET', '/api/me', ({ me }) => publicUser(me));
+
+  route('POST', '/api/me/avatar', ({ me, body }) => {
+    const avatar = Avatar.normalize(body.avatar);
+    if (!avatar) fail(400, 'That avatar has a part that does not exist.');
+    me.avatar = avatar;
+    store.save();
+    for (const id of friendIds(me.id)) push(id, { type: 'friends' });
+    return publicUser(me);
+  });
 
   route('GET', '/api/events', ({ me, res }) => {
     res.writeHead(200, {

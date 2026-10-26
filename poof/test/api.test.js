@@ -65,6 +65,22 @@ test('signup, login, logout and validation', async () => {
   } finally { await s.close(); }
 });
 
+test('avatars: saved, shown to friends, invalid parts rejected', async () => {
+  const s = await boot();
+  try {
+    const { a, b } = await friends(s.base);
+    const avatar = { bg: 1, skin: 2, face: 0, hair: 3, hairColor: 4, eyes: 1, mouth: 0, acc: 2, shirt: 5 };
+    assert.equal((await a.get('/api/me')).data.avatar, null);
+    assert.deepEqual((await a.post('/api/me/avatar', { avatar })).data.avatar, avatar);
+    assert.deepEqual((await b.get('/api/friends')).data.friends[0].avatar, avatar);
+    assert.equal((await a.post('/api/me/avatar', { avatar: { ...avatar, hair: 99 } })).status, 400);
+    assert.equal((await a.post('/api/me/avatar', { avatar: { ...avatar, eyes: '<script>' } })).status, 400);
+    const { eyes, ...missing } = avatar;
+    assert.equal((await a.post('/api/me/avatar', { avatar: missing })).status, 400);
+    assert.ok(eyes >= 0);
+  } finally { await s.close(); }
+});
+
 test('writes must be JSON (blocks cross-site form posts)', async () => {
   const s = await boot();
   try {

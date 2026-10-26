@@ -27,5 +27,5 @@ Group chats,chat,could,yes,no,
 Lenses and AR filters,camera,could,yes,skip,needs a face-tracking engine; a project of its own
 Snap Map,map,could,yes,skip,location sharing needs its own privacy design
 Discover and Spotlight,content,could,yes,skip,publisher content and creator network they own
-Bitmoji avatars,profile,could,yes,skip,their avatar system
+Personal avatars,profile,could,yes,yes,own avatar system built from parts; not theirs
 Screenshot alerts,sending,should,yes,skip,a web page cannot detect screenshots

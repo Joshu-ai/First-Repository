@@ -14,6 +14,16 @@ do. Drawn in code (`public/mascot.js`) in four moods (happy, wink, sleepy,
 wow). Puff is the app icon, greets you on the login screen, naps on empty
 screens, and pops up with a "Poof!" when you send a snap or one disappears.
 
+## Avatars
+
+Right after sign-up, people build an avatar: face shape, skin tone, 8 hair
+styles in 10 colours, eyes, mouth, extras (glasses, shades, cap, beanie,
+headphones, freckles, blush), top and background, or tap 🎲 to shuffle.
+That's over 2.4 million combinations. Avatars show everywhere a person
+appears. Drawn in code (`public/avatar.js`); the server stores only small
+numbers and rejects anything that isn't a real option. Edit any time
+from the profile.
+
 ## Run it
 
 Needs Node 18 or newer. Nothing to install.
