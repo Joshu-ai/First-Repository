@@ -16,13 +16,23 @@ screens, and pops up with a "Poof!" when you send a snap or one disappears.
 
 ## Avatars
 
-Right after sign-up, people build an avatar: face shape, skin tone, 8 hair
-styles in 10 colours, eyes, mouth, extras (glasses, shades, cap, beanie,
-headphones, freckles, blush), top and background, or tap 🎲 to shuffle.
-That's about 26 million combinations. Avatars show everywhere a person
-appears. Drawn in code (`public/avatar.js`); the server stores only small
-numbers and rejects anything that isn't a real option. Edit any time
-from the profile.
+Right after sign-up, people build an avatar, or tap 🎲 to shuffle one:
+
+- **16 expressions:** smile, grin, laugh, wink, love, wow, sad, angry, cool,
+  sleepy, silly, shy, nervous, crying laughing, thinking, starstruck
+- face shape, 7 skin tones, 6 eye colours
+- 11 hairstyles (crop, side part, afro, long, bun, bob, quiff, buzz,
+  braids, puffs, bald) in 11 colours
+- facial hair, extras (glasses, shades, cap, beanie, headphones, earrings,
+  freckles), top and background
+
+Avatars show everywhere a person appears and can be edited from the
+profile. Drawn in code (`public/avatar.js`); the server stores only small
+numbers and rejects anything that isn't a real option.
+
+Puff has 10 moods too (happy, wink, sleepy, wow, love, laugh, sad, cool,
+shy, party), used around the app: party when you post a story, love when
+you make a friend, sad when a snap is already gone.
 
 ## Marketing art
 

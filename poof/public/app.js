@@ -410,7 +410,7 @@
       sendBtn.textContent = 'Sending…';
       try {
         await api('/api/snaps', { to: [...picked], story, image, duration: state.editor.timer });
-        puffPop(story && !picked.size ? 'Posted to your story' : 'Poof! Sent');
+        puffPop(story && !picked.size ? 'Posted to your story' : 'Poof! Sent', story && !picked.size ? 'party' : 'wink');
         go('chat');
       } catch (e) {
         toast(e.message);
@@ -522,7 +522,7 @@
       const id = queue.shift();
       if (!id) return close();
       let snap;
-      try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) { toast(e.message); return next(); }
+      try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) { puffPop(e.message, 'sad'); return next(); }
       img.src = snap.image;
       viewed++;
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
@@ -674,8 +674,12 @@
     show(h('section', { class: 'screen', 'aria-label': 'Add friends' }, header('Add friends', back),
       h('div', { class: 'scroll' }, h('div', { class: 'field' }, search), results, requests)));
 
-    async function act(path, body, okText) {
-      try { await api(path, body); toast(okText); await Promise.all([runSearch(), loadRequests()]); } catch (e) { toast(e.message); }
+    async function act(path, body, okText, mood) {
+      try {
+        await api(path, body);
+        if (mood) puffPop(okText, mood); else toast(okText);
+        await Promise.all([runSearch(), loadRequests()]);
+      } catch (e) { toast(e.message); }
     }
     async function runSearch() {
       if (q.length < 2) { results.replaceChildren(); return; }
@@ -696,7 +700,7 @@
         data.incoming.length ? h('h2', { class: 'section-title' }, 'Added me') : null,
         ...data.incoming.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username)),
-          h('button', { class: 'btn small', onclick: () => act('/api/friends/accept', { userId: u.id }, 'You are now friends') }, 'Accept'))),
+          h('button', { class: 'btn small', onclick: () => act('/api/friends/accept', { userId: u.id }, 'You are now friends', 'love') }, 'Accept'))),
         data.outgoing.length ? h('h2', { class: 'section-title' }, 'Waiting on') : null,
         ...data.outgoing.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username + ' · pending')))),
@@ -710,14 +714,14 @@
 
   // ---------- avatar maker (S11) ----------
   const TABS = [
-    ['face', 'Face'], ['skin', 'Skin'], ['hair', 'Hair'], ['hairColor', 'Hair colour'], ['eyes', 'Eyes'],
-    ['mouth', 'Mouth'], ['acc', 'Extras'], ['shirt', 'Top'], ['bg', 'Background'],
+    ['expr', 'Expression'], ['face', 'Face'], ['skin', 'Skin'], ['eyeColor', 'Eyes'], ['hair', 'Hair'],
+    ['hairColor', 'Hair colour'], ['beard', 'Facial hair'], ['acc', 'Extras'], ['shirt', 'Top'], ['bg', 'Background'],
   ];
   function renderAvatarMaker() {
     const A = window.PoofAvatar;
     const onboarding = !state.me.avatar;
     let cfg = { ...(state.me.avatar || A.random()) };
-    let tab = 'hair';
+    let tab = 'expr';
     const preview = h('div', { class: 'avatar-preview' });
     const tabs = h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Avatar parts' });
     const grid = h('div', { class: 'option-grid', role: 'radiogroup' });

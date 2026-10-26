@@ -12,12 +12,12 @@ const ICON = 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(PUBLIC, 'i
 
 // a fixed cast of friends so the art never changes between runs
 const CAST = [
-  { bg: 1, skin: 1, face: 0, hair: 2, hairColor: 0, eyes: 1, mouth: 1, acc: 1, shirt: 2 },
-  { bg: 2, skin: 4, face: 1, hair: 4, hairColor: 1, eyes: 4, mouth: 4, acc: 0, shirt: 4 },
-  { bg: 3, skin: 0, face: 2, hair: 6, hairColor: 5, eyes: 0, mouth: 0, acc: 7, shirt: 7 },
-  { bg: 4, skin: 2, face: 0, hair: 1, hairColor: 6, eyes: 1, mouth: 5, acc: 2, shirt: 0 },
-  { bg: 5, skin: 5, face: 1, hair: 3, hairColor: 3, eyes: 2, mouth: 1, acc: 5, shirt: 6 },
-  { bg: 7, skin: 3, face: 0, hair: 0, hairColor: 0, eyes: 5, mouth: 2, acc: 3, shirt: 1 },
+  { expr: 2, face: 0, skin: 1, eyeColor: 0, hair: 3, hairColor: 0, beard: 0, acc: 1, shirt: 2, bg: 1 },
+  { expr: 3, face: 1, skin: 4, eyeColor: 1, hair: 5, hairColor: 1, beard: 0, acc: 7, shirt: 4, bg: 2 },
+  { expr: 4, face: 3, skin: 0, eyeColor: 4, hair: 6, hairColor: 6, beard: 0, acc: 8, shirt: 7, bg: 3 },
+  { expr: 8, face: 2, skin: 2, eyeColor: 3, hair: 7, hairColor: 9, beard: 1, acc: 3, shirt: 0, bg: 4 },
+  { expr: 15, face: 1, skin: 5, eyeColor: 2, hair: 9, hairColor: 4, beard: 0, acc: 6, shirt: 6, bg: 5 },
+  { expr: 13, face: 0, skin: 3, eyeColor: 0, hair: 2, hairColor: 2, beard: 3, acc: 0, shirt: 1, bg: 0 },
 ];
 
 const css = `

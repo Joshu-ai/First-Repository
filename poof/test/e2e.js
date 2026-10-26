@@ -45,10 +45,11 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       // S11 avatar maker runs once, right after sign up
       await page.getByRole('heading', { name: 'Make your avatar' }).waitFor();
       if (page === ava) {
+        await page.getByRole('radio', { name: 'Love' }).click(); // expression tab opens first
         await page.getByRole('tab', { name: 'Hair', exact: true }).click();
-        await page.getByRole('radio', { name: 'Curly' }).click();
+        await page.getByRole('radio', { name: 'Afro' }).click();
         await page.getByRole('tab', { name: 'Extras' }).click();
-        await page.getByRole('radio', { name: 'Glasses' }).click();
+        await page.getByRole('radio', { name: 'Round glasses' }).click();
         await shot(page, 'S11-avatar-maker');
         await page.getByRole('button', { name: 'Looks like me' }).click();
       } else {
