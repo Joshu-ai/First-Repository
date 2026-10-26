@@ -1,0 +1,31 @@
+feature,area,priority,original,clone,notes
+Sign up and log in with username,onboarding,must,yes,yes,
+Opens straight to the camera,camera,must,yes,yes,
+Take a photo with front or back camera,camera,must,yes,yes,browser camera; falls back to picking a file when blocked
+Pick a photo from the device instead,camera,should,yes,yes,
+Add a text caption,editor,must,yes,yes,
+Draw on the photo in colours,editor,should,yes,yes,
+Set how long the snap shows (1-10s or no limit),editor,must,yes,yes,
+Save the snap to the device,editor,could,yes,yes,
+Send a snap to one or more friends,sending,must,yes,yes,
+Snap can be opened once then is deleted,sending,must,yes,yes,
+Inbox shows new / opened / delivered per friend,chat,must,yes,yes,
+Text chat with a friend,chat,must,yes,yes,
+Messages disappear 24h after being read,chat,should,yes,yes,
+Save a message in chat,chat,should,yes,yes,
+Post a snap to My Story for 24 hours,stories,must,yes,yes,
+Watch friends' stories with auto-advance,stories,must,yes,yes,
+See who viewed my story,stories,should,yes,yes,
+Search users and send a friend request,friends,must,yes,yes,
+Accept a friend request,friends,must,yes,yes,
+Remove a friend,friends,could,yes,yes,
+Streak count for consecutive days,friends,should,yes,yes,UTC days; shown from 2 days
+Live updates when a snap or message arrives,realtime,should,yes,yes,
+Works on a phone screen,platform,must,yes,yes,
+Video snaps,camera,could,yes,no,
+Group chats,chat,could,yes,no,
+Lenses and AR filters,camera,could,yes,skip,needs a face-tracking engine; a project of its own
+Snap Map,map,could,yes,skip,location sharing needs its own privacy design
+Discover and Spotlight,content,could,yes,skip,publisher content and creator network they own
+Bitmoji avatars,profile,could,yes,skip,their avatar system
+Screenshot alerts,sending,should,yes,skip,a web page cannot detect screenshots
