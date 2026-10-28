@@ -10,9 +10,11 @@ method; the planning files are in [`replica/`](replica/).
 ## Meet Puff
 
 Puff is the Poof mascot: a little cloud that vanishes, the way your snaps
-do. Drawn in code (`public/mascot.js`) in four moods (happy, wink, sleepy,
-wow). Puff is the app icon, greets you on the login screen, naps on empty
-screens, and pops up with a "Poof!" when you send a snap or one disappears.
+do. A puffy, shaded cloud with glossy eyes, a curl of wisp on top, stubby
+legs and arms that pose with the mood. Drawn in code (`public/mascot.js`),
+so it stays sharp from app icon to poster. Puff greets you on the login
+screen, naps on empty screens, and pops up with a "Poof!" when you send a
+snap or one disappears.
 
 ## Avatars
 
