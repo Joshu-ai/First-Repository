@@ -1,7 +1,9 @@
 'use strict';
 // Renders the Poof marketing art from the same code-drawn Puff and avatars the
 // app uses, so the brand stays consistent. Run: node brand/render.js
-// Output: brand/social-1200x630.png, brand/story-1080x1920.png, brand/puff-1024.png
+// Output (at 2x pixel density): brand/social-1200x630.png, brand/story-1080x1920.png,
+// brand/puff-1024.png, plus brand/puff/: every mood as a vector SVG and a
+// 2048px transparent PNG, and the solid mark used for the app icon.
 const path = require('node:path');
 const fs = require('node:fs');
 const { chromium } = require('playwright');
@@ -75,7 +77,7 @@ function story(m, a) {
 (async () => {
   const browser = await chromium.launch();
   const render = async (name, w, h, body) => {
-    const page = await browser.newPage({ viewport: { width: w, height: h } });
+    const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
     await page.setContent(`<!doctype html><style>${css}</style><body></body>`);
     await page.addScriptTag({ path: path.join(PUBLIC, 'mascot.js') });
     await page.addScriptTag({ path: path.join(PUBLIC, 'avatar.js') });
@@ -94,6 +96,36 @@ function story(m, a) {
   await render('story-1080x1920.png', 1080, 1920, story);
   await render('puff-1024.png', 1024, 1024, (m) =>
     `<div style="position:absolute;inset:0;display:grid;place-items:center"><div class="puff" style="width:860px">${m('happy', 860)}</div></div>`);
+  // Puff on its own: vector SVG + 2048px transparent PNG for each mood and the mark
+  const PUFF = path.join(OUT, 'puff');
+  fs.mkdirSync(PUFF, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1024, height: 1024 }, deviceScaleFactor: 2 });
+  await page.setContent('<!doctype html><style>html,body{margin:0;background:transparent}body{width:1024px;height:1024px;display:grid;place-items:center}svg{display:block}</style><body></body>');
+  await page.addScriptTag({ path: path.join(PUBLIC, 'mascot.js') });
+  const variants = [...(await page.evaluate(() => window.mascotMoods)).map((mood) => [mood, mood, 'char', '#ffffff']),
+    ['mark', 'happy', 'mark', '#6d4cff'], ['mark-white', 'happy', 'mark', '#ffffff']];
+  for (const [name, mood, variant, color] of variants) {
+    // draw it, then crop the viewBox to the artwork with even padding so every file is centred
+    const svg = await page.evaluate(({ mood, variant, color }) => {
+      document.body.innerHTML = window.mascotSVG(mood, 960, 'Puff, the Poof mascot', variant, color);
+      const el = document.querySelector('svg');
+      // the belly shade is clipped to the body but getBBox ignores clipping, so leave it out
+      const shade = el.querySelector('g[clip-path]');
+      if (shade) shade.style.display = 'none';
+      const b = el.getBBox();
+      if (shade) shade.style.display = '';
+      const side = Math.max(b.width, b.height) * 1.2;
+      const x = b.x + b.width / 2 - side / 2;
+      const y = b.y + b.height / 2 - side / 2;
+      el.setAttribute('viewBox', [x, y, side, side].map((v) => +v.toFixed(2)).join(' '));
+      el.setAttribute('width', 960);
+      el.setAttribute('height', 960);
+      return el.outerHTML;
+    }, { mood, variant, color });
+    fs.writeFileSync(path.join(PUFF, `${name}.svg`), svg.replace(/ width="\d+" height="\d+"/, '') + '\n');
+    await page.screenshot({ path: path.join(PUFF, `${name}.png`), omitBackground: true });
+  }
+  await page.close();
   await browser.close();
-  console.log('brand art written to', OUT, fs.readdirSync(OUT).filter((f) => f.endsWith('.png')));
+  console.log('brand art written to', OUT, fs.readdirSync(OUT).filter((f) => f.endsWith('.png')), '+', fs.readdirSync(PUFF).length, 'files in puff/');
 })().catch((e) => { console.error(e); process.exit(1); });

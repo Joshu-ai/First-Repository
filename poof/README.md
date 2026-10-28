@@ -39,8 +39,11 @@ you make a friend, sad when a snap is already gone.
 ## Marketing art
 
 `brand/` holds a social banner (1200×630), a story/phone poster
-(1080×1920) and a large Puff (1024×1024). They're drawn from the same
-code as the app, so they always match it. Change the cast or the tagline
+(1080×1920) and a large Puff (1024×1024), all rendered at 2× pixel
+density. `brand/puff/` has Puff on its own in every mood plus the solid
+mark, each as a vector SVG (sharp at any size) and a 2048px transparent
+PNG. Everything is drawn from the same code as the app, so it always
+matches. Change the cast or the tagline
 in `brand/render.js`, then run `node brand/render.js` to redraw them.
 
 ## Run it

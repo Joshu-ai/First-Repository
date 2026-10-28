@@ -10,8 +10,54 @@
   const DRIFT = '#a48dff'; // the trail: light enough for dark screens, strong enough for light ones
   let uid = 0;
 
-  // silhouette: one big puff, two side puffs, a flat rounded base
-  const BODY = '<circle cx="104" cy="82" r="40"/><circle cx="64" cy="106" r="28"/><circle cx="142" cy="102" r="30"/><rect x="40" y="100" width="128" height="42" rx="21"/>';
+  // silhouette: one big puff, two side puffs, a flat rounded base, traced as a
+  // single outline. Wherever two puffs meet, a small concave fillet joins them,
+  // so the edge flows instead of pinching into a notch.
+  function cloudPath() {
+    // clockwise round the outside: bottom-left corner, left puff, top puff,
+    // right puff, bottom-right corner; then a straight base back to the start
+    const C = [[61, 121, 21], [64, 106, 28], [104, 82, 40], [142, 102, 30], [147, 121, 21]];
+    const FILLET = [18, 12, 12, 18];
+    const MID = [104, 112];
+    const n = (v) => +v.toFixed(2);
+    function fillet([x1, y1, r1], [x2, y2, r2], f) {
+      const R1 = r1 + f;
+      const R2 = r2 + f;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const d = Math.hypot(dx, dy);
+      const l = (R1 * R1 - R2 * R2 + d * d) / (2 * d);
+      const h = Math.sqrt(Math.max(0, R1 * R1 - l * l));
+      const mx = x1 + (dx * l) / d;
+      const my = y1 + (dy * l) / d;
+      const a = [mx - (dy * h) / d, my + (dx * h) / d];
+      const b = [mx + (dy * h) / d, my - (dx * h) / d];
+      const P = Math.hypot(a[0] - MID[0], a[1] - MID[1]) > Math.hypot(b[0] - MID[0], b[1] - MID[1]) ? a : b;
+      return {
+        t1: [x1 + ((P[0] - x1) * r1) / R1, y1 + ((P[1] - y1) * r1) / R1],
+        t2: [x2 + ((P[0] - x2) * r2) / R2, y2 + ((P[1] - y2) * r2) / R2],
+      };
+    }
+    // clockwise arc on circle c from point p to point q (screen coords, y down)
+    function arc([cx, cy, r], p, q) {
+      let delta = Math.atan2(q[1] - cy, q[0] - cx) - Math.atan2(p[1] - cy, p[0] - cx);
+      while (delta < 0) delta += Math.PI * 2;
+      return `A${r} ${r} 0 ${delta > Math.PI ? 1 : 0} 1 ${n(q[0])} ${n(q[1])}`;
+    }
+    let cur = [C[0][0], C[0][1] + C[0][2]];
+    let d = `M${n(cur[0])} ${n(cur[1])}`;
+    for (let i = 0; i < C.length; i++) {
+      if (i < C.length - 1) {
+        const { t1, t2 } = fillet(C[i], C[i + 1], FILLET[i]);
+        d += arc(C[i], cur, t1) + `A${FILLET[i]} ${FILLET[i]} 0 0 0 ${n(t2[0])} ${n(t2[1])}`;
+        cur = t2;
+      } else {
+        d += arc(C[i], cur, [C[i][0], C[i][1] + C[i][2]]) + 'Z';
+      }
+    }
+    return d;
+  }
+  const BODY = `<path d="${cloudPath()}"/>`;
   const TRAIL = { normal: [[186, 122, 8.5], [204, 108, 5.5], [214, 95, 3]], droop: [[184, 132, 8], [198, 146, 5], [206, 158, 3]] };
 
   // ---------- face parts (eyes at 91/117, y 100; mouth at y 120) ----------
