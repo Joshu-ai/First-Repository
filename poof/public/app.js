@@ -120,7 +120,7 @@
         btn.disabled = false;
       }
     } },
-      h('div', { class: 'logo float' }, puff('happy', 150, 'Puff, the Poof mascot')),
+      h('div', { class: 'logo' }, puff('happy', 168, 'Puff, the Poof mascot')),
       h('h1', {}, 'Poof'),
       h('p', {}, signup ? 'Make an account. It takes ten seconds.' : 'Photos that vanish once they are seen.'),
       signup && h('label', { class: 'field' }, h('span', {}, 'Your name'),

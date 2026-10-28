@@ -23,12 +23,9 @@ const CAST = [
 const css = `
   * { box-sizing: border-box; margin: 0; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff; overflow: hidden; }
-  .bg { position: absolute; inset: 0; background:
-      radial-gradient(60% 70% at 70% 40%, #9b82ff 0%, transparent 70%),
-      radial-gradient(50% 60% at 15% 90%, #ff7a6b55 0%, transparent 70%),
-      linear-gradient(160deg, #6a48f5 0%, #2a1f66 100%); }
-  .dots { position: absolute; inset: 0; background-image: radial-gradient(#ffffff22 1.5px, transparent 1.5px); background-size: 28px 28px; }
-  .puff { position: absolute; filter: drop-shadow(0 30px 40px rgb(20 10 60 / .45)); }
+  .bg { position: absolute; inset: 0; background: #6d4cff; }
+  .dots { display: none; }
+  .puff { position: absolute; filter: drop-shadow(0 18px 24px rgb(20 10 60 / .3)); }
   .puff svg { width: 100%; height: auto; display: block; }
   .av { position: absolute; border-radius: 50%; box-shadow: 0 0 0 6px #ffffff, 0 18px 30px rgb(20 10 60 / .4); }
   .av svg { display: block; }
@@ -54,7 +51,7 @@ function social(m, a) {
   <div class="av" style="left:1080px;top:430px">${a(2, 92)}</div>
   <div class="av" style="left:700px;top:470px">${a(3, 80)}</div>
   <div class="bubble" style="left:820px;top:520px;font-size:24px">New snap from Ava 📸</div>
-  <svg class="spark" style="left:980px;top:60px" width="34" height="34" viewBox="0 0 10 10"><path d="M5 0l1.3 3.7L10 5 6.3 6.3 5 10 3.7 6.3 0 5l3.7-1.3z" fill="currentColor"/></svg>`;
+`;
 }
 
 function story(m, a) {

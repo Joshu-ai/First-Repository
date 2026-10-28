@@ -57,17 +57,22 @@ button { cursor: pointer; }
 .mascot { display: inline-block; line-height: 0; }
 .mascot svg { display: block; }
 .empty .mascot { display: block; width: fit-content; margin: 0 auto var(--space-3); }
-.float { animation: float 3.2s ease-in-out infinite; }
-@keyframes float { 50% { transform: translateY(-8px); } }
-.puff-pop { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); pointer-events: none; color: var(--text); font-size: 1.3rem; text-shadow: 0 2px 8px rgb(0 0 0 / .6); animation: puff-pop 1.3s ease-out forwards; }
-@keyframes puff-pop {
-  0% { opacity: 0; transform: scale(.4); }
-  25% { opacity: 1; transform: scale(1.08); }
-  70% { opacity: 1; transform: scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: scale(1.5); filter: blur(6px); }
+.puff-pop { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); pointer-events: none; color: var(--text); font-size: 1.3rem; text-shadow: 0 2px 8px rgb(0 0 0 / .6); background: radial-gradient(circle at 50% 50%, rgb(20 18 31 / .82), rgb(20 18 31 / 0) 62%); animation: puff-say 1.5s cubic-bezier(.16, 1, .3, 1) forwards; }
+/* the one authored moment: Puff arrives, then drifts off and is gone */
+.puff-pop .mascot { animation: puff-drift 1.5s cubic-bezier(.16, 1, .3, 1) forwards; }
+.puff-pop strong { animation: puff-say 1.5s cubic-bezier(.16, 1, .3, 1) forwards; }
+.puff-pop .puff-trail circle { animation: puff-trail 1.5s ease-out forwards; }
+.puff-pop .puff-trail circle:nth-child(2) { animation-delay: .06s; }
+.puff-pop .puff-trail circle:nth-child(3) { animation-delay: .12s; }
+@keyframes puff-drift {
+  0% { opacity: 0; transform: translateY(12px); }
+  22%, 58% { opacity: 1; transform: none; filter: blur(0); }
+  100% { opacity: 0; transform: translate(110px, -36px) scale(.8); filter: blur(3px); }
 }
+@keyframes puff-say { 0% { opacity: 0; } 22%, 62% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes puff-trail { 0%, 50% { opacity: 1; } 80%, 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .float, .puff-pop { animation: none; }
+  .puff-pop .mascot, .puff-pop strong, .puff-pop .puff-trail circle { animation: puff-say 1.5s linear forwards; }
 }
 .auth h1 { text-align: center; margin: 0; font-size: 2.2rem; }
 .auth p { text-align: center; color: var(--text-dim); margin: 0; }
@@ -151,7 +156,7 @@ button { cursor: pointer; }
 .thread { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
 .msg { max-width: 80%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--surface-2); border: 0; text-align: left; overflow-wrap: anywhere; }
 .msg.mine { align-self: flex-end; background: var(--brand); color: var(--brand-ink); }
-.msg.saved { box-shadow: inset 4px 0 0 var(--accent); }
+.msg.saved { box-shadow: 0 0 0 2px var(--accent); }
 .msg small { display: block; font-size: .7rem; opacity: .75; margin-top: 2px; }
 .composer { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); background: var(--surface); }
 .composer input { flex: 1; min-height: var(--tap); border-radius: var(--radius-pill); border: 0; padding: 0 var(--space-4); background: var(--surface-2); }
