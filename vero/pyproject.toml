@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vero-re"
+version = "0.1.0"
+description = "Evidence-first reverse engineering: take apart software you own or are authorized to analyze, with a verifiable evidence chain behind every claim."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "vero contributors" }]
+keywords = ["reverse-engineering", "binary-analysis", "mcp", "disassembly", "evidence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Topic :: Software Development :: Disassemblers",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "capstone>=5.0",
+    "lief>=0.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+vero = "vero.cli:main"
+vero-mcp = "vero.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/"
+
+[tool.setuptools.packages.find]
+include = ["vero*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
