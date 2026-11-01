@@ -10,6 +10,9 @@ const { chromium } = require('playwright');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const OUT = __dirname;
+// realistic Puff renders (brand/puff/real/, made with an open image model) for the marketing art
+const REAL = Object.fromEntries(fs.readdirSync(path.join(OUT, 'puff', 'real')).filter((f) => f.endsWith('.png'))
+  .map((f) => [f.replace('.png', ''), 'data:image/png;base64,' + fs.readFileSync(path.join(OUT, 'puff', 'real', f)).toString('base64')]));
 const ICON = 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(PUBLIC, 'icon.svg')).toString('base64');
 
 // a fixed cast of friends so the art never changes between runs
@@ -38,37 +41,35 @@ const css = `
   .wordmark { display: inline-flex; align-items: center; gap: 12px; font-weight: 900; font-size: var(--wm); }
   .wordmark img { width: var(--wmi); height: var(--wmi); border-radius: 22%; box-shadow: 0 6px 16px rgb(0 0 0 / .25); }
   .spark { position: absolute; color: #ffd9d4; }
+  .photo { position: absolute; border-radius: 32px; background-size: cover; background-position: center; box-shadow: 0 24px 48px rgb(20 10 60 / .35); }
 `;
 
-function social(m, a) {
+function social(m, a, r) {
   return `<div class="bg"></div><div class="dots"></div>
-  <div style="position:absolute;left:72px;top:96px;width:560px;--h1:84px;--p:28px;--wm:34px;--wmi:52px">
+  <div class="photo" style="left:540px;top:64px;width:620px;height:500px;background-image:url(${r('wink')})"></div>
+  <div style="position:absolute;left:72px;top:96px;width:450px;--h1:84px;--p:24px;--wm:34px;--wmi:52px">
     <div class="wordmark"><img alt="">Poof</div>
     <h1 style="margin-top:40px">Snap it.<br>Send it.<br><em>Poof.</em></h1>
     <p>Photos that vanish once they're seen.</p>
   </div>
-  <div class="puff" style="left:690px;top:150px;width:430px">${m('wink', 430)}</div>
-  <div class="av" style="left:650px;top:70px">${a(0, 96)}</div>
-  <div class="av" style="left:1060px;top:90px">${a(1, 84)}</div>
-  <div class="av" style="left:1080px;top:430px">${a(2, 92)}</div>
-  <div class="av" style="left:700px;top:470px">${a(3, 80)}</div>
-  <div class="bubble" style="left:820px;top:520px;font-size:24px">New snap from Ava 📸</div>
+  <div class="av" style="left:500px;top:30px">${a(0, 96)}</div>
+  <div class="av" style="left:1108px;top:40px">${a(1, 80)}</div>
+  <div class="av" style="left:1100px;top:470px">${a(2, 88)}</div>
+  <div class="bubble" style="left:760px;top:532px;font-size:24px">New snap from Ava 📸</div>
 `;
 }
 
-function story(m, a) {
+function story(m, a, r) {
   return `<div class="bg"></div><div class="dots"></div>
+  <div class="photo" style="left:60px;top:340px;width:960px;height:750px;background-image:url(${r('happy')})"></div>
   <div style="position:absolute;left:0;right:0;top:150px;text-align:center;--wm:56px;--wmi:88px">
     <div class="wordmark"><img alt="">Poof</div>
   </div>
-  <div class="av" style="left:110px;top:420px">${a(0, 150)}</div>
-  <div class="av" style="left:820px;top:380px">${a(1, 140)}</div>
-  <div class="av" style="left:70px;top:1060px">${a(4, 130)}</div>
-  <div class="av" style="left:860px;top:1020px">${a(2, 140)}</div>
-  <div class="av" style="left:470px;top:360px">${a(5, 120)}</div>
-  <div class="puff" style="left:190px;top:560px;width:700px">${m('happy', 700)}</div>
-  <div class="bubble" style="left:540px;top:1180px;font-size:38px">Opened ✨</div>
-  <div style="position:absolute;left:0;right:0;top:1340px;text-align:center;--h1:128px;--p:44px">
+  <div class="av" style="left:20px;top:290px">${a(0, 150)}</div>
+  <div class="av" style="left:900px;top:300px">${a(1, 140)}</div>
+  <div class="av" style="left:30px;top:990px">${a(4, 130)}</div>
+  <div class="bubble" style="left:640px;top:1050px;font-size:38px">Opened ✨</div>
+  <div style="position:absolute;left:0;right:0;top:1250px;text-align:center;--h1:128px;--p:44px">
     <h1>Snap it.<br>Send it. <em>Poof.</em></h1>
     <p>Photos that vanish once they're seen.</p>
   </div>`;
@@ -81,12 +82,13 @@ function story(m, a) {
     await page.setContent(`<!doctype html><style>${css}</style><body></body>`);
     await page.addScriptTag({ path: path.join(PUBLIC, 'mascot.js') });
     await page.addScriptTag({ path: path.join(PUBLIC, 'avatar.js') });
-    await page.evaluate(({ body: fnSrc, cast }) => {
+    await page.evaluate(({ body: fnSrc, cast, real }) => {
       const m = (mood, size) => window.mascotSVG(mood, size, '');
+      const r = (mood) => real[mood];
       const a = (i, size) => window.PoofAvatar.avatarSVG(cast[i], size);
       // eslint-disable-next-line no-new-func
-      document.body.innerHTML = new Function('m', 'a', 'return (' + fnSrc + ')(m, a)')(m, a);
-    }, { body: body.toString(), cast: CAST });
+      document.body.innerHTML = new Function('m', 'a', 'r', 'return (' + fnSrc + ')(m, a, r)')(m, a, r);
+    }, { body: body.toString(), cast: CAST, real: REAL });
     await page.evaluate((src) => document.querySelectorAll('img').forEach((i) => { i.src = src; }), ICON);
     await page.waitForFunction(() => [...document.images].every((i) => i.complete));
     await page.screenshot({ path: path.join(OUT, name) });

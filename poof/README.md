@@ -43,7 +43,10 @@ you make a friend, sad when a snap is already gone.
 density. `brand/puff/` has Puff on its own in every mood plus the solid
 mark, each as a vector SVG (sharp at any size) and a 2048px transparent
 PNG. Everything is drawn from the same code as the app, so it always
-matches. Change the cast or the tagline
+matches. The banner and poster use the **realistic Puff**
+(`brand/puff/real/`, a sunlit cloud in all ten moods; see
+[`brand/realistic/`](brand/realistic/) for how it is made). The app keeps
+the flat vector Puff. Change the cast or the tagline
 in `brand/render.js`, then run `node brand/render.js` to redraw them.
 
 ## Run it
