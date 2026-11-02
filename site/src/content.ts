@@ -72,24 +72,27 @@ export const process = [
   },
 ];
 
-// Sample projects: replace with real case studies before launch.
+// Concept projects: each one is a working demo page under /work.
 export const work = [
   {
+    slug: "harbor-coffee",
     name: "Harbor Coffee",
     kind: "Online store",
-    result: "Checkout time cut from 4 minutes to 70 seconds",
+    summary: "A roaster's shop with a product grid and a working cart.",
     hue: 28,
   },
   {
+    slug: "fieldnote",
     name: "Fieldnote",
     kind: "Web app",
-    result: "Booking portal serving 3,000 clinics",
+    summary: "A clinic booking flow: pick a service, a day and a time.",
     hue: 160,
   },
   {
+    slug: "northline-legal",
     name: "Northline Legal",
     kind: "Marketing site",
-    result: "Organic leads up 2.4× in six months",
+    summary: "A law firm site with practice areas and a consultation form.",
     hue: 220,
   },
 ];

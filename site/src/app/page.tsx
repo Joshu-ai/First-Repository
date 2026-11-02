@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buildLog, faq, nav, plans, process, services, site, work } from "@/content";
 
 export default function Home() {
@@ -90,17 +91,19 @@ export default function Home() {
           <div className="wrap">
             <SectionHead
               title="Recent work"
-              intro="Sample projects shown below. Ask on a call for live links and references."
+              intro="Three concept projects built to show the range. Open one and click around."
             />
             <ul className="work">
               {work.map((p) => (
-                <li key={p.name} className="work-item">
-                  <Preview hue={p.hue} name={p.name} />
-                  <div className="work-meta">
-                    <h3>{p.name}</h3>
-                    <span className="work-kind">{p.kind}</span>
-                  </div>
-                  <p>{p.result}</p>
+                <li key={p.slug} className="work-item">
+                  <Link href={`/work/${p.slug}`} className="work-link">
+                    <Preview hue={p.hue} name={p.name} />
+                    <div className="work-meta">
+                      <h3>{p.name}</h3>
+                      <span className="work-kind">{p.kind}</span>
+                    </div>
+                    <p>{p.summary}</p>
+                  </Link>
                 </li>
               ))}
             </ul>
