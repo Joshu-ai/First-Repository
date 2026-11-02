@@ -1,0 +1,189 @@
+.page {
+  color-scheme: light;
+  --paper: #ffffff;
+  --ink: #17191c;
+  --buoy: #f2541b;
+  --teal: #0e4d5c;
+  --mist: #e7eef0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--h-body), sans-serif;
+}
+
+.page h1,
+.page h2,
+.page h3 {
+  font-family: var(--h-display), serif;
+  letter-spacing: -0.02em;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px clamp(16px, 4vw, 48px);
+  border-bottom: 2px solid var(--ink);
+}
+.brand {
+  font-family: var(--h-display), serif;
+  font-weight: 900;
+  font-size: 22px;
+}
+.nav {
+  display: flex;
+  gap: 20px;
+}
+.nav a:hover {
+  color: var(--buoy);
+}
+.bag {
+  margin-left: auto;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+
+.hero {
+  padding: clamp(56px, 10vw, 120px) clamp(16px, 4vw, 48px);
+  background: var(--teal);
+  color: #fff;
+}
+.hero h1 {
+  font-size: clamp(44px, 8vw, 104px);
+  font-weight: 900;
+  line-height: 0.95;
+  max-width: 12ch;
+}
+.hero p {
+  margin-top: 20px;
+  font-size: 19px;
+  max-width: 44ch;
+  opacity: 0.85;
+}
+
+.primary,
+.secondary,
+.add {
+  display: inline-block;
+  margin-top: 28px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid var(--ink);
+}
+.primary {
+  background: var(--buoy);
+  border-color: var(--buoy);
+  color: #fff;
+}
+.primary:hover {
+  background: #d9440e;
+}
+
+.shop {
+  padding: 72px clamp(16px, 4vw, 48px);
+}
+.shop h2,
+.subscribe h2 {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 900;
+  margin-bottom: 32px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 32px 24px;
+}
+.product p {
+  font-size: 15px;
+}
+.notes {
+  color: #5d636b;
+}
+.bagArt {
+  aspect-ratio: 4 / 5;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--mist);
+  margin-bottom: 14px;
+}
+.bagArt span {
+  font-family: var(--h-display), serif;
+  font-weight: 900;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.15;
+  color: #fff;
+  background: var(--teal);
+  width: 62%;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px 8px 4px 4px;
+  box-shadow: 0 18px 30px -18px rgb(14 77 92 / 0.7);
+}
+.bagArt[data-roast="Light"] span {
+  background: var(--buoy);
+}
+.bagArt[data-roast="Dark"] span {
+  background: var(--ink);
+}
+.productInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+.productInfo h3 {
+  font-size: 22px;
+}
+.add {
+  margin-top: 14px;
+  width: 100%;
+  background: transparent;
+  color: var(--ink);
+}
+.add:hover {
+  background: var(--ink);
+  color: #fff;
+}
+
+.subscribe {
+  margin: 0 clamp(16px, 4vw, 48px) 72px;
+  padding: clamp(32px, 6vw, 64px);
+  background: var(--buoy);
+  color: #fff;
+  border-radius: 20px;
+}
+.subscribe h2 {
+  margin-bottom: 12px;
+}
+.subscribe p {
+  max-width: 46ch;
+  font-size: 18px;
+}
+.secondary {
+  background: #fff;
+  color: var(--ink);
+  border-color: #fff;
+}
+
+.footer {
+  padding: 28px clamp(16px, 4vw, 48px);
+  border-top: 2px solid var(--ink);
+  font-size: 14px;
+}
+
+.page :focus-visible {
+  outline: 3px solid var(--buoy);
+  outline-offset: 3px;
+}
