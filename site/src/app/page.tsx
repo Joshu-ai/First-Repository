@@ -207,9 +207,15 @@ function SectionHead({ title, intro }: { title: string; intro: string }) {
 
 function LogoMark() {
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-      <rect x="1" y="1" width="20" height="20" rx="6" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M13 6v7.5a3 3 0 0 1-6 0" fill="none" stroke="var(--signal)" strokeWidth="2.4" strokeLinecap="round" />
+    <svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true">
+      <path
+        d="M7.5 18h11a4.5 4.5 0 0 0 .7-8.95A6.5 6.5 0 0 0 6.6 9.6 4.2 4.2 0 0 0 7.5 18z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M10 14.5h6" stroke="var(--signal)" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }

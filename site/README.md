@@ -1,4 +1,4 @@
-# Joshu: web development service site
+# Nimbus: web development service site
 
 A one-page marketing site for a freelance web development service, built with Next.js (App Router) and plain CSS.
 
@@ -16,6 +16,5 @@ All copy lives in `src/content.ts`: brand name, contact email, services, process
 
 Before going live, replace:
 
-- `site.email` (currently `hello@example.com`)
 - the sample projects in `work` with real case studies
 - the prices in `plans` with your own

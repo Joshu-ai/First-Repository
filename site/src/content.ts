@@ -2,11 +2,11 @@
 // can be changed without touching layout code.
 
 export const site = {
-  name: "Joshu",
+  name: "Nimbus",
   tagline: "Websites built like software",
   description:
-    "Joshu designs and builds fast, maintainable websites and web apps for small teams. Fixed scope, weekly demos, and code you own.",
-  email: "hello@example.com",
+    "Nimbus designs and builds fast, maintainable websites and web apps for small teams. Fixed scope, weekly demos, and code you own.",
+  email: "joshualef@duck.com",
   bookingUrl: "#contact",
 };
 
