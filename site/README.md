@@ -13,7 +13,3 @@ npm run build    # production build
 ## Edit the content
 
 All copy lives in `src/content.ts`: brand name, contact email, services, process, sample projects, prices and FAQ. The three concept projects are working demo pages under `src/app/work/`. Layout is in `src/app/page.tsx` and styles in `src/app/globals.css`.
-
-Before going live, replace:
-
-- the prices in `plans` with your own

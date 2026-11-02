@@ -100,7 +100,7 @@ export const work = [
 export const plans = [
   {
     name: "Launch",
-    price: "$2,500",
+    price: "$3,500",
     note: "one-off",
     summary: "A focused site for a new business or product.",
     features: [
@@ -114,7 +114,7 @@ export const plans = [
   },
   {
     name: "Growth",
-    price: "$6,000",
+    price: "$9,000",
     note: "one-off",
     summary: "A full site or small web app for a growing team.",
     features: [
@@ -129,7 +129,7 @@ export const plans = [
   },
   {
     name: "Care",
-    price: "$300",
+    price: "$450",
     note: "per month",
     summary: "Ongoing updates for any site, including ones I did not build.",
     features: [
