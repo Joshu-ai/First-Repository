@@ -18,7 +18,7 @@ snap or one disappears.
 
 ## Avatars
 
-Right after sign-up, people build an avatar, or tap 🎲 to shuffle one:
+Right after sign-up, people build an avatar, or tap the die to shuffle one:
 
 - **16 expressions:** smile, grin, laugh, wink, love, wow, sad, angry, cool,
   sleepy, silly, shy, nervous, crying laughing, thinking, starstruck
@@ -35,6 +35,14 @@ numbers and rejects anything that isn't a real option.
 Puff has 10 moods too (happy, wink, sleepy, wow, love, laugh, sad, cool,
 shy, party), used around the app: party when you post a story, love when
 you make a friend, sad when a snap is already gone.
+
+## Icons
+
+Every control uses Poof's own drawn icons (`public/icons.js`): one 24px
+grid, a 2px round stroke, coloured by the button they sit in. No emoji or
+text symbols stand in for icons. Add friends is Puff's solid silhouette
+with a plus badge. `PoofIcons.svg(name, size)` returns the markup; the
+icons are decorative, so the button always carries the label.
 
 ## Marketing art
 

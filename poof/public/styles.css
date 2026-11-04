@@ -50,6 +50,9 @@ button { cursor: pointer; }
 .btn:disabled { opacity: .5; cursor: default; }
 .icon-btn { width: var(--tap); height: var(--tap); border-radius: 50%; border: 0; background: rgb(0 0 0 / .35); color: #fff; display: inline-grid; place-items: center; font-size: 1.3rem; }
 .icon-btn.plain { background: var(--surface-2); }
+/* drawn icons (icons.js): sized by the markup, coloured by currentColor */
+.icon { display: inline-grid; place-items: center; flex: none; line-height: 0; }
+.icon svg { display: block; }
 
 /* Auth */
 .auth { justify-content: center; padding: var(--space-6); gap: var(--space-4); }
@@ -78,6 +81,9 @@ button { cursor: pointer; }
 .auth p { text-align: center; color: var(--text-dim); margin: 0; }
 .field { display: flex; flex-direction: column; gap: var(--space-1); }
 .field span { font-size: .85rem; color: var(--text-dim); }
+.search-field { position: relative; }
+.search-field .icon { position: absolute; left: var(--space-4); top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
+.search-field .search { padding-left: calc(var(--space-4) + 20px + var(--space-2)); }
 .field input, .search { min-height: var(--tap); padding: 0 var(--space-4); border-radius: var(--radius); border: 1px solid var(--surface-2); background: var(--surface); }
 .error { color: var(--danger); text-align: center; min-height: 1.2em; margin: 0; }
 .link { background: none; border: 0; color: var(--brand); font-weight: 600; padding: var(--space-2); }
@@ -95,7 +101,6 @@ button { cursor: pointer; }
 .nav { position: absolute; left: 0; right: 0; bottom: 0; height: var(--nav-h); padding-bottom: env(safe-area-inset-bottom); display: flex; z-index: 3; background: linear-gradient(transparent, rgb(0 0 0 / .6)); }
 .nav button { flex: 1; border: 0; background: none; color: #fff; font-size: .8rem; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; opacity: .75; position: relative; }
 .nav button[aria-current="page"] { opacity: 1; }
-.nav .glyph { font-size: 1.4rem; line-height: 1; }
 .nav .badge { position: absolute; top: 6px; left: 55%; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--snap); font-size: .7rem; display: grid; place-items: center; }
 .nav.solid { background: var(--surface); }
 
@@ -110,7 +115,8 @@ button { cursor: pointer; }
 .swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; }
 .swatch[aria-pressed="true"] { transform: scale(1.25); }
 .editor-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--space-4); padding-bottom: max(var(--space-4), env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; z-index: 3; }
-.timer-label { font-size: .75rem; font-weight: 700; }
+.timer-btn { align-content: center; gap: 1px; }
+.timer-label { font-size: .65rem; font-weight: 700; line-height: 1; }
 
 /* Lists */
 .row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border: 0; border-bottom: 1px solid var(--surface-2); width: 100%; background: none; text-align: left; }
@@ -134,7 +140,8 @@ button { cursor: pointer; }
 .empty { text-align: center; color: var(--text-dim); padding: var(--space-6) var(--space-4); }
 .empty strong { display: block; color: var(--text); font-size: 1.1rem; margin-bottom: var(--space-2); }
 .check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--text-dim); display: grid; place-items: center; flex: none; }
-.row[aria-checked="true"] .check { background: var(--brand); border-color: var(--brand); }
+.row[aria-checked="true"] .check { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.row:not([aria-checked="true"]) .check .icon { visibility: hidden; }
 .send-bar { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); background: var(--brand); display: flex; gap: var(--space-3); align-items: center; }
 .send-bar .who { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .send-bar .btn { background: #fff; color: var(--brand); }

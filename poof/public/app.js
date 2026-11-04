@@ -86,6 +86,14 @@
     return el;
   }
 
+  // A drawn interface icon (see icons.js). Always decorative: the button around
+  // it carries the accessible name.
+  function icon(name, size = 24) {
+    const el = h('span', { class: 'icon', 'aria-hidden': 'true' });
+    el.innerHTML = window.PoofIcons.svg(name, size); // static markup, no user input
+    return el;
+  }
+
   // a quick celebratory pop: Puff appears, then vanishes in a puff
   function puffPop(text, mood = 'wink') {
     const pop = h('div', { class: 'puff-pop', role: 'status' }, puff(mood, 150), h('strong', {}, text));
@@ -139,13 +147,13 @@
 
   // ---------- shell ----------
   function nav(active) {
-    const item = (tab, glyph, label) => h('button', {
+    const item = (tab, label) => h('button', {
       type: 'button', 'aria-current': active === tab ? 'page' : null, 'aria-label': label,
       onclick: () => go(tab),
-    }, h('span', { class: 'glyph', 'aria-hidden': 'true' }, glyph), label,
+    }, icon(tab, 26), label,
     tab === 'chat' && state.unread ? h('span', { class: 'badge' }, state.unread) : null);
     return h('nav', { class: 'nav' + (active === 'camera' ? '' : ' solid') },
-      item('chat', '💬', 'Chat'), item('camera', '◉', 'Camera'), item('stories', '◎', 'Stories'));
+      item('chat', 'Chat'), item('camera', 'Camera'), item('stories', 'Stories'));
   }
 
   function go(tab) {
@@ -166,7 +174,9 @@
   }
   const meButton = () => h('button', { class: 'icon-btn plain', 'aria-label': 'Profile', onclick: () => go('profile') },
     avatar(state.me));
-  const addButton = () => h('button', { class: 'icon-btn plain', 'aria-label': 'Add friends', onclick: () => go('friends') }, '+');
+  const addButton = () => h('button', { class: 'icon-btn plain', 'aria-label': 'Add friends', onclick: () => go('friends') },
+    icon('puff-plus', 28));
+  const backButton = (label, onclick) => h('button', { class: 'icon-btn plain', 'aria-label': label, onclick }, icon('back'));
 
   // ---------- camera (S02) ----------
   function stopCamera() {
@@ -189,13 +199,13 @@
       video, msg,
       h('header', { class: 'bar overlay' }, meButton(), h('h1', {}), addButton()),
       h('div', { class: 'shutter-row' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Choose a photo', onclick: () => file.click() }, '🖼'),
+        h('button', { class: 'icon-btn', 'aria-label': 'Choose a photo', onclick: () => file.click() }, icon('image')),
         h('button', { class: 'shutter', 'aria-label': 'Take photo', onclick: () => capture(video) }),
         h('button', { class: 'icon-btn', 'aria-label': 'Flip camera', onclick: () => {
           state.facing = state.facing === 'user' ? 'environment' : 'user';
           stopCamera();
           renderCamera();
-        } }, '⟲')),
+        } }, icon('flip'))),
       file, nav('camera'));
     show(screen);
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -315,7 +325,7 @@
       penBtn.setAttribute('aria-pressed', String(ed.drawing));
       colors.hidden = !ed.drawing;
       undoBtn.hidden = !ed.drawing;
-    } }, '✎');
+    } }, icon('pen'));
     const colors = h('div', { class: 'colors', hidden: true }, COLORS.map((c) => h('button', {
       class: 'swatch', style: `background:${c}`, 'aria-label': 'Colour ' + c, 'aria-pressed': String(c === ed.color),
       onclick: (e) => {
@@ -327,24 +337,26 @@
     const undoBtn = h('button', { class: 'icon-btn', 'aria-label': 'Undo', hidden: true, onclick: () => {
       const prev = history.pop();
       if (prev) dctx.putImageData(prev, 0, 0);
-    } }, '↶');
-    const timerBtn = h('button', { class: 'icon-btn', 'aria-label': 'Timer', onclick: () => {
+    } }, icon('undo'));
+    const timerLabel = h('span', { class: 'timer-label' });
+    const showTimer = () => { timerLabel.textContent = ed.timer ? ed.timer + 's' : '∞'; };
+    const timerBtn = h('button', { class: 'icon-btn timer-btn', 'aria-label': 'Timer', onclick: () => {
       ed.timer = TIMERS[(TIMERS.indexOf(ed.timer) + 1) % TIMERS.length];
-      timerBtn.replaceChildren(timerText());
-    } }, timerText());
-    function timerText() { return h('span', { class: 'timer-label' }, ed.timer ? ed.timer + 's' : '∞'); }
+      showTimer();
+    } }, icon('timer', 20), timerLabel);
+    showTimer();
     const textBtn = h('button', { class: 'icon-btn', 'aria-label': 'Add caption', onclick: () => {
       caption.hidden = false; layout(); caption.focus();
-    } }, 'T');
+    } }, icon('text'));
 
     const screen = h('section', { class: 'screen editor', 'aria-label': 'Edit snap' },
       stage,
       h('div', { class: 'tools' }, textBtn, penBtn, colors, undoBtn, timerBtn),
       h('header', { class: 'bar overlay', style: 'right:auto' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Discard', onclick: () => go('camera') }, '✕')),
+        h('button', { class: 'icon-btn', 'aria-label': 'Discard', onclick: () => go('camera') }, icon('close'))),
       h('div', { class: 'editor-foot' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Save to device', onclick: saveToDevice }, '⤓'),
-        h('button', { class: 'btn', onclick: () => renderSendTo() }, 'Send to ➤')));
+        h('button', { class: 'icon-btn', 'aria-label': 'Save to device', onclick: saveToDevice }, icon('download')),
+        h('button', { class: 'btn', onclick: () => renderSendTo() }, 'Send to', icon('send', 20))));
     show(screen);
     requestAnimationFrame(layout);
     window.onresize = layout;
@@ -390,11 +402,10 @@
     const picked = new Set();
     let story = false;
     const who = h('span', { class: 'who' }, 'Pick who gets it');
-    const sendBtn = h('button', { class: 'btn small', disabled: true, onclick: send }, 'Send ➤');
+    const sendLabel = () => ['Send', icon('send', 18)];
+    const sendBtn = h('button', { class: 'btn small', disabled: true, onclick: send }, sendLabel());
     const list = h('div', { class: 'scroll', style: 'padding-bottom:96px' }, h('p', { class: 'hint' }, 'Loading friends…'));
-    const back = h('button', { class: 'icon-btn plain', 'aria-label': 'Back to editing', onclick: () => {
-      show(editorScreen); window.onresize?.();
-    } }, '‹');
+    const back = backButton('Back to editing', () => { show(editorScreen); window.onresize?.(); });
     const editorScreen = app.firstElementChild;
     show(h('section', { class: 'screen', 'aria-label': 'Send to' }, header('Send to', back), list,
       h('div', { class: 'send-bar' }, who, sendBtn)));
@@ -415,7 +426,7 @@
       } catch (e) {
         toast(e.message);
         sendBtn.disabled = false;
-        sendBtn.textContent = 'Send ➤';
+        sendBtn.replaceChildren(...sendLabel());
       }
     }
     let data;
@@ -423,9 +434,9 @@
     const toggle = (row, on) => row.setAttribute('aria-checked', String(on));
     const storyRow = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
       story = !story; toggle(storyRow, story); update(data.friends);
-    } }, h('span', { class: 'avatar ring', style: 'background:var(--surface-2)' }, '◎'),
+    } }, h('span', { class: 'avatar ring', style: 'background:var(--surface-2)' }, icon('stories')),
     h('span', { class: 'main' }, h('div', { class: 'name' }, 'My Story'), h('div', { class: 'sub' }, 'Friends can watch for 24 hours')),
-    h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'));
+    h('span', { class: 'check' }, icon('check', 16)));
     list.replaceChildren(storyRow, h('h2', { class: 'section-title' }, 'Friends'));
     if (!data.friends.length) {
       list.append(h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'No friends yet'),
@@ -440,7 +451,7 @@
       } }, avatar(f), h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName),
         h('div', { class: 'sub' }, '@' + f.username)),
       f.streak > 1 ? h('span', { class: 'streak' }, f.streak + ' 🔥') : null,
-      h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'));
+      h('span', { class: 'check' }, icon('check', 16)));
       list.append(row);
     }
   }
@@ -485,7 +496,7 @@
               r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null)),
           r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null),
           h('button', { class: 'icon-btn plain', style: 'margin-left:8px', 'aria-label': 'Chat with ' + r.friend.displayName,
-            onclick: () => renderChat(r.friend) }, '💬'));
+            onclick: () => renderChat(r.friend) }, icon('chat')));
       }));
     };
     state.refresh = load;
@@ -541,7 +552,7 @@
     show(h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, img,
       h('button', { class: 'tap', 'aria-label': 'Next', onclick: next }),
       h('div', { class: 'head' }, avatar(friend), h('span', { class: 'who' }, friend.displayName), svg,
-        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, '✕'))));
+        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, icon('close')))));
     next();
   }
 
@@ -556,8 +567,9 @@
       input.value = '';
       try { await api('/api/chat/' + friend.id, { text }); await load(); } catch (e2) { toast(e2.message); input.value = text; }
     } }, input, h('button', { class: 'btn small', type: 'submit' }, 'Send'));
-    const back = h('button', { class: 'icon-btn plain', 'aria-label': 'Back', onclick: () => go('chat') }, '‹');
-    const cam = h('button', { class: 'icon-btn plain', 'aria-label': 'Snap ' + friend.displayName, onclick: () => go('camera') }, '◉');
+    const back = backButton('Back', () => go('chat'));
+    const cam = h('button', { class: 'icon-btn plain', 'aria-label': 'Snap ' + friend.displayName, onclick: () => go('camera') },
+      icon('camera'));
     show(h('section', { class: 'screen', 'aria-label': 'Chat with ' + friend.displayName },
       header(friend.displayName, back, cam), thread, form));
     async function load() {
@@ -655,7 +667,7 @@
       h('button', { class: 'tap', style: 'left:34%', 'aria-label': 'Next', onclick: () => step(1) }),
       h('div', { class: 'head', style: 'top:12px' }, av,
         h('span', { class: 'who', style: 'display:flex;flex-direction:column' }, who, sub),
-        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, '✕'))));
+        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, icon('close')))));
     play();
   }
 
@@ -670,9 +682,9 @@
         clearTimeout(debounce);
         debounce = setTimeout(() => { q = search.value.trim(); runSearch(); }, 200);
       } });
-    const back = h('button', { class: 'icon-btn plain', 'aria-label': 'Back', onclick: () => go('chat') }, '‹');
+    const back = backButton('Back', () => go('chat'));
     show(h('section', { class: 'screen', 'aria-label': 'Add friends' }, header('Add friends', back),
-      h('div', { class: 'scroll' }, h('div', { class: 'field' }, search), results, requests)));
+      h('div', { class: 'scroll' }, h('div', { class: 'field search-field' }, icon('search', 20), search), results, requests)));
 
     async function act(path, body, okText, mood) {
       try {
@@ -690,7 +702,8 @@
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username)),
           u.status === 'accepted' ? h('span', { class: 'sub' }, 'Friends')
             : u.status === 'pending' ? h('span', { class: 'sub' }, 'Requested')
-              : h('button', { class: 'btn small', onclick: () => act('/api/friends/request', { username: u.username }, 'Request sent') }, '+ Add')))
+              : h('button', { class: 'btn small', onclick: () => act('/api/friends/request', { username: u.username }, 'Request sent') },
+                icon('plus', 18), 'Add')))
           : [h('p', { class: 'hint' }, 'No one matches "' + q + '".')]));
     }
     async function loadRequests() {
@@ -755,8 +768,9 @@
     }
     const left = onboarding
       ? h('button', { class: 'link', onclick: () => go('camera') }, 'Skip')
-      : h('button', { class: 'icon-btn plain', 'aria-label': 'Back', onclick: () => go('profile') }, '‹');
-    const shuffle = h('button', { class: 'icon-btn plain', 'aria-label': 'Shuffle', onclick: () => { cfg = A.random(); draw(); } }, '🎲');
+      : backButton('Back', () => go('profile'));
+    const shuffle = h('button', { class: 'icon-btn plain', 'aria-label': 'Shuffle', onclick: () => { cfg = A.random(); draw(); } },
+      icon('shuffle'));
     show(h('section', { class: 'screen', 'aria-label': 'Avatar maker' },
       header(onboarding ? 'Make your avatar' : 'Your avatar', left, shuffle),
       h('div', { class: 'scroll', style: 'padding-bottom:var(--space-4)' }, preview, tabs, grid),
@@ -767,7 +781,7 @@
   // ---------- profile (S10) ----------
   async function renderProfile() {
     const body = h('div', { class: 'scroll' });
-    const back = h('button', { class: 'icon-btn plain', 'aria-label': 'Back', onclick: () => go('camera') }, '‹');
+    const back = backButton('Back', () => go('camera'));
     show(h('section', { class: 'screen', 'aria-label': 'Profile' }, header('Profile', back), body));
     const load = async () => {
       let friends;

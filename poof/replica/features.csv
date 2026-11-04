@@ -22,6 +22,7 @@ Remove a friend,friends,could,yes,yes,
 Streak count for consecutive days,friends,should,yes,yes,UTC days; shown from 2 days
 Live updates when a snap or message arrives,realtime,should,yes,yes,
 Works on a phone screen,platform,must,yes,yes,
+Drawn icons for every control,platform,should,yes,yes,own 24px line icon set in icons.js; Add friends is Puff with a plus badge; no emoji or text glyphs as icons
 Video snaps,camera,could,yes,no,
 Group chats,chat,could,yes,no,
 Lenses and AR filters,camera,could,yes,skip,needs a face-tracking engine; a project of its own
