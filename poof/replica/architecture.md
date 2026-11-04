@@ -16,6 +16,15 @@
   arrives. The server passes on at most one a second per pair, counting
   afresh after each message. A typing event only redraws the typing line
   and the Chat list row (`state.onTyping`); nothing is reloaded.
+  Snap, message and friends events carry `from` (the id) and `sender`
+  (`publicUser`), so the app can show a banner with the friend's name and
+  avatar without asking again; friends events have a `kind` (`request`,
+  `accepted`, `removed`, `avatar`) and a message a `preview` of its first
+  60 characters (whole characters, an ellipsis if cut).
+- **Notifications:** with Poof on screen, a banner (`showBanner` in
+  `app.js`, in the `#banner` live region); with it out of sight and the
+  Profile switch on, a system `Notification`, only while a tab is open (no
+  push service yet). The unread count is in the tab's title.
 - **Client:** plain HTML/CSS/JS, mobile-first, installable (web manifest).
   Camera via `getUserMedia`, editing on a `<canvas>`; caption and drawing are
   burned into the JPEG before upload.
@@ -86,7 +95,7 @@ POST /api/signup {username, password, displayName}
 POST /api/login  {username, password}
 POST /api/logout
 GET  /api/me
-GET  /api/events                       SSE
+GET  /api/events                       SSE: snap, message, friends (with from + sender), typing, story, opened, read, story-view
 GET  /api/users/available?username=     {available, reason}; no session needed
 GET  /api/users/search?q=
 GET  /api/users/by-username/:username  publicUser + status: self|friends|requested|incoming|none

@@ -99,6 +99,8 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   // after a reload: wait for the launch splash to fade, so screenshots are clean
   const settled = (page) => page.locator('#splash').waitFor({ state: 'detached' });
   const noToast = (page) => page.locator('#toast').waitFor({ state: 'hidden' });
+  // the notification banner at the top (app.js showBanner), when one is showing
+  const bannerOf = (page) => page.locator('#banner .banner');
   // video snaps: the upload as sent (its JSON and the clip's bytes), whether
   // a <video> is really playing, and how far the shutter's ring has filled
   const snapPost = (page) => page.waitForRequest((r) => r.url().endsWith('/api/snaps') && r.method() === 'POST');
@@ -422,11 +424,23 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await shot(ben, 'S12-add-from-link');
     await ben.getByRole('button', { name: 'Add friend' }).click();
     await ben.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
-    // Ava sees it live and accepts; Ben's screen follows along
+    // Ava sees it live (a banner says so too) and accepts; Ben's screen follows along
+    await bannerOf(ava).getByText('Sent you a friend request', { exact: true }).waitFor();
     await ava.getByRole('button', { name: 'Accept' }).click();
     await ava.getByText('You are now friends').waitFor();
+    assert.equal(await bannerOf(ava).count(), 0, 'answered, the request banner goes');
     await ben.getByText('You and Ava are friends.').waitFor();
     await ben.getByRole('button', { name: 'Send a chat' }).waitFor();
+    // S17 Ben hears it in a banner. From the keyboard: on it, Escape puts it
+    // away and focus goes back where it was
+    const acceptedBanner = bannerOf(ben);
+    await acceptedBanner.getByText('Accepted your friend request', { exact: true }).waitFor();
+    await ben.getByRole('button', { name: 'Send a chat' }).focus();
+    await acceptedBanner.focus();
+    await ben.keyboard.press('Escape');
+    await acceptedBanner.waitFor({ state: 'detached', timeout: 1000 });
+    assert.equal(await ben.evaluate(() => document.activeElement?.textContent), 'Send a chat', 'focus is back on Send a chat');
+    assert.equal(await ben.getByText('You and Ava are friends.').count(), 1, 'Escape on the banner did nothing else');
     await ava.locator('.puff-pop').waitFor({ state: 'detached' });
     await ava.getByText('Find your friends').waitFor();
     await shot(ava, 'S09-add-friends');
@@ -821,12 +835,17 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.ok(!('image' in avaClip.body));
     await ava.getByText('Delivered').waitFor();
 
-    // S15 Ben opens it: a <video> plays with its sound, the caption over it;
-    // when it ends the viewer moves on (here, it closes) and the snap is gone
-    await ben.getByText('New snap', { exact: true }).waitFor();
-    await ben.locator('.puff-pop').waitFor({ state: 'detached' });
-    await ben.getByRole('button', { name: /Ava, New snap/ }).click();
+    // S15 Ben opens it from its banner (S17): a <video> plays with its sound,
+    // the caption over it; when it ends the viewer moves on (here, it closes)
+    // and the snap is gone
+    const snapBanner = bannerOf(ben);
+    await snapBanner.waitFor();
+    assert.equal(await snapBanner.locator('.banner-name').textContent(), 'Ava');
+    assert.equal(await snapBanner.locator('.banner-say').textContent(), 'New snap');
+    await ben.locator('.chat-row').getByText('New snap', { exact: true }).waitFor();
+    await snapBanner.click();
     await playing(ben, '.viewer video');
+    assert.equal(await bannerOf(ben).count(), 0, 'the banner went as the snap opened');
     await ben.waitForFunction(() => document.querySelector('.viewer video')?.webkitAudioDecodedByteCount > 0); // its sound plays
     const clipEl = ben.locator('.viewer video');
     assert.equal(await clipEl.getAttribute('aria-label'), 'Snap from Ava');
@@ -879,9 +898,31 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.getByLabel('Message').fill('nice photo');
     await ben.getByRole('button', { name: 'Send', exact: true }).click();
     await ben.getByText('nice photo').waitFor();
-    await ava.getByText('New chat', { exact: true }).waitFor();
-    await ava.getByRole('button', { name: 'Chat with Ben' }).click();
+    // S17 it drops in on Ava's Chat list as a banner: the Puff mark on Ben's
+    // avatar, his name and what he said, in a polite live region; the tab's
+    // title counts what is new. Tapping the banner opens his chat
+    await ava.locator('.chat-row').getByText('New chat', { exact: true }).waitFor();
+    const chatBanner = bannerOf(ava);
+    await chatBanner.waitFor();
+    assert.equal(await ava.locator('#banner').getAttribute('aria-live'), 'polite');
+    assert.equal(await chatBanner.locator('.banner-name').textContent(), 'Ben');
+    assert.equal(await chatBanner.locator('.banner-say').textContent(), 'nice photo');
+    assert.equal(await chatBanner.locator('.banner-who .avatar').count(), 1, "with Ben's avatar");
+    assert.equal(await chatBanner.locator('.banner-mark svg').count(), 1, 'and the Puff mark');
+    assert.equal((await chatBanner.textContent()).trim(), 'BenNew chat: nice photo', 'read out as who, then what');
+    await chatBanner.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // dropped in
+    const bannerBox = await chatBanner.boundingBox();
+    assert.ok(bannerBox.y >= 0 && bannerBox.y < 24 && bannerBox.height >= 44 && bannerBox.x >= 0 &&
+      bannerBox.x + bannerBox.width <= viewport.width, `at the top, easy to tap, inside the screen (${JSON.stringify(bannerBox)})`);
+    const unreadBadge = await ava.locator('.nav .badge').textContent();
+    assert.ok(Number(unreadBadge) >= 1);
+    assert.equal(await ava.title(), `(${unreadBadge}) Poof`, 'the tab title counts what is new');
+    await shot(ava, 'S17-banner');
+    await chatBanner.click();
+    await ava.locator('section.screen[aria-label="Chat with Ben"]').waitFor();
     await ava.getByText('nice photo').waitFor();
+    assert.equal(await bannerOf(ava).count(), 0, 'the banner went as the chat opened');
+    await ava.waitForFunction(() => document.title === 'Poof'); // read, so nothing is new
     await ava.getByRole('button', { name: /Message: nice photo/ }).click();
     await ava.getByText(/kept/).waitFor();
     await checkIcons(ava, 'chat', { Back: 'back', 'Snap Ben': 'camera' });
@@ -935,6 +976,8 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.getByRole('button', { name: 'Send', exact: true }).click();
     await ava.getByText('see you tomorrow').waitFor();
     assert.equal(await benTyping.count(), 0, 'the message arrived and the dots went');
+    assert.equal(await bannerOf(ava).count(), 0, 'no banner for a message into the chat on screen');
+    assert.equal(await ava.title(), 'Poof', 'nor anything unread');
     assert.ok(Date.now() - typedAgainAt < 3500, 'gone with the message, not 4 seconds on');
     await ava.emulateMedia({ reducedMotion: 'no-preference' });
 
@@ -1001,6 +1044,36 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await drag(ben, [195, 250], [195, 640], { mid: () => shot(ben, 'S08-story-swipe-down') });
     await ben.getByRole('heading', { name: 'Stories' }).waitFor();
     await swipeSettled(ben);
+
+    // S17 a banner tapped while a snap is open takes Ben where it says, and
+    // the snap's timer stops there: when it would have run out, nothing
+    // takes him back to the Chat list
+    const benIdNow = await ben.evaluate(() => fetch('/api/me').then((r) => r.json()).then((u) => u.id));
+    await ben.getByRole('button', { name: 'Chat', exact: true }).click();
+    await ben.getByRole('heading', { name: 'Chat' }).waitFor();
+    const SNAP_MS = 4000;
+    await ava.evaluate(async ([to, secs]) => {
+      const c = document.createElement('canvas');
+      c.width = 270;
+      c.height = 480;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#3ddc97';
+      ctx.fillRect(0, 0, c.width, c.height);
+      const r = await fetch('/api/snaps', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: [to], image: c.toDataURL('image/png'), duration: secs }) });
+      if (!r.ok) throw new Error('could not send the snap: ' + r.status);
+    }, [benIdNow, SNAP_MS / 1000]);
+    await ben.getByRole('button', { name: /Ava, New snap/ }).click();
+    await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
+    const snapOpenAt = Date.now();
+    await ava.evaluate((to) => fetch('/api/chat/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'wait for me' }) }), benIdNow);
+    await bannerOf(ben).click();
+    await ben.locator('section.screen[aria-label="Chat with Ava"]').waitFor();
+    await ben.getByText('wait for me').waitFor();
+    assert.ok(Date.now() - snapOpenAt < SNAP_MS - 500, 'the banner was tapped with the snap still showing');
+    await ben.waitForTimeout(SNAP_MS + 600 - (Date.now() - snapOpenAt));
+    assert.equal(await ben.locator('section.screen[aria-label="Chat with Ava"]').count(), 1, 'still in the chat once the snap would have run out');
     await ava.getByRole('button', { name: 'Back' }).click();
     await ava.getByRole('button', { name: 'Stories', exact: true }).click();
     await ava.getByText(/1 viewers/).waitFor();
@@ -1012,6 +1085,23 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       [true, 0], 'picture, and not a byte of sound');
     await ava.getByRole('heading', { name: 'Stories' }).waitFor(); // it ended and the viewer closed
 
+    // the system notifications Ava's browser shows are recorded here instead,
+    // and the browser's answer to asking for permission is window.permissionAnswer
+    await ava.evaluate(() => {
+      window.shownNotes = [];
+      window.permissionAsks = 0;
+      window.permissionAnswer = 'denied';
+      window.Notification = class {
+        static permission = 'default';
+        static async requestPermission() {
+          window.permissionAsks++;
+          window.Notification.permission = window.permissionAnswer;
+          return window.permissionAnswer;
+        }
+        constructor(title, options) { Object.assign(this, { title, ...options, closed: false }); window.shownNotes.push(this); }
+        close() { this.closed = true; this.onclose?.(); }
+      };
+    });
     // S10 profile: Ava's Puffcode, large at the top with her avatar inside it
     await ava.getByRole('button', { name: 'Profile' }).click();
     await ava.getByText('Friends (1)').waitFor();
@@ -1042,12 +1132,84 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(png.subarray(1, 4).toString(), 'PNG');
     assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1080, 1080], '1080px square');
     await ava.getByText('Puffcode saved').waitFor();
+
+    // S17 Profile > Notifications, a switch. Turned on, it asks the browser:
+    // blocked, it stays off and says so; allowed, it is on
+    const notifySwitch = ava.getByRole('switch', { name: 'Notifications' });
+    assert.equal(await notifySwitch.getAttribute('aria-checked'), 'false');
+    assert.ok((await notifySwitch.boundingBox()).height >= 44, 'the switch is easy to tap');
+    await notifySwitch.click();
+    await ava.getByText('Blocked in this browser. Allow notifications for this site in its settings.').waitFor();
+    assert.equal(await notifySwitch.getAttribute('aria-checked'), 'false', 'blocked: still off');
+    await ava.evaluate(() => { window.permissionAnswer = 'granted'; });
+    await notifySwitch.click();
+    await ava.waitForFunction(() => document.querySelector('[role="switch"]').getAttribute('aria-checked') === 'true');
+    assert.equal(await ava.evaluate(() => window.permissionAsks), 2);
+    await notifySwitch.scrollIntoViewIfNeeded();
+    await noToast(ava);
+    await shot(ava, 'S10-profile-notifications');
+    // with Poof out of sight, a chat from Ben raises one, titled Poof with his
+    // name and the app icon, and no banner; the tab's title counts it
+    const benUser = await ben.evaluate(() => fetch('/api/me').then((r) => r.json()));
+    const avaUser = await ava.evaluate(() => fetch('/api/me').then((r) => r.json()));
+    const setHidden = (page, hidden) => page.evaluate((hide) => {
+      if (hide) {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      } else {
+        delete document.hidden;
+        delete document.visibilityState;
+      }
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+    await setHidden(ava, true);
+    await ben.evaluate((to) => fetch('/api/chat/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'on my way' }) }), avaUser.id);
+    await ava.waitForFunction(() => window.shownNotes.length === 1);
+    assert.deepEqual(await ava.evaluate(() => (({ title, body, icon, tag }) => ({ title, body, icon, tag }))(window.shownNotes[0])),
+      { title: 'Poof', body: 'New chat from Ben', icon: '/icons/icon-192.png', tag: 'chat:' + benUser.id });
+    assert.equal(await bannerOf(ava).count(), 0, 'no banner while Poof is out of sight');
+    assert.equal(await ava.title(), '(1) Poof');
+    const icon192 = await ava.evaluate(() => fetch('/icons/icon-192.png').then(async (r) => [r.status, r.headers.get('content-type')]));
+    assert.deepEqual(icon192, [200, 'image/png'], 'the icon it shows is there');
+    // clicking it brings Poof back with Ben's chat open, and closes it
+    await setHidden(ava, false);
+    await ava.evaluate(() => window.shownNotes[0].onclick());
+    await ava.locator('section.screen[aria-label="Chat with Ben"]').waitFor();
+    await ava.getByText('on my way').waitFor();
+    assert.equal(await ava.evaluate(() => window.shownNotes[0].closed), true);
+    await ava.waitForFunction(() => document.title === 'Poof');
+    // his chat open but out of sight: what he says next waits there unread,
+    // counted in the title, until Poof is back in view
+    const lastFromBen = () => ben.evaluate((to) => fetch('/api/chat/' + to).then((r) => r.json())
+      .then((d) => d.messages.filter((m) => m.from !== to).at(-1)), avaUser.id);
+    await setHidden(ava, true);
+    await ben.evaluate((to) => fetch('/api/chat/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'are you there' }) }), avaUser.id);
+    await ava.waitForFunction(() => window.shownNotes.length === 2);
+    await ava.waitForFunction(() => document.title === '(1) Poof');
+    assert.deepEqual([(await lastFromBen()).text, (await lastFromBen()).readAt], ['are you there', null], 'not read while out of sight');
+    assert.equal(await ava.getByText('are you there').count(), 0);
+    await setHidden(ava, false);
+    await ava.getByText('are you there').waitFor();
+    await ava.waitForFunction(() => document.title === 'Poof');
+    assert.ok((await lastFromBen()).readAt, 'read once back in view');
+    // in sight again, news comes as a banner, not a notification; and the
+    // switch turns off without asking again
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('button', { name: 'Profile' }).click();
+    await notifySwitch.click();
+    assert.equal(await notifySwitch.getAttribute('aria-checked'), 'false');
+    assert.equal(await ava.evaluate(() => window.permissionAsks), 2);
+    assert.equal(await ava.evaluate(() => window.shownNotes.length), 2, 'one a message, no more');
     await ava.getByRole('button', { name: 'Log out' }).click();
 
     // S01 log out lands on the welcome screen; log back in from there
     await ava.getByRole('button', { name: 'Sign up' }).waitFor();
     assert.equal(await ava.evaluate(() => document.documentElement.dataset.chrome), 'brand');
     assert.ok(await ava.locator('#toast').isHidden(), 'no news from the last session on the welcome screen');
+    assert.equal(await bannerOf(ava).count(), 0, 'no banner either');
+    assert.equal(await ava.title(), 'Poof', 'and nothing counted in the title');
     // a profile link opened while logged out is remembered through log in
     await ava.goto(base + '/add/ben');
     await ava.getByText('Log in or sign up to add @ben.').waitFor();
@@ -1085,6 +1247,21 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await cal.locator('.profile-card .avatar.has-art').count(), 1, 'Ava\'s avatar');
     await cal.getByRole('button', { name: 'Add friend' }).click();
     await cal.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
+    // S17 Ava, in her chat with Ben, hears about it in a banner; she swipes it
+    // up out of the way and stays where she was
+    const calBanner = bannerOf(ava);
+    await calBanner.waitFor();
+    assert.equal(await calBanner.locator('.banner-name').textContent(), 'Cal');
+    assert.equal(await calBanner.locator('.banner-say').textContent(), 'Sent you a friend request');
+    await calBanner.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const calBox = await calBanner.boundingBox();
+    const calMid = [calBox.x + calBox.width / 2, calBox.y + calBox.height * 0.75];
+    await drag(ava, calMid, [calMid[0], 2], { ms: 180, mid: async () => {
+      const y = (await calBanner.boundingBox()).y;
+      assert.ok(y < calBox.y - 8, `it follows the pointer up (${y} from ${calBox.y})`);
+    } });
+    await calBanner.waitFor({ state: 'detached', timeout: 1000 });
+    assert.equal(await ava.locator('section.screen[aria-label="Chat with Ben"]').count(), 1, 'swiping it away opens nothing');
 
     // S02 with a code reader: the camera spots a Puffcode and offers to add them
     await cal.getByRole('button', { name: 'Done' }).click();
@@ -1164,6 +1341,13 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
         body: JSON.stringify({ to: [to], image: c.toDataURL('image/png'), duration: 10 }) });
       if (!r.ok) throw new Error('could not send the snap: ' + r.status);
     }, avaId);
+    // S17 left alone, its banner goes by itself after 4 seconds
+    const lastBanner = bannerOf(ava);
+    await lastBanner.waitFor();
+    const bannerAt = Date.now();
+    await lastBanner.waitFor({ state: 'detached', timeout: 8000 });
+    const bannerFor = Date.now() - bannerAt;
+    assert.ok(bannerFor >= 3600 && bannerFor < 6000, `the banner stayed about 4 seconds (${bannerFor}ms)`);
     await ava.getByRole('button', { name: /Ben, New snap/ }).click();
     await ava.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await drag(ava, [195, 300], [195, 620], { mid: () => shot(ava, 'S06-snap-swipe-down') });

@@ -7,6 +7,7 @@
   <title>Poof</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -17,6 +18,9 @@
 <g fill="#ffffff" mask="url(#splash-k)"><path d="M61 142A21 21 0 0 1 40.13 123.3A18 18 0 0 0 38.58 117.74A28 28 0 0 1 57.1 78.86A12 12 0 0 0 65.65 70.64A40 40 0 0 1 140.63 65.94A12 12 0 0 0 148.87 72.8A30 30 0 0 1 169.5 113.99A18 18 0 0 0 168 121.1A21 21 0 0 1 147 142Z"/><circle cx="186" cy="122" r="8.5"/><circle cx="204" cy="108" r="5.5"/><circle cx="214" cy="95" r="3"/></g></svg></div>
   <noscript><p class="noscript">Poof needs JavaScript turned on.</p></noscript>
   <main id="app" aria-live="polite"></main>
+  <!-- in-app notification banners (app.js showBanner): an empty live region
+       from the start, so what is put in it later is read out -->
+  <div id="banner" class="banner-region" aria-live="polite"></div>
   <div id="toast" role="status" hidden></div>
   <script src="/mascot.js"></script>
   <script src="/avatar.js"></script>

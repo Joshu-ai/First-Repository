@@ -7,6 +7,10 @@
   const FLASH_KEY = 'poof.flash'; // the camera's Flash switch, remembered on this device
   const TYPING_SEND_MS = 2000; // while you type, your friend is told at most this often
   const TYPING_SHOW_MS = 4000; // and a friend shows as typing until this long passes with no more from them
+  const BANNER_MS = 4000; // a notification banner goes by itself after this long
+  const PREVIEW_MAX = 60; // characters of a message shown in its banner (the server sends no more)
+  const NOTIFY_KEY = 'poof.notify'; // Notifications on the Profile screen, remembered on this device
+  const APP_TITLE = 'Poof'; // the tab's title; with unread snaps and chats, "(2) Poof"
 
   const state = {
     me: null,
@@ -28,6 +32,8 @@
     onEscape: null, // what Escape does on this screen (the viewers close)
     typing: new Map(), // friends typing to you now: their id -> the timer that ends it
     onTyping: null, // how this screen shows a friend starting or stopping typing: (friendId) => {}
+    chatWith: null, // the friend whose chat is on screen: their messages need no banner
+    onLeave: null, // run when the screen is replaced (the viewers stop their clocks and videos)
   };
 
   // ---------- tiny DOM helper ----------
@@ -50,9 +56,13 @@
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   function show(screen) {
+    const leave = state.onLeave;
+    state.onLeave = null;
+    leave?.();
     closeSheet({ restore: false, animate: false });
     state.onEscape = null;
     state.onTyping = null;
+    state.chatWith = null;
     const old = app.firstElementChild;
     app.replaceChildren(screen);
     // a tab's screen is kept (once out of the page, focus and all) to show beside its neighbour during a swipe
@@ -697,6 +707,9 @@
     state.friendsBack = null;
     clearTimeout(toastTimer); // news from the last session is not for whoever logs in next
     toastEl.hidden = true;
+    dismissBanner({ animate: false, restore: false });
+    closeNotes([...notes.keys()]);
+    setUnread(0);
     show(h('section', { class: 'screen welcome', 'aria-label': 'Welcome' },
       h('div', { class: 'hero' },
         puff('happy', 220, 'Puff, the Poof mascot'),
@@ -894,6 +907,27 @@
     tab === 'chat' && state.unread ? h('span', { class: 'badge' }, state.unread) : null);
     return h('nav', { class: 'nav' + (active === 'camera' ? '' : ' solid') },
       item('chat', 'Chat'), item('camera', 'Camera'), item('stories', 'Stories'));
+  }
+
+  // ---------- unread count ----------
+  // New snaps plus unread chats: on the Chat tab's badge and in the tab's
+  // title, "(2) Poof", so it shows from another tab too. Badges are updated
+  // where they are (the tab bar is never swapped mid-swipe), peeks included.
+  const countUnread = (rows) => rows.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
+  function setUnread(n) {
+    state.unread = Math.max(0, n | 0);
+    document.title = state.unread ? `(${state.unread}) ${APP_TITLE}` : APP_TITLE;
+    const tabs = [app, ...Object.values(peeks)].flatMap((el) => [...el.querySelectorAll('.nav button[aria-label="Chat"]')]);
+    for (const tab of tabs) {
+      let badge = tab.querySelector('.badge');
+      if (!state.unread) { badge?.remove(); continue; }
+      if (!badge) tab.append(badge = h('span', { class: 'badge' }));
+      badge.textContent = state.unread;
+    }
+  }
+  // the count from the server, after something was read or opened
+  async function syncUnread() {
+    try { setUnread(countUnread(await api('/api/inbox'))); } catch {}
   }
 
   function go(tab) {
@@ -1827,8 +1861,7 @@
     const load = async () => {
       let rows;
       try { rows = await api('/api/inbox'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return false; }
-      state.unread = rows.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
-      app.querySelector('.nav')?.replaceWith(nav('chat'));
+      setUnread(countUnread(rows));
       if (!rows.length) {
         list.replaceChildren(h('div', { class: 'empty' }, puff('sleepy', 120), h('strong', {}, 'Nobody to talk to yet'),
           'Add friends by username, then snap them from the camera.',
@@ -1958,6 +1991,7 @@
       }
       if (closed) return undefined; // closed while it was on its way
       viewed++;
+      setUnread(state.unread - 1);
       caption.textContent = snap.caption || '';
       caption.hidden = !snap.caption;
       if (snap.video) {
@@ -1994,6 +2028,9 @@
     viewerGestures(screen, { from: 'chat', close, pause, resume });
     show(screen);
     state.onEscape = close;
+    state.onLeave = () => { closed = true; stopMedia(); }; // left for another screen (a banner tapped)
+    dismissBannerFor(friend.id, ['snap']);
+    closeNotes(['snap:' + friend.id]);
     next();
   }
 
@@ -2039,6 +2076,9 @@
     show(h('section', { class: 'screen', 'aria-label': 'Chat with ' + friend.displayName },
       header(friend.displayName, back, cam), thread, typing, form));
     state.onTyping = (id) => { if (id === friend.id) showTyping(); };
+    state.chatWith = friend.id;
+    dismissBannerFor(friend.id, ['chat', 'friend']);
+    closeNotes(['chat:' + friend.id]);
     showTyping();
     async function load() {
       let data;
@@ -2054,8 +2094,20 @@
       if (!data.messages.length) thread.append(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to ' + friend.displayName + ' 👋'));
       if (atBottom || !thread.dataset.loaded) thread.scrollTop = thread.scrollHeight;
       thread.dataset.loaded = '1';
+      if (state.unread) syncUnread(); // opening the chat read what was new in it
     }
-    state.refresh = load;
+    // Loading the chat reads it. While Poof is out of sight what comes in
+    // waits (unread, and counted in the tab's title) until it is back in view.
+    let stale = false;
+    const refresh = () => {
+      if (document.hidden) { stale = true; return undefined; }
+      stale = false;
+      return load();
+    };
+    const onVisible = () => { if (stale && !document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    state.onLeave = () => document.removeEventListener('visibilitychange', onVisible);
+    state.refresh = refresh;
     await load();
   }
 
@@ -2182,6 +2234,7 @@
     viewerGestures(screen, { from: 'stories', close, pause, resume, holdToPause: true });
     show(screen);
     state.onEscape = close;
+    state.onLeave = () => { closed = true; stopMedia(); };
     play();
   }
 
@@ -2229,7 +2282,10 @@
         data.incoming.length ? h('h2', { class: 'section-title' }, 'Added me') : null,
         ...data.incoming.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username)),
-          h('button', { class: 'btn small', onclick: () => act('/api/friends/accept', { userId: u.id }, 'You are now friends', 'love') }, 'Accept'))),
+          h('button', { class: 'btn small', onclick: () => {
+            dismissBannerFor(u.id, ['friend']); // their request is answered
+            act('/api/friends/accept', { userId: u.id }, 'You are now friends', 'love');
+          } }, 'Accept'))),
         data.outgoing.length ? h('h2', { class: 'section-title' }, 'Waiting on') : null,
         ...data.outgoing.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username + ' · pending')))),
@@ -2266,7 +2322,7 @@
         btn.disabled = true;
         try {
           const r = await api('/api/friends/request', { username: u.username });
-          if (r.status === 'accepted') puffPop('You are now friends', 'love');
+          if (r.status === 'accepted') { dismissBannerFor(u.id, ['friend']); puffPop('You are now friends', 'love'); }
           else toast('Request sent');
           await load();
         } catch (e) { toast(e.message); btn.disabled = false; }
@@ -2500,6 +2556,8 @@
             if (!confirm(`Remove ${f.displayName} as a friend?`)) return;
             try { await api('/api/friends/remove', { userId: f.id }); load(); } catch (e) { toast(e.message); }
           } }, 'Remove'))),
+        h('h2', { class: 'section-title' }, 'Settings'),
+        notifySetting(),
         h('div', { style: 'margin-top:32px;display:flex;justify-content:center' },
           h('button', { class: 'btn ghost', onclick: async () => {
             await api('/api/logout', {}).catch(() => {});
@@ -2510,6 +2568,233 @@
     };
     state.refresh = load;
     await load();
+  }
+
+  // ---------- notifications (S17) ----------
+  // Something new from a friend: a new snap, a chat, a friend request or
+  // its acceptance. With Poof on screen it drops in as a banner at the top;
+  // with Poof out of sight and Notifications on (Profile), snaps and chats
+  // raise a system notification instead.
+  const bannerRegion = document.getElementById('banner');
+  let banner = null; // the banner showing: { el, who, kind, timer, holds, back, done }
+  const notes = new Map(); // system notifications showing: key -> Notification
+
+  // whole characters, so an emoji is never cut in half
+  function previewText(text) {
+    const chars = Array.from(String(text || '').replace(/\s+/g, ' ').trim());
+    return chars.length > PREVIEW_MAX ? chars.slice(0, PREVIEW_MAX - 1).join('').trimEnd() + '\u2026' : chars.join('');
+  }
+
+  // What an event from the server says, and what opening it does. `said`
+  // is the system notification's text (snaps and chats only); `lead` is
+  // read out before a chat's words, which on screen speak for themselves.
+  function noticeFor(ev) {
+    const who = ev.sender;
+    if (!who?.id) return null;
+    const name = who.displayName;
+    if (ev.type === 'snap') {
+      return { key: 'snap:' + who.id, who, kind: 'snap', line: 'New snap', said: `New snap from ${name}`, open: () => openSnapsFrom(who) };
+    }
+    if (ev.type === 'message') {
+      return { key: 'chat:' + who.id, who, kind: 'chat', line: previewText(ev.preview) || 'New chat', lead: 'New chat: ',
+        said: `New chat from ${name}`, open: () => openChatWith(who) };
+    }
+    if (ev.type === 'friends' && ev.kind === 'request') {
+      return { key: 'friend:' + who.id, who, kind: 'friend', line: 'Sent you a friend request', open: () => go('friends') };
+    }
+    if (ev.type === 'friends' && ev.kind === 'accepted') {
+      return { key: 'friend:' + who.id, who, kind: 'friend', line: 'Accepted your friend request', open: () => openChatWith(who) };
+    }
+    return null; // avatar changes, removals and the rest only refresh what is on screen
+  }
+
+  // making a snap (editing, picking who gets it, recording): no banner to
+  // cover the tools or to tap away the work by accident
+  const creating = () => !!state.recording || !!app.firstElementChild?.matches('.editor, [aria-label="Send to"]');
+
+  function notify(ev) {
+    const n = noticeFor(ev);
+    if (!n) return;
+    if (document.hidden) systemNotify(n);
+    else if (!creating()) showBanner(n);
+  }
+
+  // Whatever is on screen gives way to a friend's chat or snaps (opened
+  // from a banner or a system notification).
+  function leaveScreen() {
+    state.tab = 'chat';
+    state.refresh = null;
+    stopCamera();
+    dropClip();
+  }
+  function openChatWith(who) {
+    leaveScreen();
+    renderChat(who);
+  }
+  async function openSnapsFrom(who) {
+    leaveScreen();
+    let rows;
+    try { rows = await api('/api/inbox'); } catch (e) { toast(e.message); go('chat'); return; }
+    const row = rows.find((r) => r.friend.id === who.id);
+    if (row?.snapIds.length) openSnaps(row.friend, row.snapIds);
+    else go('chat'); // opened already, somewhere else
+  }
+
+  // The banner: the Puff mark on the friend's avatar, their name, and the
+  // news. Tap it to open that. Swipe it up, or press Escape on it, to put it
+  // away; else it goes by itself after BANNER_MS, though not while a finger
+  // is on it or it has keyboard focus. One at a time: the newest wins.
+  function showBanner(n) {
+    const old = banner;
+    const again = old && old.key === n.key; // more of the same: no second drop-in
+    const hadFocus = old?.el.contains(document.activeElement);
+    const mark = h('span', { class: 'banner-mark', 'aria-hidden': 'true' });
+    mark.innerHTML = window.mascotSVG('happy', 16, '', 'mark', '#ffffff'); // static markup, no user input
+    const card = h('button', { type: 'button', class: `banner ${n.kind}${again ? ' again' : ''}`,
+      onclick: () => { dismissBanner({ animate: false, restore: false }); n.open(); } },
+    h('span', { class: 'banner-who' }, avatar(n.who, '', 40), mark),
+    h('span', { class: 'banner-text' },
+      h('strong', { class: 'banner-name' }, n.who.displayName),
+      h('span', { class: 'banner-line' },
+        n.kind === 'friend' ? null : h('span', { class: 'status-icon fill', 'aria-hidden': 'true' }),
+        n.lead ? h('span', { class: 'sr-only' }, n.lead) : null,
+        h('span', { class: 'banner-say' }, n.line))));
+    const b = { el: card, key: n.key, who: n.who, kind: n.kind, timer: null, holds: new Set(), back: old?.back || null, done: false };
+    const run = () => {
+      clearTimeout(b.timer);
+      if (!b.done && !b.holds.size) b.timer = setTimeout(() => { if (banner === b) dismissBanner(); }, BANNER_MS);
+    };
+    b.hold = (why) => { b.holds.add(why); clearTimeout(b.timer); };
+    b.release = (why) => { b.holds.delete(why); run(); };
+    card.addEventListener('focusin', (e) => {
+      if (!b.back && e.relatedTarget && !card.contains(e.relatedTarget)) b.back = e.relatedTarget;
+      b.hold('focus');
+    });
+    card.addEventListener('focusout', () => b.release('focus'));
+    card.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault(); // this Escape is the banner's, not the screen's
+      dismissBanner();
+    });
+    // drag it up and it follows; past a third of its height, or flicked, it goes
+    pointerDrag(card, {
+      lock: (g) => {
+        if (g.axis !== 'y') return false;
+        card.style.animation = 'none'; // still dropping in: from here it follows the finger
+        return true;
+      },
+      down: () => b.hold('touch'),
+      move: (g) => { card.style.transform = `translateY(${g.dy < 0 ? g.dy : Math.min(g.dy * 0.25, 12)}px)`; },
+      end: (g, { cancelled, vy }) => {
+        if (g.dragging) {
+          swallowClick();
+          if (!cancelled && (g.dy < -card.offsetHeight / 3 || (vy < -FLICK && g.dy < -12))) { dismissBanner(); return; }
+          glide([card], () => { card.style.transform = ''; });
+        }
+        b.release('touch');
+      },
+    });
+    if (old) { old.done = true; clearTimeout(old.timer); }
+    banner = b;
+    bannerRegion.replaceChildren(card);
+    if (hadFocus) card.focus();
+    run();
+  }
+
+  // Put the banner away: sliding up and out, or at once (when what it was
+  // about is being opened). Focus that was on it goes back where it came from.
+  function dismissBanner({ animate = true, restore = true } = {}) {
+    const b = banner;
+    if (!b) return;
+    banner = null;
+    b.done = true;
+    clearTimeout(b.timer);
+    const hadFocus = b.el.contains(document.activeElement);
+    b.el.inert = true;
+    if (hadFocus && restore && b.back?.isConnected) b.back.focus();
+    if (!animate || reduceMotion()) { b.el.remove(); return; }
+    b.el.style.animation = 'none'; // were it still dropping in, its transform would win
+    glide([b.el], () => {
+      b.el.style.transform = 'translateY(calc(-100% - var(--space-5)))';
+      b.el.style.opacity = '0';
+    }, () => b.el.remove());
+  }
+  // a friend's chat or snaps are open: their banner about that has done its job
+  function dismissBannerFor(friendId, kinds) {
+    if (banner && banner.who.id === friendId && kinds.includes(banner.kind)) dismissBanner({ animate: false, restore: false });
+  }
+
+  // ---------- system notifications ----------
+  // Only while Poof is open in a tab or window that is out of sight: there is
+  // no push service, so a closed Poof hears nothing (the tab's title still
+  // counts what is new). Some browsers (Chrome on Android) show them only
+  // from a service worker; there it quietly does nothing.
+  const notifySupported = () => typeof window.Notification === 'function';
+  const notifyWanted = () => { try { return localStorage.getItem(NOTIFY_KEY) === 'on'; } catch { return false; } };
+  const notifyOn = () => notifySupported() && window.Notification.permission === 'granted' && notifyWanted();
+  function setNotifyWanted(on) {
+    try { if (on) localStorage.setItem(NOTIFY_KEY, 'on'); else localStorage.removeItem(NOTIFY_KEY); } catch {}
+  }
+
+  function systemNotify(n) {
+    if (!n.said || !notifyOn()) return;
+    let note;
+    try {
+      note = new window.Notification(APP_TITLE, { body: n.said, icon: '/icons/icon-192.png', tag: n.key });
+    } catch { return; }
+    notes.set(n.key, note); // the same tag replaces the last one for this friend
+    note.onclick = () => {
+      window.focus();
+      note.close();
+      n.open();
+    };
+    note.onclose = () => { if (notes.get(n.key) === note) notes.delete(n.key); };
+  }
+  function closeNotes(keys) {
+    for (const key of keys) {
+      notes.get(key)?.close();
+      notes.delete(key);
+    }
+  }
+
+  // Profile > Notifications: a switch. Turning it on asks the browser once;
+  // blocked or unsupported, it says so and stays off.
+  function notifySetting() {
+    const note = h('span', { class: 'sub', id: 'notify-note' });
+    const sw = h('button', { type: 'button', class: 'row setting', role: 'switch', 'aria-checked': 'false',
+      'aria-labelledby': 'notify-label', 'aria-describedby': 'notify-note', onclick: flip },
+    h('span', { class: 'main' }, h('span', { class: 'name', id: 'notify-label' }, 'Notifications'), note),
+    h('span', { class: 'switch', 'aria-hidden': 'true' }));
+    let asking = false;
+    function draw() {
+      const supported = notifySupported();
+      const on = notifyOn();
+      sw.setAttribute('aria-checked', String(on));
+      sw.disabled = !supported;
+      note.textContent = !supported ? "This browser can't show notifications."
+        : window.Notification.permission === 'denied' ? 'Blocked in this browser. Allow notifications for this site in its settings.'
+          : on ? 'New snaps and chats will show up while Poof is in the background.'
+            : 'Hear about new snaps and chats while Poof is in the background.';
+    }
+    async function flip() {
+      if (asking || !notifySupported()) return;
+      if (notifyOn()) { setNotifyWanted(false); draw(); return; }
+      asking = true;
+      let permission = window.Notification.permission;
+      if (permission !== 'granted') {
+        try {
+          permission = await new Promise((resolve) => {
+            const asked = window.Notification.requestPermission(resolve); // older Safari only calls back
+            if (asked?.then) asked.then(resolve, () => resolve(window.Notification.permission));
+          });
+        } catch { permission = window.Notification.permission; }
+      }
+      asking = false;
+      setNotifyWanted(permission === 'granted');
+      draw();
+    }
+    draw();
+    return sw;
   }
 
   // ---------- live updates ----------
@@ -2524,13 +2809,10 @@
       // typing only changes who shows as typing; nothing needs reloading
       if (ev.type === 'typing') { setTyping(ev.from, true); return; }
       if (ev.type === 'message') setTyping(ev.from, false);
-      if (ev.type === 'snap') toast('New snap 📸');
-      if (ev.type === 'message') toast('New chat 💬');
-      if (ev.type === 'friends') toast('Friends updated');
-      if (ev.type === 'snap' || ev.type === 'message') {
-        state.unread++;
-        app.querySelector('.nav')?.replaceWith(nav(state.tab));
-      }
+      // a message into the chat on screen is read there and then: no banner, nothing unread
+      const seen = ev.type === 'message' && ev.from === state.chatWith && !document.hidden;
+      if ((ev.type === 'snap' || ev.type === 'message') && !seen) setUnread(state.unread + 1);
+      if (!seen) notify(ev);
       if (state.refresh) state.refresh();
     };
   }
@@ -2538,11 +2820,7 @@
   async function start(first = 'camera') {
     listen();
     if (first === 'camera') home(); else go(first); // draw straight away; the unread badge follows
-    try {
-      const inbox = await api('/api/inbox');
-      state.unread = inbox.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
-      app.querySelector('.nav')?.replaceWith(nav(state.tab));
-    } catch {}
+    syncUnread();
   }
 
   (async () => {

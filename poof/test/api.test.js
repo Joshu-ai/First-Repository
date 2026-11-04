@@ -317,6 +317,75 @@ test('typing to someone who is not a friend is 403, and they hear nothing', asyn
   } finally { await s.close(); }
 });
 
+test('live events for banners: snaps, messages and friend changes say who sent them; messages carry a 60-character preview', async () => {
+  const s = await boot();
+  try {
+    const a = client(s.base);
+    const b = client(s.base);
+    const aId = (await a.post('/api/signup', { username: 'ava', password: 'password1', displayName: 'Ava' })).data.id;
+    const bId = (await b.post('/api/signup', { username: 'ben', password: 'password2', displayName: 'Ben' })).data.id;
+    const ava = { id: aId, username: 'ava', displayName: 'Ava', avatar: null };
+    const ben = { id: bId, username: 'ben', displayName: 'Ben', avatar: null };
+    const toBen = await listen(b);
+    const toAva = await listen(a);
+    try {
+      // a request, and its acceptance, each name who did it
+      let next = toBen.until('friends');
+      await a.post('/api/friends/request', { username: 'ben' });
+      assert.deepEqual(await next, { type: 'friends', kind: 'request', from: aId, sender: ava });
+      next = toAva.until('friends');
+      await b.post('/api/friends/accept', { userId: aId });
+      assert.deepEqual(await next, { type: 'friends', kind: 'accepted', from: bId, sender: ben });
+
+      // a snap: its sender, never the picture
+      next = toBen.until('snap');
+      await a.post('/api/snaps', { to: [bId], image: PNG });
+      assert.deepEqual(await next, { type: 'snap', from: aId, sender: ava });
+
+      // a message: its sender and the start of what it says
+      next = toBen.until('message');
+      await a.post('/api/chat/' + bId, { text: '  nice\n\nphoto  ' });
+      assert.deepEqual(await next, { type: 'message', from: aId, sender: ava, preview: 'nice photo' }, 'spaces and lines tidied');
+      const sixty = 'x'.repeat(60);
+      next = toBen.until('message');
+      await a.post('/api/chat/' + bId, { text: sixty });
+      assert.equal((await next).preview, sixty, '60 characters fit as they are');
+      const long = 'The light on the water this morning was something else, you had to be there to see it';
+      next = toBen.until('message');
+      await a.post('/api/chat/' + bId, { text: long });
+      const cut = (await next).preview;
+      assert.equal(cut.length, 60);
+      assert.equal(cut, long.slice(0, 59) + '…', 'cut to 59 and an ellipsis');
+      next = toBen.until('message');
+      await a.post('/api/chat/' + bId, { text: '\u{1F600}'.repeat(70) });
+      const faces = Array.from((await next).preview);
+      assert.deepEqual([faces.length, faces.at(-1)], [60, '…'], 'counted in whole characters');
+      assert.ok(faces.slice(0, -1).every((c) => c === '\u{1F600}'), 'no emoji cut in half');
+
+      // an avatar change, then a removal: friends events still, with a kind and a sender
+      const avatar = { expr: 4, face: 1, skin: 2, eyeColor: 3, hair: 3, hairColor: 4, beard: 0, acc: 2, shirt: 5, bg: 1 };
+      next = toBen.until('friends');
+      await a.post('/api/me/avatar', { avatar });
+      assert.deepEqual(await next, { type: 'friends', kind: 'avatar', from: aId, sender: { ...ava, avatar } });
+      next = toBen.until('friends');
+      await a.post('/api/friends/remove', { userId: bId });
+      assert.deepEqual(await next, { type: 'friends', kind: 'removed', from: aId, sender: { ...ava, avatar } });
+
+      // adding back someone who already asked you accepts, and says so
+      next = toAva.until('friends');
+      await b.post('/api/friends/request', { username: 'ava' });
+      await next;
+      next = toBen.until('friends');
+      await a.post('/api/friends/request', { username: 'ben' });
+      assert.deepEqual(await next, { type: 'friends', kind: 'accepted', from: aId, sender: { ...ava, avatar } });
+
+      // nothing private ever rides along
+      const all = JSON.stringify([...toBen.events, ...toAva.events]);
+      for (const secret of ['salt', 'hash', 'password']) assert.ok(!all.includes(secret), `no ${secret} in live events`);
+    } finally { await toBen.close(); await toAva.close(); }
+  } finally { await s.close(); }
+});
+
 test('stories: friends only, viewers tracked, gone after 24h', async () => {
   const s = await boot();
   try {

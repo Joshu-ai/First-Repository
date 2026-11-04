@@ -77,6 +77,12 @@ text symbols stand in for icons. Add friends is Puff's solid silhouette
 with a plus badge. `PoofIcons.svg(name, size)` returns the markup; the
 icons are decorative, so the button always carries the label.
 
+The app icons for home screens, install prompts and notifications are PNGs
+in `public/icons/`, rendered from `public/icon.svg` by `npm run icons`
+(Playwright): 192 and 512px rounded tiles, a 512px maskable one with Puff
+inside the safe zone, and a 180px apple-touch-icon that is violet to the
+edges (iOS rounds it itself).
+
 ## Marketing art
 
 `brand/` holds a social banner (1200×630), a story/phone poster
@@ -121,6 +127,7 @@ stored (default `./data`).
 | Friends | Search by username, requests, accept, remove, streaks for consecutive days |
 | Puffcode | Your scannable profile code with your avatar inside; share or save it; scan friends' codes; `/add/<username>` links |
 | Live | New snaps, chats, "opened" updates and typing arrive instantly (Server-Sent Events) |
+| Notifications | A new snap, chat or friend request drops in as a banner at the top: the Puff mark on your friend's avatar, their name, and New snap or the start of their message. Tap it to open; swipe it up to put it away; it goes by itself after 4 seconds. Turn on Notifications in Profile to get system notifications while Poof is open in the background. The tab's title counts what is new: "(2) Poof" |
 
 Not built: group chats, AR lenses, map, discover feed, screenshot alerts.
 Videos can't be drawn on or saved to the device yet. See
@@ -181,7 +188,7 @@ Story videos are served with byte ranges, which Safari needs to play them.
 ## Tests
 
 ```bash
-npm test             # API: auth, friends, open-once snaps and videos, chat expiry, typing (live, friends only), stories, streaks, security; WebM sound removal
+npm test             # API: auth, friends, open-once snaps and videos, chat expiry, typing (live, friends only), live events with their sender, stories, streaks, security; WebM sound removal; app icons
 npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
 npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
 ```
@@ -198,5 +205,8 @@ python3 -m venv /tmp/qrcheck && /tmp/qrcheck/bin/pip install opencv-python-headl
 - Swap the JSON file store (`store.js`) for Postgres and the media folder for
   object storage. The current store is fine for a demo, not for many users.
 - Put it behind HTTPS.
+- Add Web Push with a service worker, so notifications arrive while Poof is
+  closed (today they come only while it is open in a tab, and not at all in
+  Chrome on Android).
 - Run a trademark check on the name "Poof" before using it publicly.
 - Add reporting/blocking and an age gate: a messaging app for real users needs them.

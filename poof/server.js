@@ -60,6 +60,19 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     for (const res of set) res.write(`data: ${JSON.stringify(event)}\n\n`);
   }
 
+  // Snap, message and friends events say who they are from twice: `from`,
+  // their id (as before), and `sender`, who they are (publicUser), so the
+  // app can show a banner with their name and avatar without asking again.
+  const fromMe = (me) => ({ from: me.id, sender: publicUser(me) });
+
+  // A message's first PREVIEW characters for the banner, whole characters
+  // only (never half an emoji), with an ellipsis when there is more.
+  const PREVIEW = 60;
+  function preview(text) {
+    const chars = Array.from(text.replace(/\s+/g, ' ').trim());
+    return chars.length > PREVIEW ? chars.slice(0, PREVIEW - 1).join('').trimEnd() + '\u2026' : chars.join('');
+  }
+
   function streakFor(a, b) {
     const s = db.streaks[pairKey(a, b)];
     if (!s) return 0;
@@ -239,7 +252,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     if (!avatar) fail(400, 'That avatar has a part that does not exist.');
     me.avatar = avatar;
     store.save();
-    for (const id of friendIds(me.id)) push(id, { type: 'friends' });
+    for (const id of friendIds(me.id)) push(id, { type: 'friends', kind: 'avatar', ...fromMe(me) });
     return publicUser(me);
   });
 
@@ -297,13 +310,13 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       if (existing.status === 'pending' && existing.requester === target.id) {
         existing.status = 'accepted';
         store.save();
-        push(target.id, { type: 'friends' });
+        push(target.id, { type: 'friends', kind: 'accepted', ...fromMe(me) });
       }
       return { status: existing.status };
     }
     db.friendships.push({ id: store.id(), a: me.id, b: target.id, requester: me.id, status: 'pending', createdAt: now() });
     store.save();
-    push(target.id, { type: 'friends' });
+    push(target.id, { type: 'friends', kind: 'request', ...fromMe(me) });
     return { status: 'pending' };
   });
 
@@ -312,7 +325,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     if (!f || f.status !== 'pending' || f.requester === me.id) fail(404, 'No request to accept.');
     f.status = 'accepted';
     store.save();
-    push(body.userId, { type: 'friends' });
+    push(body.userId, { type: 'friends', kind: 'accepted', ...fromMe(me) });
     return { status: 'accepted' };
   });
 
@@ -321,7 +334,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     if (!f) fail(404, 'Not friends.');
     db.friendships = db.friendships.filter((x) => x !== f);
     store.save();
-    push(body.userId, { type: 'friends' });
+    push(body.userId, { type: 'friends', kind: 'removed', ...fromMe(me) });
     return { ok: true };
   });
 
@@ -347,7 +360,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     for (const id of to) {
       db.snaps.push({ id: store.id(), from: me.id, to: id, media: store.putMedia(buf, ext), duration, ...extra, createdAt: now(), openedAt: null });
       recordStreak(me.id, id);
-      push(id, { type: 'snap', from: me.id });
+      push(id, { type: 'snap', ...fromMe(me) });
     }
     if (story) {
       db.stories.push({ id: store.id(), userId: me.id, media: store.putMedia(buf, ext), duration: duration || 5, ...extra, createdAt: now(), viewers: [] });
@@ -417,7 +430,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     db.messages.push(m);
     store.save();
     typingAt.delete(me.id + '>' + fid); // a message ends the typing; the next keystroke starts it afresh
-    push(fid, { type: 'message', from: me.id });
+    push(fid, { type: 'message', ...fromMe(me), preview: preview(text) });
     return m;
   });
 
