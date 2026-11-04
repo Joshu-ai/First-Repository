@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+:root {
+  --bg: #ffffff;
+  --bg-soft: #fafafa;
+  --fg: #0a0a0a;
+  --muted: #666666;
+  --border: #eaeaea;
+  --accent: #0070f3;
+}
+[data-theme="dark"] {
+  --bg: #000000;
+  --bg-soft: #0a0a0a;
+  --fg: #ededed;
+  --muted: #a1a1a1;
+  --border: #242424;
+  --accent: #3291ff;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+.prose-doc h2 { font-size: 1.5rem; font-weight: 600; margin: 2.5rem 0 1rem; scroll-margin-top: 5rem; letter-spacing: -0.02em; }
+.prose-doc p { color: var(--muted); line-height: 1.75; margin: 1rem 0; }
+.prose-doc ul { list-style: disc; padding-left: 1.25rem; color: var(--muted); line-height: 1.75; }
+.prose-doc code:not(pre code) { font-family: var(--font-geist-mono); font-size: 0.875em; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.35rem; color: var(--fg); }
