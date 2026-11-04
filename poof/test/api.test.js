@@ -229,3 +229,63 @@ test('static files cannot escape the public folder', async () => {
     assert.ok(!text.includes('createApp'), 'leaked server source');
   } finally { await s.close(); }
 });
+
+test('username availability: same rule as sign up, no session needed', async () => {
+  const s = await boot();
+  try {
+    const c = client(s.base);
+    const available = async (name) => (await c.get('/api/users/available?username=' + encodeURIComponent(name))).data;
+    assert.deepEqual(await available('ava'), { available: true, reason: null });
+    assert.deepEqual(await available('x'), {
+      available: false, reason: 'Usernames are 3-20 letters, numbers, dots or underscores.',
+    });
+    assert.equal((await c.get('/api/users/available')).data.available, false, 'missing username');
+    await client(s.base).post('/api/signup', { username: 'ava', password: 'password1' });
+    for (const taken of ['ava', 'AVA', '  Ava ']) {
+      assert.deepEqual(await available(taken), { available: false, reason: 'That username is taken.' }, taken);
+    }
+    assert.equal((await c.get('/api/me')).status, 401, 'checking never starts a session');
+    // whatever the check says is exactly what sign up then does
+    for (const name of ['ab', 'abc', 'a'.repeat(20), 'a'.repeat(21), 'with space', 'dots.ok', 'under_score',
+      'Mixed.Case', 'semi;colon', '<b>', 'ava']) {
+      const said = await available(name);
+      const signup = await client(s.base).post('/api/signup', { username: name, password: 'password1' });
+      assert.equal(said.available, signup.status === 200, `${name}: check said ${said.available}, sign up gave ${signup.status}`);
+      if (!said.available) assert.equal(said.reason, signup.data.error, name);
+    }
+  } finally { await s.close(); }
+});
+
+test('username availability is rate limited, apart from log in attempts', async () => {
+  const s = await boot();
+  try {
+    const c = client(s.base);
+    for (let i = 0; i < 30; i++) assert.equal((await c.get('/api/users/available?username=name' + i)).status, 200);
+    const blocked = await c.get('/api/users/available?username=one_more');
+    assert.equal(blocked.status, 429);
+    assert.match(blocked.data.error, /Too many attempts/);
+    // typing usernames never uses up someone's sign up or log in tries
+    assert.equal((await c.post('/api/signup', { username: 'ava', password: 'password1' })).status, 200);
+    assert.equal((await c.post('/api/login', { username: 'ava', password: 'password1' })).status, 200);
+    s.clock.t += 15 * 60 * 1000 + 1;
+    assert.equal((await c.get('/api/users/available?username=later')).status, 200, 'the window resets');
+  } finally { await s.close(); }
+});
+
+test('the launch splash is in the page before any script, drawn from mascot.js', async () => {
+  const s = await boot();
+  try {
+    const html = await (await fetch(s.base + '/')).text();
+    const splash = html.indexOf('<div id="splash"');
+    assert.ok(splash > 0 && splash < html.indexOf('<script'), 'splash markup comes before the scripts');
+    const window = {};
+    window.window = window;
+    const vm = require('node:vm');
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'mascot.js'), 'utf8'), vm.createContext(window));
+    const mark = window.mascotSVG('happy', 160, '', 'mark', '#ffffff').replace(/pf\d+k/g, 'splash-k');
+    assert.ok(html.includes(`<div id="splash" aria-hidden="true">${mark}</div>`), 'splash is the solid white Puff mark');
+    assert.match(html, /<meta name="theme-color" content="#6d4cff">/);
+    const manifest = await (await fetch(s.base + '/manifest.webmanifest')).json();
+    assert.equal(manifest.background_color, '#6d4cff');
+  } finally { await s.close(); }
+});

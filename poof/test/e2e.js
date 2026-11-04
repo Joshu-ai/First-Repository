@@ -20,14 +20,24 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
   });
   const errors = [];
-  const open = async () => {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'] });
+  const viewport = { width: 390, height: 844 };
+  // `context` adds browser context options; `before` runs on the page before it loads
+  const open = async ({ context, before } = {}) => {
+    const ctx = await browser.newContext({ viewport, permissions: ['camera'], ...context });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && !/40[0-9]|410/.test(m.text()) && errors.push(m.text()));
+    if (before) await before(page);
     await page.goto(base);
     return page;
   };
+  // records whether the launch splash ever started its fade
+  const watchSplash = (page) => page.addInitScript(() => {
+    window.splashFaded = false;
+    new MutationObserver(() => {
+      if (document.getElementById('splash')?.classList.contains('leaving')) window.splashFaded = true;
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
   const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.png') });
 
   // Controls show Poof's drawn icons (public/icons.js), never emoji or text
@@ -49,17 +59,87 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   };
 
   try {
+    // S00 launch splash: brand violet and the white Puff mark, there before any script runs
+    const noJs = await (await browser.newContext({ viewport, javaScriptEnabled: false })).newPage();
+    await noJs.goto(base);
+    assert.ok(await noJs.locator('#splash svg').isVisible(), 'splash shows without JavaScript');
+    assert.equal(await noJs.locator('#splash').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(109, 76, 255)');
+    await noJs.context().close();
+    // hold the session check to see the splash, then let it go: it fades away
+    let release;
+    const held = new Promise((r) => (release = r));
+    const early = await open({ before: async (page) => {
+      await watchSplash(page);
+      await page.route('**/api/me', async (route) => { await held; await route.continue(); });
+    } });
+    await early.locator('#splash svg').waitFor();
+    await shot(early, 'S00-splash');
+    release();
+    await early.locator('#splash').waitFor({ state: 'detached' });
+    await early.getByRole('button', { name: 'Sign up' }).waitFor();
+    assert.equal(await early.evaluate(() => window.splashFaded), true, 'splash fades out');
+    await early.context().close();
+    // with reduced motion it just goes, no fade
+    const calm = await open({ context: { reducedMotion: 'reduce' }, before: watchSplash });
+    await calm.locator('#splash').waitFor({ state: 'detached' });
+    assert.equal(await calm.evaluate(() => window.splashFaded), false, 'no fade with reduced motion');
+    await calm.context().close();
+
     const ava = await open();
     const ben = await open();
 
-    // S01 sign up
-    await shot(ava, 'S01-login');
+    // S01 welcome: violet edge to edge, Puff, and both choices in the thumb zone
+    await ava.locator('#splash').waitFor({ state: 'detached' });
+    await ava.getByRole('heading', { name: 'Poof' }).waitFor();
+    assert.ok(await ava.getByRole('img', { name: 'Puff, the Poof mascot' }).isVisible());
+    for (const name of ['Log in', 'Sign up']) {
+      const b = await ava.getByRole('button', { name }).boundingBox();
+      assert.ok(b.height >= 44 && b.width >= viewport.width - 2 * 24, `${name} is a full-width button`);
+      assert.ok(b.y > viewport.height * 0.7, `${name} sits in the thumb zone`);
+    }
+    assert.equal(await ava.evaluate(() => document.querySelector('meta[name="theme-color"]').content), '#6d4cff');
+    await shot(ava, 'S01-welcome');
+
+    // S01 sign up, one step at a time
     for (const [page, user, name] of [[ava, 'ava', 'Ava'], [ben, 'ben', 'Ben']]) {
-      await page.getByRole('button', { name: 'New here? Sign up' }).click();
+      await page.getByRole('button', { name: 'Sign up' }).click();
+      await page.getByText('Step 1 of 3').waitFor();
+      assert.equal(await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content), '#14121f');
       await page.getByLabel('Your name').fill(name);
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByText('Step 2 of 3').waitFor();
+      if (page === ben) {
+        // Ava has the name by now: the live check says so and Continue stays put
+        await page.getByLabel('Username').fill('Ava');
+        await page.getByText('That username is taken.').waitFor();
+        await page.getByRole('button', { name: 'Continue' }).click();
+        await page.getByText('That username is taken.').waitFor();
+        assert.equal(await page.getByText('Step 3 of 3').count(), 0, 'a taken name does not move on');
+        assert.equal(await page.getByLabel('Username').getAttribute('aria-invalid'), 'true');
+        // Back keeps the answers, and Enter submits
+        await page.getByRole('button', { name: 'Back' }).click();
+        await page.getByText('Step 1 of 3').waitFor();
+        assert.equal(await page.getByLabel('Your name').inputValue(), 'Ben');
+        await page.keyboard.press('Enter');
+        await page.getByText('Step 2 of 3').waitFor();
+      }
       await page.getByLabel('Username').fill(user);
-      await page.getByLabel('Password').fill('password123');
-      await page.getByRole('button', { name: 'Create account' }).click();
+      await page.getByText(`${user} is available`).waitFor();
+      if (page === ava) {
+        await checkIcons(page, 'sign up', { Back: 'back' });
+        await shot(page, 'S01-signup-username');
+      }
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByText('Step 3 of 3').waitFor();
+      const password = page.getByLabel('Password', { exact: true });
+      await password.fill('password123');
+      if (page === ava) {
+        await page.getByRole('button', { name: 'Show password' }).click();
+        assert.equal(await password.getAttribute('type'), 'text');
+        await page.getByRole('button', { name: 'Hide password' }).click();
+        assert.equal(await password.getAttribute('type'), 'password');
+      }
+      await page.keyboard.press('Enter');
       // S11 avatar maker runs once, right after sign up
       await page.getByRole('heading', { name: 'Make your avatar' }).waitFor();
       if (page === ava) {
@@ -180,7 +260,22 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await checkIcons(ava, 'profile', { Back: 'back' });
     await shot(ava, 'S10-profile');
     await ava.getByRole('button', { name: 'Log out' }).click();
-    await ava.getByRole('button', { name: 'Log in' }).waitFor();
+
+    // S01 log out lands on the welcome screen; log back in from there
+    await ava.getByRole('button', { name: 'Sign up' }).waitFor();
+    assert.equal(await ava.evaluate(() => document.documentElement.dataset.chrome), 'brand');
+    assert.ok(await ava.locator('#toast').isHidden(), 'no news from the last session on the welcome screen');
+    await ava.getByRole('button', { name: 'Log in' }).click();
+    await ava.getByRole('heading', { name: 'Log in' }).waitFor();
+    await checkIcons(ava, 'log in', { Back: 'back' });
+    await ava.getByLabel('Username').fill('ava');
+    await ava.getByLabel('Password', { exact: true }).fill('not-my-password');
+    await shot(ava, 'S01-login');
+    await ava.getByRole('button', { name: 'Log in' }).click();
+    await ava.getByText('Wrong username or password.').waitFor();
+    await ava.getByLabel('Password', { exact: true }).fill('password123');
+    await ava.keyboard.press('Enter');
+    await ava.getByRole('button', { name: 'Take photo' }).waitFor();
 
     assert.deepEqual(errors, [], 'browser errors: ' + errors.join('\n'));
     console.log('e2e: all flows passed. Screenshots in replica/clone-screens/');

@@ -3,7 +3,7 @@
   "short_name": "Poof",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#14121f",
+  "background_color": "#6d4cff",
   "theme_color": "#14121f",
   "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

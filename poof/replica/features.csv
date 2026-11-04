@@ -1,5 +1,8 @@
 feature,area,priority,original,clone,notes
-Sign up and log in with username,onboarding,must,yes,yes,
+Sign up and log in with username,onboarding,must,yes,yes,sign up is 3 short steps (name; username; password) with Step N of 3 and Back that keeps answers; log in is its own screen; Show/Hide password
+Launch splash,onboarding,should,yes,yes,brand-violet screen with the white Puff mark in index.html so it paints before any script; goes once the session check returns (short fade; none with reduced motion); manifest background matches
+Welcome screen with Log in and Sign up,onboarding,must,yes,yes,violet full bleed with Puff; the wordmark and tagline; both buttons full width in the thumb zone; shown on log out
+Live username availability check,onboarding,should,yes,yes,GET /api/users/available uses the same rule as sign up; rate limited per IP in its own bucket so typing never uses up log in attempts
 Opens straight to the camera,camera,must,yes,yes,
 Take a photo with front or back camera,camera,must,yes,yes,browser camera; falls back to picking a file when blocked
 Pick a photo from the device instead,camera,should,yes,yes,

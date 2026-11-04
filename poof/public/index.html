@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#14121f">
+  <meta name="theme-color" content="#6d4cff">
   <title>Poof</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <!-- launch splash: painted before any script runs, removed by app.js once
+       the session check returns. The mark is mascotSVG('happy', 160, '', 'mark',
+       '#ffffff') with its mask id renamed (test/api.test.js keeps them in step). -->
+  <div id="splash" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="20 2 204 168" width="160" height="132" aria-hidden="true"><defs><mask id="splash-k" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="200"><rect width="240" height="200" fill="#fff"/><rect x="84.5" y="89" width="13" height="22" rx="6.5" fill="#000"/><rect x="110.5" y="89" width="13" height="22" rx="6.5" fill="#000"/><path d="M96 120 Q104 127 112 120" fill="none" stroke="#000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></mask></defs>
+<g fill="#ffffff" mask="url(#splash-k)"><path d="M61 142A21 21 0 0 1 40.13 123.3A18 18 0 0 0 38.58 117.74A28 28 0 0 1 57.1 78.86A12 12 0 0 0 65.65 70.64A40 40 0 0 1 140.63 65.94A12 12 0 0 0 148.87 72.8A30 30 0 0 1 169.5 113.99A18 18 0 0 0 168 121.1A21 21 0 0 1 147 142Z"/><circle cx="186" cy="122" r="8.5"/><circle cx="204" cy="108" r="5.5"/><circle cx="214" cy="95" r="3"/></g></svg></div>
+  <noscript><p class="noscript">Poof needs JavaScript turned on.</p></noscript>
   <main id="app" aria-live="polite"></main>
   <div id="toast" role="status" hidden></div>
   <script src="/mascot.js"></script>

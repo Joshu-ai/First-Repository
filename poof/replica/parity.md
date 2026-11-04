@@ -1,9 +1,9 @@
 # Parity: Poof vs the original (core slice)
 
 Scored with the replica-diff rules (must 3, should 2, could 1, partial half,
-`skip` rows left out). Computed 2026-10-26 from `features.csv`.
+`skip` rows left out). Computed 2026-11-04 from `features.csv`.
 
-**Feature score: 97 / 100. Must-haves: 14 of 14. Shippable for this slice.**
+**Feature score: 97 / 100. Must-haves: 15 of 15. Shippable for this slice.**
 
 Missing (could-haves, in build order):
 1. Group chats

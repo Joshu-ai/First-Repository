@@ -99,11 +99,22 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     if (changed || before !== db.messages.length + db.stories.length) store.save();
   }
 
-  function rateLimit(ip) {
+  // 30 tries per IP per 15 minutes, counted per bucket so that checking
+  // usernames while typing never uses up someone's log in attempts
+  function rateLimit(ip, bucket = 'auth') {
     const t = now();
-    const a = attempts.get(ip);
-    if (!a || a.reset < t) return attempts.set(ip, { count: 1, reset: t + 15 * 60 * 1000 });
+    const key = bucket + ' ' + ip;
+    const a = attempts.get(key);
+    if (!a || a.reset < t) return attempts.set(key, { count: 1, reset: t + 15 * 60 * 1000 });
     if (++a.count > 30) fail(429, 'Too many attempts. Try again in a few minutes.');
+  }
+
+  // one rule for sign up and the live availability check: [status, reason] or null
+  const cleanUsername = (value) => String(value || '').trim().toLowerCase();
+  function usernameProblem(username) {
+    if (!/^[a-z0-9_.]{3,20}$/.test(username)) return [400, 'Usernames are 3-20 letters, numbers, dots or underscores.'];
+    if (db.users.some((u) => u.username === username)) return [409, 'That username is taken.'];
+    return null;
   }
 
   function cookies(req) {
@@ -153,14 +164,12 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
 
   route('POST', '/api/signup', ({ body, res, ip }) => {
     rateLimit(ip);
-    const username = String(body.username || '').trim().toLowerCase();
+    const username = cleanUsername(body.username);
     const password = String(body.password || '');
     const displayName = String(body.displayName || '').trim().slice(0, 40) || username;
-    if (!/^[a-z0-9_.]{3,20}$/.test(username)) {
-      fail(400, 'Usernames are 3-20 letters, numbers, dots or underscores.');
-    }
+    const problem = usernameProblem(username);
+    if (problem) fail(...problem);
     if (password.length < 8) fail(400, 'Passwords need at least 8 characters.');
-    if (db.users.some((u) => u.username === username)) fail(409, 'That username is taken.');
     const salt = crypto.randomBytes(16).toString('hex');
     const u = { id: store.id(), username, displayName, salt, hash: hashPassword(password, salt), createdAt: now() };
     db.users.push(u);
@@ -168,9 +177,16 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     return publicUser(u);
   }, { auth: false });
 
+  // live check for the sign up form; the same rule as sign up, never a session
+  route('GET', '/api/users/available', ({ url, ip }) => {
+    rateLimit(ip, 'available');
+    const problem = usernameProblem(cleanUsername(url.searchParams.get('username')));
+    return { available: !problem, reason: problem ? problem[1] : null };
+  }, { auth: false });
+
   route('POST', '/api/login', ({ body, res, ip }) => {
     rateLimit(ip);
-    const u = db.users.find((x) => x.username === String(body.username || '').trim().toLowerCase());
+    const u = db.users.find((x) => x.username === cleanUsername(body.username));
     const given = Buffer.from(hashPassword(String(body.password || ''), u ? u.salt : 'x'), 'hex');
     if (!u || !crypto.timingSafeEqual(given, Buffer.from(u.hash, 'hex'))) {
       fail(401, 'Wrong username or password.');

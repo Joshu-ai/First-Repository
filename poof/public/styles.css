@@ -6,6 +6,7 @@
   --text-dim: #a9a3c7;
   --brand: #7c5cff;
   --brand-ink: #ffffff;
+  --brand-bg: #6d4cff; /* full-bleed brand violet: splash and welcome */
   --accent: #ff7a6b;
   --snap: #ff5d8f;
   --chat: #3db4ff;
@@ -27,6 +28,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+/* the welcome screen bleeds its violet past the app column on wide screens */
+html[data-chrome="brand"], html[data-chrome="brand"] body { background: var(--brand-bg); }
 body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -54,9 +57,37 @@ button { cursor: pointer; }
 .icon { display: inline-grid; place-items: center; flex: none; line-height: 0; }
 .icon svg { display: block; }
 
-/* Auth */
-.auth { justify-content: center; padding: var(--space-6); gap: var(--space-4); }
-.auth .logo { margin: 0 auto; }
+/* Launch splash (markup in index.html, so it paints before any script) */
+#splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--brand-bg); transition: opacity .24s ease-out; }
+#splash svg { display: block; }
+#splash.leaving { opacity: 0; pointer-events: none; }
+.noscript { position: fixed; left: 0; right: 0; bottom: max(var(--space-6), env(safe-area-inset-bottom)); z-index: 101; margin: 0; padding: 0 var(--space-4); text-align: center; color: var(--brand-ink); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { #splash { transition: none; } }
+
+/* Welcome: violet, Puff, the wordmark, and both choices in the thumb zone */
+.welcome { background: var(--brand-bg); color: var(--brand-ink); padding: var(--space-5); padding-top: max(var(--space-5), env(safe-area-inset-top)); padding-bottom: max(var(--space-5), env(safe-area-inset-bottom)); }
+.welcome :focus-visible { outline-color: var(--brand-ink); }
+.welcome .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; }
+.welcome h1 { margin: var(--space-2) 0 0; font-size: 3.25rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.welcome .tagline { margin: 0; max-width: 18em; font-size: 1.15rem; font-weight: 600; text-wrap: balance; }
+.welcome .actions { display: flex; flex-direction: column; gap: var(--space-3); }
+.btn.block { width: 100%; font-size: 1.05rem; }
+.btn.on-brand { background: var(--brand-ink); color: var(--brand-bg); }
+.btn.on-brand-quiet { background: transparent; color: var(--brand-ink); box-shadow: inset 0 0 0 2px var(--brand-ink); }
+
+/* Log in and sign up: one question per screen, the button at the bottom */
+.flow .bar .step { flex: 1; margin: 0; text-align: center; font-size: .9rem; font-weight: 600; color: var(--text-dim); }
+.flow .bar-end { width: var(--tap); flex: none; }
+.flow-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5); }
+.flow-body h1 { margin: var(--space-2) 0 0; font-size: 1.75rem; line-height: 1.2; text-wrap: balance; }
+.flow-body .lede { margin: 0; color: var(--text-dim); }
+.flow-foot { padding: var(--space-4) var(--space-5); padding-bottom: max(var(--space-4), env(safe-area-inset-bottom)); }
+.note { display: flex; align-items: center; gap: var(--space-2); min-height: 1.4em; margin: 0; font-size: .9rem; color: var(--text-dim); }
+.note.ok { color: var(--ok); }
+.note.bad { color: var(--danger); }
+.reveal-wrap { position: relative; display: flex; }
+.reveal-wrap input { flex: 1; min-width: 0; padding-right: calc(var(--tap) + var(--space-5)); }
+.reveal { position: absolute; top: 0; right: 0; bottom: 0; min-width: calc(var(--tap) + var(--space-4)); padding: 0 var(--space-4); border: 0; border-radius: var(--radius); background: none; color: var(--text); font-weight: 700; font-size: .9rem; }
 .mascot { display: inline-block; line-height: 0; }
 .mascot svg { display: block; }
 .empty .mascot { display: block; width: fit-content; margin: 0 auto var(--space-3); }
@@ -77,10 +108,8 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .puff-pop .mascot, .puff-pop strong, .puff-pop .puff-trail circle { animation: puff-say 1.5s linear forwards; }
 }
-.auth h1 { text-align: center; margin: 0; font-size: 2.2rem; }
-.auth p { text-align: center; color: var(--text-dim); margin: 0; }
 .field { display: flex; flex-direction: column; gap: var(--space-1); }
-.field span { font-size: .85rem; color: var(--text-dim); }
+.field > span, .field > label { font-size: .85rem; color: var(--text-dim); }
 .search-field { position: relative; }
 .search-field .icon { position: absolute; left: var(--space-4); top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
 .search-field .search { padding-left: calc(var(--space-4) + 20px + var(--space-2)); }

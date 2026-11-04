@@ -35,10 +35,29 @@
     return el;
   }
 
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
   function show(screen) {
     app.replaceChildren(screen);
+    // the welcome screen is violet edge to edge (status bar too); the rest is dark
+    const brand = screen.classList.contains('welcome');
+    if (brand) document.documentElement.dataset.chrome = 'brand';
+    else delete document.documentElement.dataset.chrome;
+    const color = getComputedStyle(document.documentElement).getPropertyValue(brand ? '--brand-bg' : '--bg').trim();
+    if (themeMeta && color) themeMeta.setAttribute('content', color);
     const focusable = screen.querySelector('[autofocus]');
     if (focusable) focusable.focus();
+  }
+
+  // The launch splash lives in index.html so it paints before any script runs.
+  // It goes as soon as the first screen is drawn: a short fade, or straight
+  // away when the system asks for less motion.
+  function hideSplash() {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { splash.remove(); return; }
+    splash.classList.add('leaving');
+    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+    setTimeout(() => splash.remove(), 500); // in case the transition never reports back
   }
 
   let toastTimer;
@@ -55,8 +74,8 @@
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      if (res.status === 401 && state.me) { state.me = null; renderAuth('login'); }
-      throw new Error(data.error || 'Something went wrong.');
+      if (res.status === 401 && state.me) { state.me = null; renderWelcome(); }
+      throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
     }
     return data;
   }
@@ -109,40 +128,196 @@
     return Math.floor(s / 86400) + 'd';
   }
 
-  // ---------- auth (S01) ----------
-  function renderAuth(mode) {
+  // ---------- welcome, log in, sign up (S01) ----------
+  function renderWelcome() {
     stopCamera();
-    const err = h('p', { class: 'error', role: 'alert' });
-    const signup = mode === 'signup';
-    const form = h('form', { class: 'screen auth', onsubmit: async (e) => {
+    state.me = null;
+    clearTimeout(toastTimer); // news from the last session is not for whoever logs in next
+    toastEl.hidden = true;
+    show(h('section', { class: 'screen welcome', 'aria-label': 'Welcome' },
+      h('div', { class: 'hero' },
+        puff('happy', 220, 'Puff, the Poof mascot'),
+        h('h1', {}, 'Poof'),
+        h('p', { class: 'tagline' }, 'Photos that vanish once they are seen.')),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn block on-brand-quiet', type: 'button', onclick: renderLogin }, 'Log in'),
+        h('button', { class: 'btn block on-brand', type: 'button', onclick: () => renderSignup(1, {}) }, 'Sign up'))));
+  }
+
+  // One screen of the log in / sign up flow: back arrow, optional step count,
+  // a heading, the fields, one note line for hints and errors, and the single
+  // action at the bottom. Enter submits.
+  function flowScreen({ label, step, back, title, lede, fields, note, action, submit }) {
+    const btn = h('button', { class: 'btn block', type: 'submit' }, action);
+    const form = h('form', { class: 'screen flow', 'aria-label': label, novalidate: true, onsubmit: async (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(form));
-      const btn = form.querySelector('button[type=submit]');
+      if (btn.disabled) return;
       btn.disabled = true;
-      err.textContent = '';
-      try {
-        state.me = await api(signup ? '/api/signup' : '/api/login', data);
-        start(signup ? 'avatar' : 'camera');
-      } catch (e2) {
-        err.textContent = e2.message;
-        btn.disabled = false;
-      }
+      try { await submit(); } finally { btn.disabled = false; }
     } },
-      h('div', { class: 'logo' }, puff('happy', 168, 'Puff, the Poof mascot')),
-      h('h1', {}, 'Poof'),
-      h('p', {}, signup ? 'Make an account. It takes ten seconds.' : 'Photos that vanish once they are seen.'),
-      signup && h('label', { class: 'field' }, h('span', {}, 'Your name'),
-        h('input', { name: 'displayName', autocomplete: 'name', maxlength: '40' })),
-      h('label', { class: 'field' }, h('span', {}, 'Username'),
-        h('input', { name: 'username', autocomplete: 'username', required: true, autocapitalize: 'none', autofocus: true })),
-      h('label', { class: 'field' }, h('span', {}, 'Password'),
-        h('input', { name: 'password', type: 'password', required: true, minlength: signup ? '8' : null,
-          autocomplete: signup ? 'new-password' : 'current-password' })),
-      err,
-      h('button', { class: 'btn', type: 'submit' }, signup ? 'Create account' : 'Log in'),
-      h('button', { class: 'link', type: 'button', onclick: () => renderAuth(signup ? 'login' : 'signup') },
-        signup ? 'I already have an account' : 'New here? Sign up'));
+    h('header', { class: 'bar' }, backButton('Back', back),
+      h('p', { class: 'step' }, step ? `Step ${step} of 3` : ''), h('span', { class: 'bar-end' })),
+    h('div', { class: 'flow-body' }, h('h1', {}, title), lede && h('p', { class: 'lede' }, lede), ...fields, note),
+    h('div', { class: 'flow-foot' }, btn));
     show(form);
+  }
+
+  // the note under a field: hints, the live username check, and errors
+  function noteLine() {
+    const el = h('p', { class: 'note', id: 'flow-note', 'aria-live': 'polite' });
+    el.set = (text, tone, withIcon) => {
+      el.className = 'note' + (tone ? ' ' + tone : '');
+      el.replaceChildren(...(withIcon ? [icon(withIcon, 18)] : []), text || '');
+      const input = el.closest('form')?.querySelector('input:not([hidden])');
+      if (input && tone === 'bad') input.setAttribute('aria-invalid', 'true');
+      else if (input) input.removeAttribute('aria-invalid');
+    };
+    return el;
+  }
+
+  // a password box with a Show / Hide switch, so one typo cannot lock you out
+  function passwordField(autocomplete, autofocus) {
+    const input = h('input', { id: 'flow-password', name: 'password', type: 'password', autocomplete, autofocus,
+      autocapitalize: 'none', spellcheck: 'false', 'aria-describedby': 'flow-note' });
+    const toggle = h('button', { class: 'reveal', type: 'button', 'aria-label': 'Show password', onclick: () => {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      toggle.textContent = showing ? 'Show' : 'Hide';
+      toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+      input.focus();
+    } }, 'Show');
+    return { input, el: h('div', { class: 'field' }, h('label', { for: 'flow-password' }, 'Password'),
+      h('div', { class: 'reveal-wrap' }, input, toggle)) };
+  }
+
+  function renderLogin() {
+    stopCamera();
+    const username = h('input', { name: 'username', autocomplete: 'username', autocapitalize: 'none',
+      spellcheck: 'false', autofocus: true, 'aria-describedby': 'flow-note' });
+    const password = passwordField('current-password', false);
+    const note = noteLine();
+    flowScreen({
+      label: 'Log in', back: renderWelcome, title: 'Log in', lede: 'Welcome back.',
+      fields: [h('label', { class: 'field' }, h('span', {}, 'Username'), username), password.el], note, action: 'Log in',
+      submit: async () => {
+        if (!username.value.trim() || !password.input.value) {
+          note.set('Enter your username and password.', 'bad');
+          (username.value.trim() ? password.input : username).focus();
+          return;
+        }
+        note.set('');
+        try {
+          state.me = await api('/api/login', { username: username.value, password: password.input.value });
+          start('camera');
+        } catch (e) {
+          note.set(e.message, 'bad');
+          password.input.focus();
+        }
+      },
+    });
+  }
+
+  // Sign up, one question at a time: name, username (checked live), password.
+  // `draft` carries the answers between steps, so Back never loses them.
+  const cleanUsername = (v) => String(v || '').trim().toLowerCase();
+  function renderSignup(step, draft) {
+    stopCamera();
+    const note = noteLine();
+    const back = () => (step === 1 ? renderWelcome() : renderSignup(step - 1, draft));
+
+    if (step === 1) {
+      const input = h('input', { name: 'displayName', autocomplete: 'name', autocapitalize: 'words', maxlength: '40',
+        value: draft.name || '', autofocus: true, 'aria-describedby': 'flow-note' });
+      return flowScreen({
+        label: 'Sign up', step, back, title: "What's your name?", lede: 'This is the name your friends see.',
+        fields: [h('label', { class: 'field' }, h('span', {}, 'Your name'), input)], note, action: 'Continue',
+        submit: () => {
+          const name = input.value.trim();
+          if (!name) { note.set("Add a name so friends know it's you.", 'bad'); input.focus(); return; }
+          renderSignup(2, { ...draft, name });
+        },
+      });
+    }
+
+    if (step === 2) {
+      const input = h('input', { name: 'username', autocomplete: 'username', autocapitalize: 'none', autocorrect: 'off',
+        spellcheck: 'false', value: draft.username || '', autofocus: true, 'aria-describedby': 'flow-note' });
+      let timer;
+      let seq = 0;
+      let result = draft.checked || null; // { name, available, reason } for the latest name checked
+      const paint = () => {
+        const name = cleanUsername(input.value);
+        if (!name) return note.set('');
+        if (!result || result.name !== name) return note.set('Checking…');
+        if (result.available) return note.set(`${name} is available`, 'ok', 'check');
+        if (result.available === false) return note.set(result.reason, 'bad');
+        return note.set(''); // the check could not run; sign up will check again
+      };
+      const check = async (name) => {
+        const mine = ++seq;
+        let r;
+        try {
+          r = { name, ...(await api('/api/users/available?username=' + encodeURIComponent(name))) };
+        } catch {
+          r = { name, available: null, reason: null };
+        }
+        if (mine !== seq) return null; // a newer check is on its way
+        result = r;
+        paint();
+        return r;
+      };
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        paint();
+        const name = cleanUsername(input.value);
+        if (name && (!result || result.name !== name)) timer = setTimeout(() => check(name), 300);
+      });
+      flowScreen({
+        label: 'Sign up', step, back: () => { draft.username = input.value; draft.checked = result; back(); },
+        title: 'Pick a username', lede: 'Friends find you by it. Use 3 to 20 letters, numbers, dots or underscores.',
+        fields: [h('label', { class: 'field' }, h('span', {}, 'Username'), input)], note, action: 'Continue',
+        submit: async () => {
+          const name = cleanUsername(input.value);
+          if (!name) { note.set('Pick a username to continue.', 'bad'); input.focus(); return; }
+          clearTimeout(timer);
+          const r = result && result.name === name ? result : await check(name);
+          if (!r || cleanUsername(input.value) !== name) return; // they kept typing
+          if (r.available === false) { note.set(r.reason, 'bad'); input.focus(); return; }
+          renderSignup(3, { ...draft, username: name, checked: r });
+        },
+      });
+      // a name carried back from another step gets checked again if needed
+      const first = cleanUsername(input.value);
+      if (first && (!result || result.name !== first)) check(first);
+      paint();
+      return undefined;
+    }
+
+    const password = passwordField('new-password', true);
+    flowScreen({
+      label: 'Sign up', step, back, title: 'Set a password', lede: 'Use at least 8 characters.',
+      // lets password managers save the new login under the right username
+      fields: [h('input', { type: 'text', name: 'username', autocomplete: 'username', value: draft.username,
+        readonly: true, hidden: true, tabindex: '-1' }), password.el],
+      note, action: 'Create account',
+      submit: async () => {
+        const pw = password.input.value;
+        if (pw.length < 8) { note.set('Passwords need at least 8 characters.', 'bad'); password.input.focus(); return; }
+        try {
+          state.me = await api('/api/signup', { displayName: draft.name, username: draft.username, password: pw });
+          start('avatar');
+        } catch (e) {
+          // a username problem (say someone took it a moment ago) is fixed on step 2
+          if (e.status === 409 || /username/i.test(e.message)) {
+            renderSignup(2, { ...draft, checked: { name: draft.username, available: false, reason: e.message } });
+            return;
+          }
+          note.set(e.message, 'bad');
+          password.input.focus();
+        }
+      },
+    });
+    return undefined;
   }
 
   // ---------- shell ----------
@@ -176,7 +351,7 @@
     avatar(state.me));
   const addButton = () => h('button', { class: 'icon-btn plain', 'aria-label': 'Add friends', onclick: () => go('friends') },
     icon('puff-plus', 28));
-  const backButton = (label, onclick) => h('button', { class: 'icon-btn plain', 'aria-label': label, onclick }, icon('back'));
+  const backButton = (label, onclick) => h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': label, onclick }, icon('back'));
 
   // ---------- camera (S02) ----------
   function stopCamera() {
@@ -804,7 +979,7 @@
             await api('/api/logout', {}).catch(() => {});
             state.me = null;
             state.events?.close();
-            renderAuth('login');
+            renderWelcome();
           } }, 'Log out')));
     };
     state.refresh = load;
@@ -831,14 +1006,17 @@
 
   async function start(first = 'camera') {
     listen();
+    go(first); // draw straight away; the unread badge follows
     try {
       const inbox = await api('/api/inbox');
       state.unread = inbox.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
+      app.querySelector('.nav')?.replaceWith(nav(state.tab));
     } catch {}
-    go(first);
   }
 
   (async () => {
-    try { state.me = await api('/api/me'); start(); } catch { renderAuth('login'); }
+    try { state.me = await api('/api/me'); } catch { state.me = null; }
+    if (state.me) start(); else renderWelcome();
+    hideSplash();
   })();
 })();

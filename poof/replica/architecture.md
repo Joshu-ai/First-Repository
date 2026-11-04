@@ -22,7 +22,9 @@
 - Snap media is never served by URL: `POST /api/snaps/:id/open` returns it
   once to the recipient and deletes the file in the same request.
 - Story media is served only to the owner and their friends.
-- Login and signup are rate limited per IP.
+- Login and signup are rate limited per IP (30 tries per 15 minutes). The
+  live username check has its own bucket with the same limit, so typing a
+  username never uses up log in attempts.
 
 ## Data
 
@@ -53,6 +55,7 @@ POST /api/login  {username, password}
 POST /api/logout
 GET  /api/me
 GET  /api/events                       SSE
+GET  /api/users/available?username=     {available, reason}; no session needed
 GET  /api/users/search?q=
 GET  /api/friends                      friends, incoming, outgoing
 POST /api/friends/request {username}
