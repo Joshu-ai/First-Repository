@@ -51,7 +51,7 @@ button { cursor: pointer; }
 .btn.danger { background: transparent; color: var(--danger); }
 .btn.small { min-height: 36px; padding: 0 var(--space-4); font-size: .9rem; }
 .btn:disabled { opacity: .5; cursor: default; }
-.icon-btn { width: var(--tap); height: var(--tap); border-radius: 50%; border: 0; background: rgb(0 0 0 / .35); color: #fff; display: inline-grid; place-items: center; font-size: 1.3rem; }
+.icon-btn { width: var(--tap); height: var(--tap); padding: 0; border-radius: 50%; border: 0; background: rgb(0 0 0 / .35); color: #fff; display: inline-grid; place-items: center; font-size: 1.3rem; }
 .icon-btn.plain { background: var(--surface-2); }
 /* drawn icons (icons.js): sized by the markup, coloured by currentColor */
 .icon { display: inline-grid; place-items: center; flex: none; line-height: 0; }
@@ -152,9 +152,11 @@ button { cursor: pointer; }
 .row .main { flex: 1; min-width: 0; }
 .row .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .sub { font-size: .85rem; color: var(--text-dim); display: flex; gap: var(--space-2); align-items: center; }
-.avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; text-transform: uppercase; }
+.avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
 .avatar.has-art { overflow: hidden; }
 .avatar.has-art svg { display: block; width: 100%; height: 100%; }
+/* no avatar yet: the white Puff mark, sized to the circle so it holds from 32px to 120px */
+.avatar.placeholder svg { display: block; width: 80%; height: auto; }
 .avatar.ring { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--story); }
 .avatar.ring.seen { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--surface-2); }
 .status-icon { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }

@@ -32,4 +32,5 @@ Lenses and AR filters,camera,could,yes,skip,needs a face-tracking engine; a proj
 Snap Map,map,could,yes,skip,location sharing needs its own privacy design
 Discover and Spotlight,content,could,yes,skip,publisher content and creator network they own
 Personal avatars,profile,could,yes,yes,own avatar system built from parts; not theirs
+Default avatar before you make one,profile,could,yes,yes,the white Puff mark (solid 'mark' variant) on a circle in the person's own colour (a steady hue from the username); darkened only as needed so the mark keeps 3:1 contrast; sized to the circle so it holds from 32px to 120px; no initial letter
 Screenshot alerts,sending,should,yes,skip,a web page cannot detect screenshots

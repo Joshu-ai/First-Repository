@@ -58,6 +58,45 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.deepEqual(glyphs, [], `${where}: buttons still use glyph icons: ${glyphs.join(', ')}`);
   };
 
+  // Someone without an avatar gets the white Puff mark on a circle in their own
+  // colour: no letter, the mark centred at 80% of the circle, every puff of its
+  // trail inside the circle, and at least 3:1 contrast for the white mark.
+  const checkPlaceholder = async (loc, where, size) => {
+    assert.equal(await loc.count(), 1, `${where}: shows one placeholder avatar`);
+    const r = await loc.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const svg = el.querySelector('svg');
+      const art = svg.getBoundingClientRect();
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      const mark = svg.querySelector('g[mask]');
+      const reach = Math.max(...[...mark.querySelectorAll('circle')].map((c) => {
+        const b = c.getBoundingClientRect();
+        return Math.hypot(b.x + b.width / 2 - cx, b.y + b.height / 2 - cy) + b.width / 2;
+      }));
+      return {
+        w: box.width, h: box.height, round: getComputedStyle(el).borderRadius, text: el.textContent.trim(),
+        hidden: el.getAttribute('aria-hidden'), art: el.classList.contains('has-art'), fill: mark.getAttribute('fill'),
+        artW: art.width, artH: art.height, dx: art.x + art.width / 2 - cx, dy: art.y + art.height / 2 - cy, reach,
+        bg: getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number),
+      };
+    });
+    assert.deepEqual([r.w, r.h], [size, size], `${where}: ${size}px circle`);
+    assert.equal(r.round, '50%', `${where}: round`);
+    assert.equal(r.text, '', `${where}: no initial letter`);
+    assert.equal(r.hidden, 'true', `${where}: decorative`);
+    assert.equal(r.art, false, `${where}: has-art is only for real avatar art`);
+    assert.equal(r.fill, '#ffffff', `${where}: white Puff mark`);
+    assert.ok(Math.abs(r.artW - size * 0.8) <= 1, `${where}: mark is 80% of the circle (${r.artW}px)`);
+    assert.ok(Math.abs(r.artH - r.artW * 168 / 204) <= 1, `${where}: mark keeps its shape`);
+    assert.ok(Math.abs(r.dx) <= 1 && Math.abs(r.dy) <= 1, `${where}: mark is centred (${r.dx}, ${r.dy})`);
+    assert.ok(r.reach < size / 2, `${where}: the trail stays inside the circle`);
+    const lum = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    const [red, green, blue] = r.bg.map(lum);
+    const contrast = 1.05 / (0.2126 * red + 0.7152 * green + 0.0722 * blue + 0.05);
+    assert.ok(contrast >= 2.95, `${where}: white mark has ${contrast.toFixed(2)}:1 contrast`); // rgb rounding
+  };
+
   try {
     // S00 launch splash: brand violet and the white Puff mark, there before any script runs
     const noJs = await (await browser.newContext({ viewport, javaScriptEnabled: false })).newPage();
@@ -156,9 +195,47 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       }
       await page.getByRole('button', { name: 'Take photo' }).waitFor();
     }
-    // Ava's avatar is real art; Ben (skipped) keeps a letter
+    // Ava's avatar is real art; Ben (skipped) gets the Puff placeholder
     assert.equal(await ava.locator('.bar .avatar.has-art').count(), 1);
+    assert.equal(await ava.locator('.bar .avatar.placeholder').count(), 0);
     assert.equal(await ben.locator('.bar .avatar.has-art').count(), 0);
+    await checkPlaceholder(ben.locator('.bar .avatar.placeholder'), 'camera bar', 44);
+    const offset = await ben.getByRole('button', { name: 'Profile' }).evaluate((b) => {
+      const btn = b.getBoundingClientRect();
+      const av = b.querySelector('.avatar').getBoundingClientRect();
+      return [av.x + av.width / 2 - (btn.x + btn.width / 2), av.y + av.height / 2 - (btn.y + btn.height / 2)];
+    });
+    assert.ok(offset.every((d) => Math.abs(d) <= 0.5), `avatar sits centred in the Profile button (${offset})`);
+
+    // S10 Ben's profile: the big placeholder and an invitation to make an avatar
+    await ben.getByRole('button', { name: 'Profile' }).click();
+    await ben.getByRole('button', { name: 'Make your avatar' }).waitFor();
+    await checkPlaceholder(ben.locator('.scroll .avatar'), 'profile', 120);
+    await shot(ben, 'S10-profile-placeholder');
+    // the same placeholder holds up at 32, 44 and 120px
+    await ben.evaluate(() => {
+      const src = document.querySelector('.scroll .avatar.placeholder');
+      const strip = document.createElement('div');
+      strip.id = 'avatar-sizes';
+      strip.style.cssText = 'position:fixed;top:0;left:0;z-index:99;display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg)';
+      for (const size of [32, 44, 120]) {
+        const el = src.cloneNode(true);
+        el.dataset.size = size;
+        el.style.width = el.style.height = size + 'px';
+        const id = 'size' + size;
+        el.querySelector('mask').id = id;
+        el.querySelector('g[mask]').setAttribute('mask', `url(#${id})`);
+        strip.append(el);
+      }
+      document.body.append(strip);
+    });
+    for (const size of [32, 44, 120]) {
+      await checkPlaceholder(ben.locator(`#avatar-sizes [data-size="${size}"]`), `${size}px placeholder`, size);
+    }
+    await ben.locator('#avatar-sizes').screenshot({ path: path.join(SHOTS, 'S10-placeholder-sizes.png') });
+    await ben.evaluate(() => document.getElementById('avatar-sizes').remove());
+    await ben.getByRole('button', { name: 'Back' }).click();
+    await ben.getByRole('button', { name: 'Take photo' }).waitFor();
     await checkIcons(ava, 'camera', {
       'Choose a photo': 'image', 'Flip camera': 'flip', 'Add friends': 'puff-plus',
       Chat: 'chat', Camera: 'camera', Stories: 'stories',
@@ -204,6 +281,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     // S04 send to Ben and the story
     await ava.getByRole('button', { name: 'Send to', exact: true }).click();
     await ava.getByRole('checkbox', { name: /Ben/ }).click();
+    await checkPlaceholder(ava.getByRole('checkbox', { name: /Ben/ }).locator('.avatar'), 'Ben in send to', 44);
     await ava.getByRole('checkbox', { name: /My Story/ }).click();
     await checkIcons(ava, 'send to', { 'Back to editing': 'back', Send: 'send' });
     assert.equal(await ava.locator('.row[aria-checked="true"] .check svg.i-check').count(), 2, 'picked rows show a drawn check');
@@ -216,6 +294,8 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     // S05 Ben sees a new snap live, S06 opens it once
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByText('New snap', { exact: true }).waitFor();
+    assert.equal(await ben.getByRole('button', { name: /Ava, New snap/ }).locator('.avatar.has-art').count(), 1, 'Ben sees Ava\'s avatar art');
+    await ben.locator('.puff-pop').waitFor({ state: 'detached' }); // "You are now friends" can still be fading out
     await shot(ben, 'S05-inbox');
     await ben.getByRole('button', { name: /Ava, New snap/ }).click();
     const img = ben.getByRole('img', { name: 'Snap from Ava' });

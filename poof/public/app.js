@@ -80,21 +80,22 @@
     return data;
   }
 
-  function hue(text) {
-    let n = 0;
-    for (const c of text) n = (n * 31 + c.charCodeAt(0)) % 360;
-    return n;
-  }
+  // A person's avatar art, or, until they make one, the white Puff mark on a
+  // circle in their own colour. Decorative: the name beside it says who it is.
   function avatar(user, extra = '', size = 44) {
+    const box = `width:${size}px;height:${size}px`;
     if (user.avatar) {
-      const el = h('span', { class: 'avatar has-art ' + extra, 'aria-hidden': 'true', style: `width:${size}px;height:${size}px` });
+      const el = h('span', { class: 'avatar has-art ' + extra, 'aria-hidden': 'true', style: box });
       el.innerHTML = window.PoofAvatar.avatarSVG(user.avatar, size); // built from validated integers only
       return el;
     }
-    return h('span', {
-      class: 'avatar ' + extra, 'aria-hidden': 'true',
-      style: `background:hsl(${hue(user.username)} 55% 45%);width:${size}px;height:${size}px;font-size:${size / 2.4}px`,
-    }, (user.displayName || user.username).slice(0, 1));
+    const el = h('span', {
+      class: 'avatar placeholder ' + extra, 'aria-hidden': 'true',
+      style: `background:${window.PoofAvatar.placeholderColor(user.username)};${box}`,
+    });
+    // static mascot markup, no user input; CSS scales it to 80% of the circle
+    el.innerHTML = window.mascotSVG('happy', Math.round(size * 0.8), '', 'mark', '#ffffff');
+    return el;
   }
 
   // Puff, the mascot (see mascot.js). Decorative unless given a label.

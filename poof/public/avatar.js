@@ -227,7 +227,37 @@ ${accessory(c.acc)}
 </g></svg>`;
   }
 
-  const api = { PARTS, KEYS, normalize, random, avatarSVG };
+  // ---------- placeholder colour (no avatar yet) ----------
+  // Someone without an avatar shows the white Puff mark on a circle in their
+  // own colour: a steady hue from their username, at 55% saturation and 45%
+  // lightness, darkened only as far as needed for the white mark (and the face
+  // knocked out of it) to keep at least 3:1 contrast, the WCAG non-text minimum.
+  function nameHue(text) {
+    let n = 0;
+    for (const c of String(text)) n = (n * 31 + c.charCodeAt(0)) % 360;
+    return n;
+  }
+  // relative luminance (WCAG) of hsl(h s% l%)
+  function luminance(h, s, l) {
+    s /= 100;
+    l /= 100;
+    const a = s * Math.min(l, 1 - l);
+    const channel = (n) => {
+      const k = (n + h / 30) % 12;
+      const v = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4);
+  }
+  const contrastWithWhite = (h, s, l) => 1.05 / (luminance(h, s, l) + 0.05);
+  function hueColor(h) {
+    let l = 45;
+    while (l > 20 && contrastWithWhite(h, 55, l) < 3) l--;
+    return `hsl(${h} 55% ${l}%)`;
+  }
+  const placeholderColor = (username) => hueColor(nameHue(username));
+
+  const api = { PARTS, KEYS, normalize, random, avatarSVG, nameHue, hueColor, placeholderColor, contrastWithWhite };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PoofAvatar = api;
 })(typeof window !== 'undefined' ? window : globalThis);

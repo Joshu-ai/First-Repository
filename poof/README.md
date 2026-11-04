@@ -30,7 +30,9 @@ Right after sign-up, people build an avatar, or tap the die to shuffle one:
 
 Avatars show everywhere a person appears and can be edited from the
 profile. Drawn in code (`public/avatar.js`); the server stores only small
-numbers and rejects anything that isn't a real option.
+numbers and rejects anything that isn't a real option. Until someone makes
+one, they show the white Puff mark on a circle in their own colour (a steady
+hue from their username, darkened just enough to keep 3:1 contrast).
 
 Puff has 10 moods too (happy, wink, sleepy, wow, love, laugh, sad, cool,
 shy, party), used around the app: party when you post a story, love when
