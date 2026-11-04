@@ -124,6 +124,34 @@ test('friend requests: request, accept, add-back accepts, remove', async () => {
   } finally { await s.close(); }
 });
 
+test('friend card: each inbox row carries who they are and the streak; Remove friend ends it both ways', async () => {
+  const s = await boot();
+  try {
+    const { a, b, aId, bId } = await friends(s.base);
+    const avatar = { expr: 1, face: 0, skin: 3, eyeColor: 2, hair: 2, hairColor: 1, beard: 0, acc: 0, shirt: 2, bg: 3 };
+    await b.post('/api/me/avatar', { avatar });
+    // the card shows avatar, name, @username and streak straight from the row: no other call
+    const row = (await a.get('/api/inbox')).data[0];
+    assert.deepEqual(Object.keys(row.friend).sort(), ['avatar', 'displayName', 'id', 'username'], 'public fields only');
+    assert.deepEqual(row.friend, { id: bId, username: 'ben', displayName: 'Ben', avatar });
+    assert.equal(row.streak, 0);
+    for (let day = 0; day < 3; day++) {
+      await a.post('/api/snaps', { to: [bId], image: PNG });
+      await b.post('/api/snaps', { to: [aId], image: PNG });
+      s.clock.t += DAY;
+    }
+    assert.equal((await a.get('/api/inbox')).data[0].streak, 3, 'the streak the card shows');
+    assert.equal((await b.get('/api/inbox')).data[0].streak, 3, 'the same from both sides');
+    // Remove friend: gone from both inboxes, no more snaps or chats, and a second try says so
+    assert.equal((await a.post('/api/friends/remove', { userId: bId })).status, 200);
+    assert.deepEqual((await a.get('/api/inbox')).data, []);
+    assert.deepEqual((await b.get('/api/inbox')).data, []);
+    assert.equal((await b.post('/api/snaps', { to: [aId], image: PNG })).status, 403);
+    assert.equal((await b.post('/api/chat/' + aId, { text: 'hi' })).status, 403);
+    assert.equal((await a.post('/api/friends/remove', { userId: bId })).status, 404);
+  } finally { await s.close(); }
+});
+
 test('a snap opens exactly once and its file is deleted', async () => {
   const s = await boot();
   try {

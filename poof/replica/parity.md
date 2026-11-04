@@ -3,7 +3,7 @@
 Scored with the replica-diff rules (must 3, should 2, could 1, partial half,
 `skip` rows left out). Computed 2026-11-04 from `features.csv`.
 
-**Feature score: 95 / 100 (83.5 of 88 points). Must-haves: 15 of 15. Shippable for this slice.**
+**Feature score: 95 / 100 (92.5 of 97 points). Must-haves: 15 of 15. Shippable for this slice.**
 
 Partial (counted half): scanning a profile code in the app, and the camera
 spotting one, need the browser's code reader (`BarcodeDetector`), which
@@ -18,6 +18,12 @@ that cannot be lit says "This camera has no flash."
 
 Also partial: saving a snap to the device works for photos; videos can't be
 saved yet.
+
+Gestures are in: swipe sideways between Chat, Camera and Stories (the screen
+follows the finger and snaps over or back), tap through snaps and swipe them
+down to close, tap the sides of a story, hold to pause it, swipe it down to
+close, swipe a chat row right to open the chat, and press and hold a row for
+the friend card (with Remove friend). Escape closes viewers and sheets.
 
 Video snaps are in: hold the shutter to record up to 10 seconds, a caption
 and Mute in the video editor (Mute takes the sound out of the file itself),

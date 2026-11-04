@@ -111,6 +111,7 @@ stored (default `./data`).
 
 | | |
 | --- | --- |
+| Gestures | Swipe sideways between Chat, Camera and Stories (the screen follows your finger, the tab bar stays put). Tap a snap for the next, swipe it down to close. In a story, tap the right half for the next, the left half to go back, press and hold to pause, swipe down to close. Swipe a chat row right to open the chat; press and hold it (or tap the avatar) for the friend card. Escape closes viewers and sheets |
 | Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
 | Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
@@ -124,6 +125,29 @@ stored (default `./data`).
 Not built: group chats, AR lenses, map, discover feed, screenshot alerts.
 Videos can't be drawn on or saved to the device yet. See
 [`replica/parity.md`](replica/parity.md).
+
+## Gestures
+
+All gestures use pointer events, so they work with a finger, a pen or a
+mouse, and each has a button or key that does the same.
+
+- **Swipe between tabs.** Drag sideways on Chat, Camera or Stories and the
+  screen follows, with its neighbour beside it (the screen last drawn for
+  that tab). Let go past a quarter of the width, or flick, and it moves
+  over; otherwise it springs back. Vertical drags are left to the browser,
+  so lists scroll as usual. The shutter, the editor and drawing are never
+  taken over. With reduced motion on, nothing slides: it follows your finger
+  and then is simply there.
+- **Snaps and stories.** Tap to go on; drag down to close, with the list
+  behind showing through. In a story the left half goes back, the right
+  half goes on, and press and hold pauses (the timer and the progress bar
+  stop; holding Space on either half does it from the keyboard). Escape
+  closes either.
+- **Chat rows.** Swipe right to open the chat. Press and hold (or tap the
+  avatar, which is also the keyboard way in) for the friend card: avatar,
+  name, @username, streak, their Puffcode, Send a chat and Remove friend,
+  which asks first. It closes with Close, Escape, a tap above it or a drag
+  down, and focus goes back where it was.
 
 ## Video snaps
 

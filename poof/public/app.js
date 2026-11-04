@@ -22,6 +22,8 @@
     refresh: null, // re-render hook for the current screen on live events
     pendingAdd: null, // a username from a Puffcode or /add/<username> link, opened once logged in
     scan: null, // { timer, busy } while the camera is looking for Puffcodes
+    sheet: null, // the bottom sheet that is open: { layer, sheet, scrim, screen, back }
+    onEscape: null, // what Escape does on this screen (the viewers close)
   };
 
   // ---------- tiny DOM helper ----------
@@ -44,7 +46,12 @@
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   function show(screen) {
+    closeSheet({ restore: false, animate: false });
+    state.onEscape = null;
+    const old = app.firstElementChild;
     app.replaceChildren(screen);
+    // a tab's screen is kept (once out of the page, focus and all) to show beside its neighbour during a swipe
+    if (old && old !== screen && old.dataset.tab) keepPeek(old);
     // the welcome screen is violet edge to edge (status bar too); the rest is dark
     const brand = screen.classList.contains('welcome');
     if (brand) document.documentElement.dataset.chrome = 'brand';
@@ -136,6 +143,427 @@
     return Math.floor(s / 86400) + 'd';
   }
 
+  // ---------- gestures ----------
+  // pointerDrag follows one pointer from down to up. Once it has moved SLOP
+  // px it is a drag along one axis, and `lock` says whether this gesture
+  // takes it; when it doesn't, the browser keeps it (so lists still scroll).
+  // `end` always runs, with the speed at the end for flicks.
+  const SLOP = 10;
+  const FLICK = 0.45; // px per ms: a flick this fast goes over whatever its length
+  const SLIDE_MS = 220; // --slide in styles.css; the fallback for transitionend
+  const LONG_PRESS_MS = 500;
+  const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function pointerDrag(el, hooks) {
+    let g = null;
+    const listen = (on) => {
+      const fn = on ? 'addEventListener' : 'removeEventListener';
+      window[fn]('pointermove', onMove, true);
+      window[fn]('pointerup', onUp, true);
+      window[fn]('pointercancel', onCancel, true);
+    };
+    function onMove(e) {
+      if (!g || e.pointerId !== g.id) return;
+      g.dx = e.clientX - g.x0;
+      g.dy = e.clientY - g.y0;
+      g.samples.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
+      if (g.samples.length > 12) g.samples.shift();
+      if (!g.axis) {
+        if (Math.hypot(g.dx, g.dy) < SLOP) return;
+        g.axis = Math.abs(g.dx) > Math.abs(g.dy) ? 'x' : 'y';
+        g.moved = true;
+        if (!hooks.lock(g)) return;
+        g.dragging = true;
+        try { el.setPointerCapture(g.id); } catch {}
+        document.documentElement.classList.add('dragging');
+        window.getSelection?.()?.removeAllRanges();
+      }
+      if (g.dragging) hooks.move(g);
+    }
+    function finish(e, cancelled) {
+      if (!g || (e && e.pointerId !== g.id)) return;
+      const done = g;
+      g = null;
+      listen(false);
+      document.documentElement.classList.remove('dragging');
+      // speed over the last 100ms; a pointer that stopped before letting go has none
+      const t = e ? e.timeStamp : performance.now();
+      const recent = done.samples.filter((p) => t - p.t <= 100);
+      if (e) recent.push({ x: e.clientX, y: e.clientY, t });
+      const [a, b] = [recent[0], recent[recent.length - 1]];
+      const dt = recent.length > 1 ? Math.max(1, b.t - a.t) : 0;
+      hooks.end(done, { cancelled, vx: dt ? (b.x - a.x) / dt : 0, vy: dt ? (b.y - a.y) / dt : 0 });
+    }
+    const onUp = (e) => finish(e, false);
+    const onCancel = (e) => finish(e, true);
+    el.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (g) finish(null, true); // one whose end never reached us
+      if (hooks.accept && !hooks.accept(e)) return;
+      g = { id: e.pointerId, type: e.pointerType, target: e.target, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0,
+        axis: null, samples: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }] };
+      listen(true);
+      hooks.down?.(g, e);
+    });
+  }
+
+  // After a drag, a hold or a long press, the click the browser sends on
+  // letting go is not a tap. The next press or key clears this.
+  let swallowUntil = 0;
+  const swallowClick = () => { swallowUntil = performance.now() + 600; };
+  window.addEventListener('pointerdown', () => { swallowUntil = 0; }, true);
+  window.addEventListener('keydown', () => { swallowUntil = 0; }, true);
+  window.addEventListener('click', (e) => {
+    if (performance.now() > swallowUntil) return;
+    swallowUntil = 0;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  // Move elements to where `apply` puts them over --slide, then `done`;
+  // straight there with less motion. Returns a function that finishes now.
+  function glide(els, apply, done) {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      els[0].removeEventListener('transitionend', onEnd);
+      els.forEach((el) => el.classList.remove('sliding'));
+      done?.();
+    };
+    const onEnd = (e) => { if (e.target === els[0]) finish(); };
+    if (reduceMotion()) { apply(); finish(); return finish; }
+    els.forEach((el) => el.classList.add('sliding'));
+    void els[0].offsetWidth; // start from where they are now
+    apply();
+    els[0].addEventListener('transitionend', onEnd);
+    setTimeout(finish, SLIDE_MS + 120);
+    return finish;
+  }
+
+  // ---------- swiping between the tabs ----------
+  // Chat | Camera | Stories, the order of the tabs. Drag sideways and the
+  // screen follows the finger with its neighbour beside it; let go past a
+  // quarter of the width, or flick, and it moves over, else it springs back.
+  // The neighbour is the screen last drawn for that tab (or a plain outline
+  // of it), never live: the real one is drawn as it slides in.
+  const TAB_ORDER = ['chat', 'camera', 'stories'];
+  const TAB_TITLES = { chat: 'Chat', camera: 'Camera', stories: 'Stories' };
+  let peeks = {}; // tab -> the screen last drawn for it
+  let sliding = null; // finishes the slide between two tabs that is still running
+
+  function keepPeek(el) {
+    el.inert = true;
+    el.setAttribute('aria-hidden', 'true');
+    el.classList.add('peek');
+    // the camera's picture stays as a still (see freezeFrame); nothing live
+    el.querySelectorAll('video').forEach((v) => { v.srcObject = null; v.remove(); });
+    peeks[el.dataset.tab] = el;
+  }
+
+  function peekFor(tab) {
+    let el = peeks[tab];
+    if (!el) {
+      el = tab === 'camera'
+        ? h('section', { class: 'screen camera' }, h('div', { class: 'shutter-row' }, h('span', { class: 'shutter' })), nav('camera'))
+        : h('section', { class: 'screen' }, header(TAB_TITLES[tab], meButton(), addButton()), h('div', { class: 'scroll' }), nav(tab));
+      el.inert = true;
+      el.setAttribute('aria-hidden', 'true');
+      el.classList.add('peek');
+    }
+    el.classList.remove('sliding', 'leaving');
+    el.style.transform = el.style.opacity = el.style.borderRadius = '';
+    const tabs = navOf(el);
+    if (tabs) tabs.style.transform = tabs.style.visibility = '';
+    return el;
+  }
+
+  // The tab bar stays put while screens slide under it: the moving screen's
+  // own bar is moved back by as much, and the neighbour's is not drawn.
+  const navOf = (el) => el?.querySelector(':scope > .nav') || null;
+  function holdNav(el, x) {
+    const tabs = navOf(el);
+    if (tabs) tabs.style.transform = x ? `translateX(${-x}px)` : '';
+  }
+  function hideNav(el) {
+    const tabs = navOf(el);
+    if (tabs) tabs.style.visibility = 'hidden';
+  }
+
+  // the camera's last frame, kept from the peek to sit under the live picture until it starts
+  function takeStill() {
+    const still = peeks.camera?.querySelector('.still');
+    still?.remove();
+    return still || null;
+  }
+
+  function slideTo(tab, from, x) {
+    const w = app.clientWidth;
+    const dir = x < 0 ? -1 : 1; // the way the screens travel
+    go(tab);
+    const fresh = app.firstElementChild;
+    if (reduceMotion() || !fresh || fresh === from) return;
+    // the old screen slides off as the new one comes in from where its peek was
+    from.classList.add('leaving');
+    from.style.transform = `translateX(${x}px)`;
+    hideNav(from);
+    app.append(from);
+    fresh.style.transform = `translateX(${x - dir * w}px)`;
+    holdNav(fresh, x - dir * w);
+    sliding = glide([fresh, navOf(fresh), from].filter(Boolean), () => {
+      fresh.style.transform = '';
+      holdNav(fresh, 0);
+      from.style.transform = `translateX(${dir * w}px)`;
+    }, () => {
+      if (from.classList.contains('leaving')) { from.classList.remove('leaving'); from.remove(); }
+      sliding = null;
+    });
+  }
+
+  function tabGestures(screen, tab) {
+    screen.dataset.tab = tab;
+    screen.classList.add('tab-screen');
+    const at = TAB_ORDER.indexOf(tab);
+    let press = null;
+    const cancelPress = () => { clearTimeout(press); press = null; };
+
+    function tabMove(g) {
+      const w = app.clientWidth;
+      const side = g.dx < 0 ? TAB_ORDER[at + 1] : TAB_ORDER[at - 1];
+      if (side !== g.side) { // a change of direction brings the other neighbour
+        g.peek?.remove();
+        g.side = side;
+        g.peek = side ? peekFor(side) : null;
+        if (g.peek) { hideNav(g.peek); app.append(g.peek); }
+      }
+      // with nothing that way it gives a little, then stops
+      g.x = side ? g.dx : Math.sign(g.dx) * Math.min(Math.abs(g.dx) * 0.3, 56);
+      screen.style.transform = `translateX(${g.x}px)`;
+      holdNav(screen, g.x);
+      if (g.peek) g.peek.style.transform = `translateX(${g.x + (g.dx < 0 ? w : -w)}px)`;
+    }
+    function tabEnd(g, { cancelled, vx }) {
+      const w = app.clientWidth;
+      const flick = Math.abs(vx) > FLICK;
+      const back = flick && Math.sign(vx) !== Math.sign(g.dx); // flicked the other way
+      if (!cancelled && g.side && !back && (Math.abs(g.dx) > w * 0.25 || flick)) return slideTo(g.side, screen, g.x);
+      const peek = g.peek;
+      glide([screen, navOf(screen), peek].filter(Boolean), () => {
+        screen.style.transform = '';
+        holdNav(screen, 0);
+        if (peek) peek.style.transform = `translateX(${g.dx < 0 ? w : -w}px)`;
+      }, () => peek?.remove());
+      return undefined;
+    }
+    // a chat row dragged right slides over to show Chat behind it; far enough opens the chat
+    function rowMove(g) {
+      const w = g.row.clientWidth;
+      const x = Math.max(0, g.dx);
+      g.row.querySelector('.row-slide').style.transform = `translateX(${x <= w / 2 ? x : w / 2 + (x - w / 2) * 0.3}px)`;
+      g.row.classList.toggle('armed', x > w * 0.3);
+    }
+    function rowEnd(g, { cancelled, vx }) {
+      const row = g.row;
+      if (!cancelled && (g.dx > row.clientWidth * 0.3 || (vx > FLICK && g.dx > 24))) return row.openChat();
+      const slide = row.querySelector('.row-slide');
+      glide([slide], () => { slide.style.transform = ''; }, () => row.classList.remove('swiping', 'armed'));
+      return undefined;
+    }
+
+    pointerDrag(screen, {
+      accept: (e) => !screen.inert && !screen.classList.contains('recording') && !e.target.closest('input, textarea, .shutter'),
+      // press and hold a chat row for the friend card
+      down: (g) => {
+        const row = g.target.closest('.chat-row');
+        if (!row?.openCard) return;
+        press = setTimeout(() => {
+          press = null;
+          g.pressed = true;
+          swallowClick();
+          if (g.type === 'touch') { try { navigator.vibrate?.(10); } catch {} }
+          row.openCard();
+        }, LONG_PRESS_MS);
+      },
+      lock: (g) => {
+        cancelPress();
+        if (g.pressed || g.axis !== 'x') return false;
+        g.row = tab === 'chat' && g.dx > 0 ? g.target.closest('.chat-row') : null;
+        if (g.row) g.row.classList.add('swiping');
+        else { sliding?.(); screen.classList.remove('sliding'); }
+        return true;
+      },
+      move: (g) => (g.row ? rowMove(g) : tabMove(g)),
+      end: (g, fling) => {
+        cancelPress();
+        if (g.pressed) return swallowClick();
+        if (!g.dragging) return undefined;
+        swallowClick();
+        return g.row ? rowEnd(g, fling) : tabEnd(g, fling);
+      },
+    });
+  }
+
+  // ---------- viewer gestures ----------
+  // Snap and story viewers: a tap goes on (their tap buttons do that), and a
+  // drag down follows the finger, the list it came from showing behind;
+  // let go far enough down, or flick, and it closes. Stories also pause
+  // while pressed: the timer and progress bar stop until you let go.
+  const STORY_HOLD_MS = 250; // pressed longer than this is a hold, not a tap
+  function viewerGestures(screen, { from, close, pause, resume, holdToPause = false }) {
+    const status = h('p', { class: 'sr-only', role: 'status' });
+    screen.append(status);
+    let holdTimer = null;
+    let behind = null;
+    const dismiss = () => {
+      if (reduceMotion()) return close();
+      glide([screen], () => {
+        screen.style.transform = `translateY(${screen.clientHeight}px) scale(.6)`;
+        screen.style.opacity = '0';
+      }, close);
+      return undefined;
+    };
+    pointerDrag(screen, {
+      accept: (e) => !e.target.closest('.head button'),
+      down: (g) => {
+        if (!holdToPause) return;
+        g.paused = true;
+        pause();
+        holdTimer = setTimeout(() => { g.held = true; screen.classList.add('held'); status.textContent = 'Paused'; }, STORY_HOLD_MS);
+      },
+      lock: (g) => {
+        clearTimeout(holdTimer);
+        if (g.axis !== 'y' || g.dy < 0) return false;
+        if (!g.paused) { g.paused = true; pause(); }
+        behind = peekFor(from);
+        screen.before(behind);
+        return true;
+      },
+      move: (g) => {
+        const dy = Math.max(0, g.dy);
+        const p = Math.min(1, dy / screen.clientHeight);
+        screen.style.transform = `translateY(${dy}px) scale(${1 - p * 0.25})`;
+        screen.style.borderRadius = Math.round(Math.min(1, p * 4) * 24) + 'px';
+      },
+      end: (g, { cancelled, vy }) => {
+        clearTimeout(holdTimer);
+        screen.classList.remove('held');
+        status.textContent = '';
+        if (g.dragging) {
+          swallowClick();
+          if (!cancelled && (g.dy > screen.clientHeight * 0.2 || (vy > FLICK && g.dy > 24))) return dismiss();
+          const peek = behind;
+          behind = null;
+          glide([screen], () => { screen.style.transform = ''; screen.style.borderRadius = ''; }, () => peek?.remove());
+        } else if (g.held || g.moved) swallowClick(); // a hold, or a slide sideways, is not a tap
+        if (g.paused) resume();
+        return undefined;
+      },
+    });
+    if (!holdToPause) return;
+    // from the keyboard, as on the shutter: hold Space on Previous or Next
+    // to pause; a short press is still a tap (Space clicks on letting go)
+    let key = null;
+    screen.addEventListener('keydown', (e) => {
+      if (e.key !== ' ' || e.repeat || key || !e.target.closest('.tap')) return;
+      pause();
+      key = { held: false };
+      key.timer = setTimeout(() => { key.held = true; screen.classList.add('held'); status.textContent = 'Paused'; }, STORY_HOLD_MS);
+    });
+    screen.addEventListener('keyup', (e) => {
+      if (e.key !== ' ' || !key) return;
+      clearTimeout(key.timer);
+      if (key.held) {
+        swallowClick();
+        screen.classList.remove('held');
+        status.textContent = '';
+      }
+      key = null;
+      resume();
+    });
+  }
+
+  // A countdown that can pause: onTick(0..1) each frame, then onDone.
+  function countdown(ms, onTick, onDone) {
+    let spent = 0;
+    let from = null;
+    let timer = null;
+    let raf = null;
+    let over = false;
+    const frame = () => { onTick(Math.min(1, (spent + performance.now() - from) / ms)); raf = requestAnimationFrame(frame); };
+    const halt = () => { clearTimeout(timer); cancelAnimationFrame(raf); };
+    const c = {
+      resume() {
+        if (over || from != null) return;
+        from = performance.now();
+        timer = setTimeout(() => { c.stop(); onTick(1); onDone(); }, ms - spent);
+        frame();
+      },
+      pause() {
+        if (from == null) return;
+        spent += performance.now() - from;
+        from = null;
+        halt();
+        onTick(Math.min(1, spent / ms));
+      },
+      stop() { over = true; from = null; halt(); },
+    };
+    c.resume();
+    return c;
+  }
+
+  // ---------- bottom sheets ----------
+  // A card that rises from the bottom; the screen behind goes inert. It
+  // closes with Close, Escape, a tap above it or a drag down on its top,
+  // and focus goes back to what opened it (`back` finds that).
+  function openSheet({ labelledby, head, body, back }) {
+    closeSheet({ restore: false, animate: false });
+    const screen = app.firstElementChild;
+    const top = h('div', { class: 'sheet-head' }, h('span', { class: 'grab', 'aria-hidden': 'true' }), head,
+      h('button', { class: 'icon-btn plain sheet-close', type: 'button', 'aria-label': 'Close', onclick: () => closeSheet() }, icon('close')));
+    const sheet = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': labelledby, tabindex: '-1' },
+      top, h('div', { class: 'sheet-body' }, body));
+    const scrim = h('div', { class: 'scrim', onclick: () => closeSheet() });
+    const layer = h('div', { class: 'sheet-layer' }, scrim, sheet);
+    if (screen) screen.inert = true;
+    app.append(layer);
+    state.sheet = { layer, sheet, scrim, screen, back };
+    pointerDrag(top, {
+      lock: (g) => g.axis === 'y' && g.dy > 0,
+      move: (g) => { sheet.style.transform = `translateY(${Math.max(0, g.dy)}px)`; },
+      end: (g, { cancelled, vy }) => {
+        if (!g.dragging) return;
+        swallowClick();
+        if (!cancelled && (g.dy > sheet.offsetHeight * 0.3 || (vy > FLICK && g.dy > 24))) closeSheet();
+        else glide([sheet], () => { sheet.style.transform = ''; });
+      },
+    });
+    sheet.focus();
+    return sheet;
+  }
+
+  function closeSheet({ restore = true, animate = true } = {}) {
+    const s = state.sheet;
+    if (!s) return;
+    state.sheet = null;
+    if (s.screen) s.screen.inert = false;
+    if (restore) s.back?.()?.focus();
+    if (!animate || reduceMotion() || !s.layer.isConnected) { s.layer.remove(); return; }
+    s.layer.inert = true;
+    glide([s.sheet, s.scrim], () => {
+      s.sheet.style.transform = 'translateY(100%)';
+      s.scrim.style.opacity = '0';
+    }, () => s.layer.remove());
+  }
+
+  // Escape closes the sheet that is open, else the viewer on screen
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const close = state.sheet ? () => closeSheet() : state.onEscape;
+    if (!close) return;
+    e.preventDefault();
+    close();
+  });
+
   // ---------- welcome, log in, sign up (S01) ----------
   function renderWelcome() {
     stopCamera();
@@ -152,6 +580,7 @@
       h('div', { class: 'actions' },
         h('button', { class: 'btn block on-brand-quiet', type: 'button', onclick: renderLogin }, 'Log in'),
         h('button', { class: 'btn block on-brand', type: 'button', onclick: () => renderSignup(1, {}) }, 'Sign up'))));
+    peeks = {}; // nor are their screens, kept for swipes (show() just kept the last one)
   }
 
   // One screen of the log in / sign up flow: back arrow, optional step count,
@@ -348,7 +777,7 @@
     state.tab = tab;
     state.refresh = null;
     if (tab !== 'camera') stopCamera();
-    if (tab === 'camera') renderCamera();
+    if (tab === 'camera') renderCamera(undefined, takeStill());
     else if (tab === 'chat') renderInbox();
     else if (tab === 'stories') renderStories();
     else if (tab === 'friends') renderFriends();
@@ -370,8 +799,24 @@
   function stopCamera() {
     stopScan();
     abortRecording();
+    freezeFrame();
     if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
+  }
+
+  // As the camera stops, its picture is left as a still in its place, so a
+  // swipe away slides the picture off (not a black screen), and a swipe back
+  // shows it until the camera is live again.
+  function freezeFrame() {
+    if (!state.stream) return;
+    const v = [...app.querySelectorAll('.camera video')].find((x) => x.srcObject === state.stream);
+    if (!v || !v.videoWidth || v.readyState < 2) return;
+    const scale = Math.min(1, 720 / Math.max(v.videoWidth, v.videoHeight));
+    const still = h('canvas', { class: 'still' + (v.classList.contains('mirror') ? ' mirror' : ''), 'aria-hidden': 'true' });
+    still.width = Math.round(v.videoWidth * scale);
+    still.height = Math.round(v.videoHeight * scale);
+    try { still.getContext('2d').drawImage(v, 0, 0, still.width, still.height); } catch { return; }
+    v.replaceWith(still);
   }
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -442,8 +887,10 @@
 
   // `focus` names a control to keep focus on after the screen is redrawn
   // (Flip camera redraws it), so keyboard users stay where they were.
-  async function renderCamera(focus) {
+  // `still` is the camera's last frame, shown under the picture until it is live.
+  async function renderCamera(focus, still = null) {
     const video = h('video', { autoplay: true, playsInline: true, muted: true, class: state.facing === 'user' ? 'mirror' : '' });
+    if (still) video.addEventListener('playing', () => still.remove(), { once: true });
     const msg = h('div', { class: 'cam-msg', hidden: true });
     const viewfinder = h('div', { class: 'viewfinder' });
     const flip = (from) => {
@@ -481,7 +928,7 @@
     // top left: you and search; top right, a column: add friends, then the
     // camera's own switches. The shutter is the one big thing, low and central.
     const screen = h('section', { class: 'screen camera', 'aria-label': 'Camera' },
-      video, msg, viewfinder,
+      still, video, msg, viewfinder,
       h('header', { class: 'bar overlay cam-bar' },
         h('h1', { class: 'sr-only' }, 'Camera'),
         meButton(),
@@ -497,9 +944,11 @@
       recordable && h('p', { id: 'shutter-hint', class: 'sr-only' }, 'Hold to record a video.'), recStatus,
       file, nav('camera'));
     holdToRecord(shutter, video, screen, recStatus);
+    tabGestures(screen, 'camera');
     show(screen);
     if (focus) screen.querySelector(`[aria-label="${focus}"]`)?.focus();
     if (!navigator.mediaDevices?.getUserMedia) {
+      still?.remove();
       msg.hidden = false;
       msg.textContent = 'This browser cannot open the camera. Use the photo button to pick one instead.';
       return;
@@ -512,6 +961,7 @@
       if (state.tab !== 'camera' || !video.isConnected) return stopCamera();
       video.srcObject = state.stream;
     } catch {
+      still?.remove();
       msg.hidden = false;
       msg.textContent = 'Camera is blocked. Allow camera access in your browser settings, or use the photo button.';
       return undefined;
@@ -1181,9 +1631,43 @@
     'tap-to-chat': ['chat-c', 'outline', 'Tap to chat'],
   };
 
+  // A row per friend: their avatar opens their friend card (so does pressing
+  // and holding the row), the row opens new snaps or the chat, and swiping
+  // the row right opens the chat too.
+  function inboxRow(r) {
+    const [color, shape, label] = STATUS[r.status];
+    const f = r.friend;
+    const find = (sel) => () => app.querySelector(`.chat-row[data-friend="${CSS.escape(f.id)}"] ${sel}`);
+    const chat = () => renderChat(f);
+    const row = h('div', { class: 'chat-row', 'data-friend': f.id },
+      h('div', { class: 'row-reveal', 'aria-hidden': 'true' }, icon('chat'), 'Chat'),
+      h('div', { class: 'row-slide' },
+        h('button', { class: 'row-avatar', type: 'button', 'aria-label': `${f.displayName}'s friend card`,
+          onclick: () => openFriendCard(f, r.streak, find('.row-avatar')) }, avatar(f)),
+        h('button', { class: 'row', type: 'button', onclick: () => (r.snapIds.length ? openSnaps(f, r.snapIds) : chat()),
+          'aria-label': `${f.displayName}, ${label}` },
+        h('span', { class: 'main' },
+          h('div', { class: 'name' }, f.displayName),
+          h('div', { class: 'sub ' + color }, h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
+            h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
+            r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null)),
+        r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null),
+        h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Chat with ' + f.displayName, onclick: chat }, icon('chat'))));
+    row.openChat = chat;
+    row.openCard = () => openFriendCard(f, r.streak, find('.row'));
+    // a right click, the menu key or Shift+F10 opens the card too
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openFriendCard(f, r.streak, find(e.target.closest('.row-avatar') ? '.row-avatar' : '.row'));
+    });
+    return row;
+  }
+
   async function renderInbox() {
     const list = h('div', { class: 'scroll' }, h('p', { class: 'hint' }, 'Loading…'));
-    show(h('section', { class: 'screen', 'aria-label': 'Chats' }, header('Chat', meButton(), addButton()), list, nav('chat')));
+    const screen = h('section', { class: 'screen', 'aria-label': 'Chats' }, header('Chat', meButton(), addButton()), list, nav('chat'));
+    tabGestures(screen, 'chat');
+    show(screen);
     const load = async () => {
       let rows;
       try { rows = await api('/api/inbox'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
@@ -1195,29 +1679,73 @@
           h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn small', onclick: () => go('friends') }, 'Add friends'))));
         return;
       }
-      list.replaceChildren(...rows.map((r) => {
-        const [color, shape, label] = STATUS[r.status];
-        return h('div', { style: 'display:flex;align-items:center' },
-          h('button', { class: 'row', onclick: () => (r.snapIds.length ? openSnaps(r.friend, r.snapIds) : renderChat(r.friend)),
-            'aria-label': `${r.friend.displayName}, ${label}` },
-          avatar(r.friend),
-          h('span', { class: 'main' },
-            h('div', { class: 'name' }, r.friend.displayName),
-            h('div', { class: 'sub ' + color }, h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
-              h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
-              r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null)),
-          r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null),
-          h('button', { class: 'icon-btn plain', style: 'margin-left:8px', 'aria-label': 'Chat with ' + r.friend.displayName,
-            onclick: () => renderChat(r.friend) }, icon('chat')));
-      }));
+      list.replaceChildren(...rows.map(inboxRow));
     };
     state.refresh = load;
     await load();
   }
 
+  // ---------- friend card (S16) ----------
+  // Press and hold a chat row, or tap the friend's avatar: who they are,
+  // your streak, their Puffcode, and Send a chat. Remove friend asks first.
+  function openFriendCard(friend, streak, back) {
+    if (state.sheet) return;
+    const name = friend.displayName;
+    const actions = h('div', { class: 'card-actions' });
+    const showActions = () => actions.replaceChildren(
+      h('button', { class: 'btn block', type: 'button', onclick: () => { closeSheet({ restore: false }); renderChat(friend); } },
+        icon('chat', 20), 'Send a chat'),
+      h('button', { class: 'btn danger block', type: 'button', onclick: askRemove }, 'Remove friend'));
+    function askRemove() {
+      const cancel = h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+        showActions();
+        actions.querySelector('.danger')?.focus();
+      } }, 'Cancel');
+      actions.replaceChildren(
+        h('div', { class: 'card-confirm' }, h('strong', {}, `Remove ${name}?`),
+          h('p', {}, `You won't be able to snap or chat with ${name} until you're friends again.`)),
+        h('div', { class: 'card-confirm-actions' }, cancel,
+          h('button', { class: 'btn danger outline', type: 'button', onclick: remove }, 'Remove')));
+      cancel.focus(); // the safe choice
+    }
+    async function remove(e) {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await api('/api/friends/remove', { userId: friend.id });
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        return;
+      }
+      closeSheet({ restore: false });
+      toast(`Removed ${name}`);
+      await state.refresh?.();
+      app.querySelector('.chat-row .row, .scroll .btn')?.focus();
+    }
+
+    const head = h('div', { class: 'card-top' }, avatar(friend, '', 64),
+      h('div', { class: 'card-who' },
+        h('h2', { id: 'card-name', class: 'card-name' }, name),
+        h('p', { class: 'card-user' }, '@' + friend.username),
+        h('p', { class: 'card-streak' }, streak > 1 ? `${streak}-day streak` : 'No streak yet')));
+    const body = [];
+    if (window.PoofPuffcode) {
+      const code = h('div', { class: 'puffcode card-code' });
+      // built from a checked username, avatar integers and the code's own modules
+      code.innerHTML = window.PoofPuffcode.svg({ url: window.PoofPuffcode.url(friend.username, location.origin),
+        username: friend.username, avatar: friend.avatar, size: 184 });
+      body.push(code, h('p', { class: 'hint' }, `Friends can scan this to add @${friend.username}.`));
+    }
+    body.push(actions);
+    showActions();
+    openSheet({ labelledby: 'card-name', head, body, back });
+  }
+
   // ---------- snap viewer (S06) ----------
   // A photo shows for its timer; a video plays once with its caption over it,
-  // the ring following along, and moves on when it ends. Tap for the next.
+  // the ring following along, and moves on when it ends. Tap for the next;
+  // swipe down (or Escape) to close. Dragging pauses the timer.
   async function openSnaps(friend, ids) {
     state.refresh = null;
     const queue = [...ids];
@@ -1235,11 +1763,16 @@
     bar.setAttribute('transform', 'rotate(-90 18 18)');
     bar.style.strokeDasharray = String(2 * Math.PI * 15);
     svg.append(track, bar);
-    let timer = null;
+    let clock = null; // a photo's countdown
     let raf = null;
     let viewed = 0;
     let clip = null; // the video on screen: { el, url }
-    const stopClip = () => {
+    let paused = false; // while being dragged
+    let closed = false;
+    const stopMedia = () => {
+      clock?.stop();
+      clock = null;
+      cancelAnimationFrame(raf);
       if (!clip) return;
       clip.el.pause();
       URL.revokeObjectURL(clip.url);
@@ -1247,17 +1780,26 @@
     };
     const ring = (p) => { bar.style.strokeDashoffset = String(p * 2 * Math.PI * 15); };
     const close = () => {
-      clearTimeout(timer); cancelAnimationFrame(raf); stopClip(); go('chat');
+      if (closed) return;
+      closed = true;
+      stopMedia();
+      go('chat');
       if (viewed) puffPop('Poof! Gone for good', 'wow');
     };
+    const pause = () => { paused = true; clock?.pause(); clip?.el.pause(); };
+    const resume = () => { paused = false; clock?.resume(); if (clip) playClip(clip.el); };
     const next = async () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(raf);
-      stopClip();
+      if (closed) return undefined;
+      stopMedia();
       const id = queue.shift();
       if (!id) return close();
       let snap;
-      try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) { puffPop(e.message, 'sad'); return next(); }
+      try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) {
+        if (closed) return undefined;
+        puffPop(e.message, 'sad');
+        return next();
+      }
+      if (closed) return undefined; // closed while it was on its way
       viewed++;
       caption.textContent = snap.caption || '';
       caption.hidden = !snap.caption;
@@ -1277,28 +1819,24 @@
         v.addEventListener('error', () => { if (clip?.el === v) toast('This video could not play. Tap to go on.'); });
         ring(0);
         tick();
-        playClip(v);
+        if (!paused) playClip(v);
         return undefined;
       }
-      media.replaceChildren(h('img', { alt: 'Snap from ' + friend.displayName, src: snap.image }));
+      media.replaceChildren(h('img', { alt: 'Snap from ' + friend.displayName, src: snap.image, draggable: 'false' }));
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
       if (snap.duration) {
-        const startAt = performance.now();
-        const total = snap.duration * 1000;
-        const tick = () => {
-          const p = Math.min(1, (performance.now() - startAt) / total);
-          ring(p);
-          if (p < 1) raf = requestAnimationFrame(tick);
-        };
-        tick();
-        timer = setTimeout(next, total);
+        clock = countdown(snap.duration * 1000, ring, next);
+        if (paused) clock.pause();
       }
       return undefined;
     };
-    show(h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, media, caption,
-      h('button', { class: 'tap', 'aria-label': 'Next', onclick: next }),
+    const screen = h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, media, caption,
+      h('button', { class: 'tap', type: 'button', 'aria-label': 'Next', onclick: next }),
       h('div', { class: 'head' }, avatar(friend), h('span', { class: 'who' }, friend.displayName), svg,
-        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, icon('close')))));
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: close }, icon('close'))));
+    viewerGestures(screen, { from: 'chat', close, pause, resume });
+    show(screen);
+    state.onEscape = close;
     next();
   }
 
@@ -1340,7 +1878,9 @@
   // ---------- stories (S08) ----------
   async function renderStories() {
     const list = h('div', { class: 'scroll' }, h('p', { class: 'hint' }, 'Loading…'));
-    show(h('section', { class: 'screen', 'aria-label': 'Stories' }, header('Stories', meButton(), addButton()), list, nav('stories')));
+    const screen = h('section', { class: 'screen', 'aria-label': 'Stories' }, header('Stories', meButton(), addButton()), list, nav('stories'));
+    tabGestures(screen, 'stories');
+    show(screen);
     const load = async () => {
       let data;
       try { data = await api('/api/stories'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
@@ -1365,25 +1905,40 @@
     await load();
   }
 
+  // Tap the right half for the next story, the left half for the one
+  // before; press and hold to pause; swipe down (or Escape) to close.
   function watch(groups, gi, mine = false) {
     state.refresh = null;
     let si = groups[gi].stories.findIndex((s) => !s.seen);
     if (si < 0 || mine) si = 0;
-    let timer = null;
+    let clock = null; // a photo story's countdown
     let raf = null;
     let clip = null; // the video story on screen
+    let paused = false; // held, or being dragged
+    let closed = false;
     const media = h('div', { class: 'media' });
     const caption = h('p', { class: 'media-caption', hidden: true });
     const progress = h('div', { class: 'progress' });
     const who = h('span', { class: 'who' });
     const sub = h('span', { class: 'sub', style: 'font-size:.8rem;opacity:.8' });
     const av = h('span');
-    const stopClip = () => { clip?.pause(); clip = null; };
-    const close = () => { clearTimeout(timer); cancelAnimationFrame(raf); stopClip(); go('stories'); };
-    function play() {
-      clearTimeout(timer);
+    const stopMedia = () => {
+      clock?.stop();
+      clock = null;
       cancelAnimationFrame(raf);
-      stopClip();
+      clip?.pause();
+      clip = null;
+    };
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      stopMedia();
+      go('stories');
+    };
+    const pause = () => { paused = true; clock?.pause(); clip?.pause(); };
+    const resume = () => { paused = false; clock?.resume(); if (clip) playClip(clip); };
+    function play() {
+      stopMedia();
       const g = groups[gi];
       const s = g.stories[si];
       const src = `/api/stories/${s.id}/media`;
@@ -1410,21 +1965,16 @@
         v.addEventListener('playing', () => { if (clip !== v) return; cancelAnimationFrame(raf); tick(); });
         v.addEventListener('ended', () => { if (clip === v) step(1); });
         v.addEventListener('error', () => { if (clip === v) toast('This video could not play. Tap to go on.'); });
-        playClip(v);
+        if (!paused) playClip(v);
         return;
       }
-      const img = h('img', { alt: label });
+      const img = h('img', { alt: label, draggable: 'false' });
       const total = (s.duration || 5) * 1000;
-      const tick = (startAt) => {
-        const p = Math.min(1, (performance.now() - startAt) / total);
-        fill.style.width = p * 100 + '%';
-        if (p < 1) raf = requestAnimationFrame(() => tick(startAt));
-      };
       // a photo that finishes loading after you've tapped on is no longer shown: leave it be
       img.onload = () => {
-        if (!img.isConnected) return;
-        tick(performance.now());
-        timer = setTimeout(step.bind(null, 1), total);
+        if (!img.isConnected || closed) return;
+        clock = countdown(total, (p) => { fill.style.width = p * 100 + '%'; }, () => step(1));
+        if (paused) clock.pause();
       };
       img.src = src;
       media.replaceChildren(img);
@@ -1438,12 +1988,15 @@
       }
       play();
     }
-    show(h('section', { class: 'screen viewer', 'aria-label': 'Story' }, media, caption, progress,
-      h('button', { class: 'tap', style: 'right:66%', 'aria-label': 'Previous', onclick: () => step(-1) }),
-      h('button', { class: 'tap', style: 'left:34%', 'aria-label': 'Next', onclick: () => step(1) }),
+    const screen = h('section', { class: 'screen viewer', 'aria-label': 'Story' }, media, caption, progress,
+      h('button', { class: 'tap prev', type: 'button', 'aria-label': 'Previous', onclick: () => step(-1) }),
+      h('button', { class: 'tap next', type: 'button', 'aria-label': 'Next', onclick: () => step(1) }),
       h('div', { class: 'head', style: 'top:12px' }, av,
         h('span', { class: 'who', style: 'display:flex;flex-direction:column' }, who, sub),
-        h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, icon('close')))));
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: close }, icon('close'))));
+    viewerGestures(screen, { from: 'stories', close, pause, resume, holdToPause: true });
+    show(screen);
+    state.onEscape = close;
     play();
   }
 

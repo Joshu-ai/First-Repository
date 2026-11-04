@@ -115,6 +115,26 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     const c = document.querySelector('.shutter-ring .arc');
     return c && c.style.strokeDashoffset !== '' && 100 - parseFloat(c.style.strokeDashoffset) >= min;
   }, atLeast);
+  // gestures: a mouse drag from one point to another over about `ms`, in
+  // even steps (its speed is what makes a flick or not); `mid` runs halfway
+  const drag = async (page, [x0, y0], [x1, y1], { ms = 240, steps = 12, mid } = {}) => {
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    for (let i = 1; i <= steps; i++) {
+      await page.mouse.move(x0 + ((x1 - x0) * i) / steps, y0 + ((y1 - y0) * i) / steps);
+      if (mid && i === Math.ceil(steps / 2)) await mid();
+      await page.waitForTimeout(ms / steps);
+    }
+    await page.mouse.up();
+  };
+  // the tab the screen in front says it is on
+  const currentTab = (page) => page.evaluate(() =>
+    document.querySelector('#app > .screen:not(.peek) .nav [aria-current="page"]')?.getAttribute('aria-label'));
+  // nothing left over from a swipe: no neighbour peeking in, nothing moved
+  const swipeSettled = (page) => page.waitForFunction(() =>
+    !document.querySelector('#app > .peek') && [...document.querySelectorAll('#app > .screen')].every((s) => !s.style.transform));
+  // a story's progress bar, 0..100
+  const storyBar = (page, i) => page.evaluate((n) => parseFloat(document.querySelectorAll('.viewer .progress i')[n]?.style.width) || 0, i);
 
   // Controls show Poof's drawn icons (public/icons.js), never emoji or text
   // glyphs. `expected` maps a button's accessible name to its icon name.
@@ -484,10 +504,116 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await checkIcons(ava, 'inbox', { 'Chat with Ben': 'chat', 'Add friends': 'puff-plus' });
     await shot(ava, 'S05-inbox-sender');
 
+    // S16 press and hold Ben's row: his friend card rises from the bottom,
+    // and letting go does not also open the row
+    const benRow = ava.getByRole('button', { name: 'Ben, Delivered' });
+    const rowBox = await benRow.boundingBox();
+    await ava.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+    await ava.mouse.down();
+    const card = ava.getByRole('dialog', { name: 'Ben' });
+    await card.waitFor();
+    await ava.mouse.up();
+    assert.equal(await ava.locator('section.screen[aria-label="Chat with Ben"]').count(), 0, 'a long press does not open the chat');
+    assert.equal(await ava.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]'))), true, 'focus moves into the card');
+    await card.getByRole('heading', { name: 'Ben' }).waitFor();
+    await card.getByText('@ben', { exact: true }).waitFor();
+    await card.getByText('No streak yet').waitFor();
+    await card.getByRole('img', { name: 'Puffcode for @ben' }).waitFor();
+    await checkPlaceholder(card.locator('.card-top .avatar'), 'Ben on his friend card', 64);
+    for (const name of ['Send a chat', 'Remove friend', 'Close']) {
+      const b = await card.getByRole('button', { name, exact: true }).boundingBox();
+      assert.ok(b.width >= 44 && b.height >= 44, `${name} is easy to tap`);
+    }
+    await checkIcons(ava, 'friend card', { Close: 'close', 'Send a chat': 'chat' });
+    await ava.locator('.sheet').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    await ava.locator('.puff-pop').waitFor({ state: 'detached' }); // "Poof! Sent" can still be fading out
+    const sheetBox = await ava.locator('.sheet').boundingBox();
+    assert.ok(Math.abs(sheetBox.y + sheetBox.height - viewport.height) <= 1 && sheetBox.width === viewport.width,
+      'a full-width sheet on the bottom edge');
+    await shot(ava, 'S16-friend-card');
+    // Remove friend asks first, with the safe choice focused; Cancel keeps him
+    await card.getByRole('button', { name: 'Remove friend' }).click();
+    await card.getByText('Remove Ben?').waitFor();
+    assert.equal(await ava.evaluate(() => document.activeElement?.textContent), 'Cancel');
+    await shot(ava, 'S16-friend-card-remove');
+    await card.getByRole('button', { name: 'Cancel' }).click();
+    await card.getByRole('button', { name: 'Remove friend' }).waitFor();
+    // Escape closes it and focus goes back to the row
+    await ava.keyboard.press('Escape');
+    await card.waitFor({ state: 'detached' });
+    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Ben, Delivered');
+    // from the keyboard: Ben's avatar is a button that opens the card; Close shuts it
+    await ava.getByRole('button', { name: "Ben's friend card" }).focus();
+    await ava.keyboard.press('Enter');
+    await card.waitFor();
+    await card.getByRole('button', { name: 'Close' }).click();
+    await card.waitFor({ state: 'detached' });
+    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), "Ben's friend card");
+    // and a tap above the card closes it
+    await ava.getByRole('button', { name: "Ben's friend card" }).click();
+    await card.waitFor();
+    await ava.mouse.click(viewport.width / 2, 40);
+    await card.waitFor({ state: 'detached' });
+
+    // swipe Ben's row right: Chat shows behind it, and his chat opens
+    const slideBox = await benRow.boundingBox();
+    const rowY = slideBox.y + slideBox.height / 2;
+    await drag(ava, [slideBox.x + 10, rowY], [slideBox.x + 230, rowY], { mid: () => shot(ava, 'S05-swipe-row-to-chat') });
+    await ava.locator('section.screen[aria-label="Chat with Ben"]').waitFor();
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+
+    // S02 swipe between the tabs, Chat | Camera | Stories: the screen follows
+    // the pointer with its neighbour beside it. Chat -> Camera, first with
+    // reduced motion: it follows the pointer, then simply is there (no slide)
+    await ava.emulateMedia({ reducedMotion: 'reduce' });
+    await ava.evaluate(() => {
+      window.slid = false;
+      new MutationObserver((ms) => {
+        if (ms.some((m) => m.target.classList?.contains('sliding') || [...m.addedNodes].some((n) => n.classList?.contains('leaving')))) window.slid = true;
+      }).observe(document.getElementById('app'), { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    });
+    await drag(ava, [320, 520], [60, 520]);
+    await camVideo(ava, true);
+    assert.equal(await currentTab(ava), 'Camera');
+    assert.equal(await ava.evaluate(() => window.slid), false, 'no slide with reduced motion');
+    assert.equal(await ava.locator('#app > .screen').count(), 1, 'nothing left beside it');
+    await ava.emulateMedia({ reducedMotion: 'no-preference' });
+    // a short, slow drag springs back
+    await drag(ava, [100, 420], [160, 420], { ms: 500 });
+    await swipeSettled(ava);
+    assert.equal(await currentTab(ava), 'Camera', 'a short drag stays put');
+    // a quick flick goes over even when short: Camera -> Stories
+    await drag(ava, [300, 420], [230, 420], { ms: 30, steps: 3 });
+    await ava.getByRole('heading', { name: 'Stories' }).waitFor();
+    // nothing is right of Stories: dragging that way gives a little, then springs back
+    await drag(ava, [300, 520], [60, 520]);
+    await swipeSettled(ava);
+    assert.equal(await currentTab(ava), 'Stories');
+    // Stories -> Camera, then Camera -> Chat (the picture slides off as Chat comes in)
+    await drag(ava, [60, 520], [320, 520]);
+    await camVideo(ava, true);
+    let midSwipe;
+    await drag(ava, [60, 420], [320, 420], { mid: async () => {
+      await shot(ava, 'S02-swipe-to-chat');
+      midSwipe = await ava.evaluate(() => {
+        const [front, peek] = document.querySelectorAll('#app > .screen');
+        return { moved: front.getBoundingClientRect().x, navX: front.querySelector(':scope > .nav').getBoundingClientRect().x,
+          peekX: peek?.getBoundingClientRect().x, peekTab: peek && getComputedStyle(peek.querySelector(':scope > .nav')).visibility };
+      });
+    } });
+    assert.ok(midSwipe.moved > 60 && Math.abs(midSwipe.peekX - (midSwipe.moved - viewport.width)) <= 1,
+      `mid-swipe the camera has moved right with Chat beside it (${JSON.stringify(midSwipe)})`);
+    assert.ok(Math.abs(midSwipe.navX) <= 1 && midSwipe.peekTab === 'hidden', 'and the tab bar stays put');
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+    assert.equal(await currentTab(ava), 'Chat');
+    await swipeSettled(ava);
+    assert.equal(await ava.locator('#app > .leaving').count(), 0, 'the camera screen has slid away');
+
     // S05 Ben sees a new snap live, S06 opens it once
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByText('New snap', { exact: true }).waitFor();
-    assert.equal(await ben.getByRole('button', { name: /Ava, New snap/ }).locator('.avatar.has-art').count(), 1, 'Ben sees Ava\'s avatar art');
+    assert.equal(await ben.getByRole('button', { name: "Ava's friend card" }).locator('.avatar.has-art').count(), 1, 'Ben sees Ava\'s avatar art');
     await ben.locator('.puff-pop').waitFor({ state: 'detached' }); // "You are now friends" can still be fading out
     await shot(ben, 'S05-inbox');
     await ben.getByRole('button', { name: /Ava, New snap/ }).click();
@@ -496,7 +622,12 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await checkIcons(ben, 'snap viewer', { Close: 'close' });
     await shot(ben, 'S06-snap-viewer');
-    await ben.getByRole('button', { name: 'Next' }).click(); // tap to close
+    // a short, slow drag down follows the pointer, then springs back: the
+    // snap stays open, and letting go is not a tap
+    await drag(ben, [195, 300], [195, 380], { ms: 500 });
+    await swipeSettled(ben);
+    assert.ok(await img.isVisible(), 'the snap is still open');
+    await ben.getByRole('button', { name: 'Next' }).click(); // tap: on to the next, and after the last it closes
     await ben.getByText('Received').waitFor();
     await ava.getByText('Opened', { exact: true }).waitFor(); // live update to the sender
 
@@ -641,6 +772,34 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await checkIcons(ben, 'story viewer', { Close: 'close' });
     await shot(ben, 'S08-story-viewer');
+    // press and hold: the photo's timer and its bar stop until you let go,
+    // and letting go of a hold is not a tap
+    await ben.mouse.move(300, 450);
+    await ben.mouse.down();
+    await ben.locator('.viewer.held').waitFor();
+    assert.equal(await ben.locator('.viewer [role="status"]').textContent(), 'Paused');
+    const heldAt = await storyBar(ben, 0);
+    await ben.waitForTimeout(600);
+    assert.equal(await storyBar(ben, 0), heldAt, 'the bar stands still while held');
+    await ben.mouse.up();
+    await ben.waitForFunction((w) => parseFloat(document.querySelectorAll('.viewer .progress i')[0].style.width) > w, heldAt);
+    assert.equal(await ben.locator('.viewer.held').count(), 0);
+    assert.equal(await storyBar(ben, 1), 0, 'still on the first story');
+    assert.ok(await ben.getByRole('img', { name: 'Story from Ava' }).isVisible());
+    // from the keyboard: hold Space on Next to pause; letting go is not a tap either
+    await ben.getByRole('button', { name: 'Next', exact: true }).focus();
+    await ben.keyboard.down(' ');
+    await ben.locator('.viewer.held').waitFor();
+    const keyHeldAt = await storyBar(ben, 0);
+    await ben.waitForTimeout(500);
+    assert.equal(await storyBar(ben, 0), keyHeldAt, 'the bar stands still while Space is held');
+    await ben.keyboard.up(' ');
+    await ben.waitForFunction((w) => parseFloat(document.querySelectorAll('.viewer .progress i')[0].style.width) > w, keyHeldAt);
+    assert.equal(await storyBar(ben, 1), 0, 'still on the first story after letting go of Space');
+    // each half of the screen is a tap target: left goes back, right goes on
+    const [prevBox, nextBox] = await Promise.all(['Previous', 'Next'].map((name) => ben.getByRole('button', { name, exact: true }).boundingBox()));
+    assert.ok(Math.abs(prevBox.width - viewport.width / 2) <= 1 && prevBox.x === 0 && Math.abs(nextBox.x - viewport.width / 2) <= 1
+      && prevBox.height === viewport.height, 'the story is split into two tap halves');
     // Ava's next story is her video: it plays with its caption, and when it
     // ends the viewer moves on by itself (it was her last, so it closes)
     await ben.getByRole('button', { name: 'Next' }).click();
@@ -650,6 +809,23 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.waitForFunction(() => parseFloat(document.querySelectorAll('.progress i')[1]?.style.width) > 0, null,
       { polling: 50 }); // its bar follows the video
     await ben.getByRole('heading', { name: 'Stories' }).waitFor();
+    // again: the right half goes on to her video, the left half back to her photo, and Escape closes
+    await ben.locator('.scroll .row').nth(1).click();
+    await ben.getByRole('img', { name: 'Story from Ava' }).waitFor();
+    await ben.getByRole('button', { name: 'Next' }).click();
+    await ben.locator('.viewer video').waitFor();
+    await ben.getByRole('button', { name: 'Previous' }).click();
+    await ben.getByRole('img', { name: 'Story from Ava' }).waitFor();
+    assert.equal(await ben.locator('.viewer video').count(), 0, 'back on the photo');
+    assert.equal(await storyBar(ben, 1), 0);
+    await ben.keyboard.press('Escape');
+    await ben.getByRole('heading', { name: 'Stories' }).waitFor();
+    // and swipe down: the story shrinks away with the list behind it, and closes
+    await ben.locator('.scroll .row').nth(1).click();
+    await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
+    await drag(ben, [195, 250], [195, 640], { mid: () => shot(ben, 'S08-story-swipe-down') });
+    await ben.getByRole('heading', { name: 'Stories' }).waitFor();
+    await swipeSettled(ben);
     await ava.getByRole('button', { name: 'Back' }).click();
     await ava.getByRole('button', { name: 'Stories', exact: true }).click();
     await ava.getByText(/1 viewers/).waitFor();
@@ -797,6 +973,38 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await cal.getByText('This is your own Puffcode.').waitFor();
     await cal.getByRole('button', { name: 'Go to your profile' }).click();
     await cal.getByRole('img', { name: 'Puffcode for @cal' }).waitFor();
+
+    // S06 Ben snaps Ava again; she swipes it down to close it
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+    const avaId = await ava.evaluate(() => fetch('/api/me').then((r) => r.json()).then((u) => u.id));
+    await ben.evaluate(async (to) => {
+      const c = document.createElement('canvas');
+      c.width = 270;
+      c.height = 480;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#3db4ff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      const r = await fetch('/api/snaps', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: [to], image: c.toDataURL('image/png'), duration: 10 }) });
+      if (!r.ok) throw new Error('could not send the snap: ' + r.status);
+    }, avaId);
+    await ava.getByRole('button', { name: /Ben, New snap/ }).click();
+    await ava.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
+    await drag(ava, [195, 300], [195, 620], { mid: () => shot(ava, 'S06-snap-swipe-down') });
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+    await ava.getByText('Received').waitFor();
+    await swipeSettled(ava);
+
+    // S16 Ava removes Ben from his friend card: it asks first, then he is gone from her chats
+    await ava.getByRole('button', { name: "Ben's friend card" }).click();
+    const lastCard = ava.getByRole('dialog', { name: 'Ben' });
+    await lastCard.getByRole('button', { name: 'Remove friend' }).click();
+    await lastCard.getByRole('button', { name: 'Remove', exact: true }).click();
+    await lastCard.waitFor({ state: 'detached' });
+    await ava.getByText('Removed Ben').waitFor();
+    await ava.getByText('Nobody to talk to yet').waitFor();
+    assert.equal(await ava.evaluate(() => document.activeElement?.textContent), 'Add friends', 'focus lands on what is left');
 
     assert.deepEqual(errors, [], 'browser errors: ' + errors.join('\n'));
     console.log('e2e: all flows passed. Screenshots in replica/clone-screens/');

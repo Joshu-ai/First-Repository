@@ -11,6 +11,13 @@
 - **Client:** plain HTML/CSS/JS, mobile-first, installable (web manifest).
   Camera via `getUserMedia`, editing on a `<canvas>`; caption and drawing are
   burned into the JPEG before upload.
+- **Gestures:** one small pointer-events tracker in `app.js` (`pointerDrag`)
+  decides after 10px whether a drag is sideways or vertical and only takes
+  the axis it wants; CSS `touch-action: pan-y` leaves vertical scrolling to
+  the browser. Tab swipes show the last drawn screen of the neighbour tab
+  (kept when it was replaced, inert and hidden from assistive tech) and
+  slide the real one in from there. The click after a drag or a hold is
+  swallowed, so it is never also a tap.
 - **Video snaps:** holding the shutter records with `MediaRecorder` (WebM
   VP8/Opus, else MP4), up to 10 seconds. The caption travels beside the
   video and is shown over it. Mute takes the sound track out of the WebM
