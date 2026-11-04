@@ -10,10 +10,10 @@ Tap to focus,camera,could,yes,partial,a focus ring at the tap point (no zoom-in 
 Flash,camera,should,yes,partial,Flash switch (pressed state shown) remembered on the device; back camera: its light goes on for the shot through the browser's torch control then off; front camera: the whole screen goes white for 150ms for the shot; back cameras the browser cannot light (Safari on iPhone; most laptops) say This camera has no flash
 Take a photo with front or back camera,camera,must,yes,yes,browser camera; falls back to picking a file when blocked; Flip camera sits in the top right column and keeps keyboard focus after the switch
 Pick a photo from the device instead,camera,should,yes,yes,Choose a photo sits left of the shutter
-Add a text caption,editor,must,yes,yes,
+Add a text caption,editor,must,yes,yes,photos: drawn into the picture (drag it up or down); videos: sent beside the video and shown over it when watched
 Draw on the photo in colours,editor,should,yes,yes,
 Set how long the snap shows (1-10s or no limit),editor,must,yes,yes,
-Save the snap to the device,editor,could,yes,yes,
+Save the snap to the device,editor,could,yes,partial,photos save as a JPEG with the caption and drawing; videos can't be saved yet
 Send a snap to one or more friends,sending,must,yes,yes,
 Snap can be opened once then is deleted,sending,must,yes,yes,
 Inbox shows new / opened / delivered per friend,chat,must,yes,yes,
@@ -30,7 +30,7 @@ Streak count for consecutive days,friends,should,yes,yes,UTC days; shown from 2 
 Live updates when a snap or message arrives,realtime,should,yes,yes,
 Works on a phone screen,platform,must,yes,yes,
 Drawn icons for every control,platform,should,yes,yes,own 24px line icon set in icons.js; Add friends is Puff with a plus badge; no emoji or text glyphs as icons
-Video snaps,camera,could,yes,no,
+Video snaps,camera,could,yes,yes,hold the shutter 350ms to record (MediaRecorder: WebM VP8/Opus; else MP4) up to 10s with a ring filling round it while the other controls step back; let go or 10s stops; a tap is still a photo; holding Space on the shutter does the same from the keyboard; the microphone is asked for only once a hold starts; with it blocked the video records silent and says so; back camera's light stays on through it with Flash on; video editor: looping preview; caption over it (sent as its own field); Mute (the WebM's sound track is taken out of the file in webm.js; MP4 records a silent second copy); Send to; front-camera clips play mirrored; opens once then is deleted; the snap viewer plays it once with its caption and moves on when it ends; stories play video with byte-range serving and move on at 'ended'; not built: drawing on video and saving a video
 Group chats,chat,could,yes,no,
 Lenses and AR filters,camera,could,yes,skip,needs a face-tracking engine; a project of its own
 Snap Map,map,could,yes,skip,location sharing needs its own privacy design

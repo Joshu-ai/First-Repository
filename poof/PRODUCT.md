@@ -21,7 +21,8 @@ Sharing without a permanent record: a snap is meant to be seen once and then
 go "poof".
 
 ## Capabilities and Constraints
-- Camera, caption and drawing editor, open-once snaps, disappearing chat,
+- Camera, caption and drawing editor, open-once snaps (photos, and videos
+  up to 10 seconds: hold the shutter), disappearing chat,
   stories, friends, streaks, personal avatars, live updates, Puffcodes
   (scannable profile codes) and `/add/<username>` profile links.
 - Zero-dependency Node server and plain HTML/CSS/JS client.

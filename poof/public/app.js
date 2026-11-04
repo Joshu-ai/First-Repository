@@ -14,7 +14,9 @@
     friendsBack: null, // the tab Add friends goes back to: wherever it was opened from
     stream: null,
     photo: null, // canvas with the captured image
-    editor: null, // { draw canvas, caption, captionY, timer }
+    editor: null, // { draw canvas, caption, captionY, timer } for a photo, { kind: 'video', muted } for a video
+    recording: null, // a hold of the shutter that is recording (or about to)
+    clip: null, // the recorded video being edited: { blob, type, sound, silent, seconds, mirror, url }
     unread: 0,
     events: null,
     refresh: null, // re-render hook for the current screen on live events
@@ -367,6 +369,7 @@
   // ---------- camera (S02) ----------
   function stopCamera() {
     stopScan();
+    abortRecording();
     if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
   }
@@ -470,6 +473,11 @@
       img.src = URL.createObjectURL(f);
     } });
     const chipSlot = h('div', { class: 'scan-chip-slot', 'aria-live': 'polite' });
+    // a tap takes a photo; holding records a video (see holdToRecord)
+    const recordable = Boolean(clipType());
+    const shutter = h('button', { class: 'shutter', type: 'button', 'aria-label': 'Take photo',
+      'aria-describedby': recordable ? 'shutter-hint' : null }, shutterRing());
+    const recStatus = h('p', { class: 'sr-only', role: 'status' });
     // top left: you and search; top right, a column: add friends, then the
     // camera's own switches. The shutter is the one big thing, low and central.
     const screen = h('section', { class: 'screen camera', 'aria-label': 'Camera' },
@@ -485,8 +493,10 @@
       chipSlot,
       h('div', { class: 'shutter-row' },
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Choose a photo', onclick: () => file.click() }, icon('image')),
-        h('button', { class: 'shutter', type: 'button', 'aria-label': 'Take photo', onclick: () => capture(video) })),
+        shutter),
+      recordable && h('p', { id: 'shutter-hint', class: 'sr-only' }, 'Hold to record a video.'), recStatus,
       file, nav('camera'));
+    holdToRecord(shutter, video, screen, recStatus);
     show(screen);
     if (focus) screen.querySelector(`[aria-label="${focus}"]`)?.focus();
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -652,6 +662,208 @@
     return undefined;
   }
 
+  // ---------- video snaps: hold the shutter (S14) ----------
+  // Hold the shutter for a moment and it records, up to 10 seconds, with a
+  // ring filling round it; let go and the video editor opens. A tap is still
+  // a photo. Holding Space on the shutter does the same from the keyboard.
+  const HOLD_MS = 350;
+  const CLIP_MAX_MS = 10000;
+  const CLIP_MAX_BYTES = 11 * 1024 * 1024; // the server's limit for a video
+  const CLIP_TYPES = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+  let clipTypeFound;
+  // the first format this browser can record that Poof can send, or ''
+  function clipType() {
+    if (clipTypeFound === undefined) {
+      clipTypeFound = typeof window.MediaRecorder !== 'function' ? '' : CLIP_TYPES.find((t) => {
+        try { return MediaRecorder.isTypeSupported(t); } catch { return false; }
+      }) || '';
+    }
+    return clipTypeFound;
+  }
+
+  const isWebm = () => clipType().startsWith('video/webm');
+
+  // A recording that stops very soon after it starts can hold no frames at
+  // all; a WebM is checked for them, anything else for having any bytes.
+  async function hasPicture(blob) {
+    if (!blob.size) return false;
+    if (!blob.type.startsWith('video/webm')) return true;
+    try {
+      const { tracks, blocks } = window.PoofWebm.info(await blob.arrayBuffer());
+      return tracks.some((t) => t.type === 1 && blocks[t.number] > 0);
+    } catch { return true; } // a layout webm.js doesn't know: let the browser judge it
+  }
+
+  // the same video with no sound in it at all, for Mute
+  async function silentCopy(clip) {
+    if (clip.silent) return clip.silent;
+    try {
+      return new Blob([window.PoofWebm.stripAudio(await clip.blob.arrayBuffer())], { type: clip.type });
+    } catch {
+      throw new Error("This video can't be muted. Turn Mute off to send it, or record it again.");
+    }
+  }
+
+  // the progress ring drawn round the shutter while it records
+  function shutterRing() {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const ring = document.createElementNS(svgNS, 'svg');
+    ring.setAttribute('class', 'shutter-ring');
+    ring.setAttribute('viewBox', '0 0 100 100');
+    ring.setAttribute('aria-hidden', 'true');
+    for (const part of ['track', 'arc']) {
+      const c = document.createElementNS(svgNS, 'circle');
+      for (const [k, v] of [['class', part], ['cx', 50], ['cy', 50], ['r', 46], ['pathLength', 100]]) c.setAttribute(k, v);
+      ring.append(c);
+    }
+    return ring;
+  }
+
+  // The microphone is asked for only once a hold has started, so a tap for a
+  // photo never asks for it or turns it on. Null when there is none or it's blocked.
+  async function openMic() {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      return s.getAudioTracks()[0] || null;
+    } catch { return null; }
+  }
+
+  function recorder(tracks) {
+    const type = clipType();
+    const rec = new MediaRecorder(new MediaStream(tracks), { mimeType: type, videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 });
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    // the plain type (no codecs), so the data URL it becomes is well formed
+    const done = new Promise((resolve) => { rec.onstop = () => resolve(new Blob(chunks, { type: type.split(';')[0] })); });
+    rec.finish = () => {
+      if (rec.state !== 'inactive') { try { rec.stop(); } catch {} }
+      return done;
+    };
+    return rec;
+  }
+
+  // stop a recording without keeping it (the camera is closing)
+  function abortRecording() {
+    const r = state.recording;
+    if (!r) return;
+    state.recording = null;
+    r.aborted = true;
+    clearTimeout(r.cap);
+    cancelAnimationFrame(r.raf);
+    r.full?.finish();
+    r.silent?.finish();
+    r.mic?.stop();
+  }
+
+  function holdToRecord(shutter, video, screen, status) {
+    const arc = shutter.querySelector('.shutter-ring .arc');
+    let press = null; // from pointer (or Space) down to up
+    let swallowUntil = 0; // the click that follows letting go of a recording is not a photo
+
+    const looks = (on) => {
+      screen.classList.toggle('recording', on);
+      shutter.classList.toggle('recording', on);
+      if (!on) arc.style.strokeDashoffset = '';
+    };
+    const down = () => {
+      if (press || state.recording || shooting || !clipType() || !video.videoWidth) return;
+      const r = { phase: 'pressed' };
+      r.timer = setTimeout(() => startClip(r), HOLD_MS);
+      press = r;
+    };
+    const up = () => {
+      const r = press;
+      if (!r) return;
+      press = null;
+      clearTimeout(r.timer);
+      if (r.phase === 'pressed') return; // a tap: the click that follows takes the photo
+      swallowUntil = performance.now() + 600;
+      r.released = true;
+      if (r.phase === 'recording') stopClip(r);
+    };
+
+    async function startClip(r) {
+      const track = camTrack();
+      if (!track || !video.isConnected || state.tab !== 'camera') return;
+      r.phase = 'starting';
+      state.recording = r;
+      looks(true);
+      const mic = await openMic();
+      if (r.aborted || r.released || !video.isConnected) {
+        mic?.stop();
+        if (state.recording === r) state.recording = null;
+        if (!r.aborted) { looks(false); toast('Keep holding to record a video.'); }
+        return;
+      }
+      try {
+        r.full = recorder(mic ? [track, mic] : [track]);
+        // Muted, a video carries no sound at all. A WebM has its sound track
+        // taken out when it's sent (webm.js). An MP4 (older Safari) can't be,
+        // so a second copy records without the microphone; only there, as
+        // two encoders at once can starve each other on a computer.
+        r.silent = mic && !isWebm() ? recorder([track]) : null;
+        r.full.start();
+        r.silent?.start();
+      } catch {
+        mic?.stop();
+        state.recording = null;
+        looks(false);
+        toast("This browser can't record video. Tap for a photo instead.");
+        return;
+      }
+      r.mic = mic;
+      if (!mic) toast('Recording without sound. Allow the microphone to add sound.');
+      r.torch = state.flash && flashKind(track) === 'torch';
+      if (r.torch) track.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
+      r.phase = 'recording';
+      r.startedAt = performance.now();
+      status.textContent = 'Recording. Let go to stop.';
+      r.cap = setTimeout(() => stopClip(r), CLIP_MAX_MS);
+      const tick = () => {
+        const p = Math.min(1, (performance.now() - r.startedAt) / CLIP_MAX_MS);
+        arc.style.strokeDashoffset = String(100 * (1 - p));
+        if (r.phase === 'recording') r.raf = requestAnimationFrame(tick);
+      };
+      tick();
+    }
+
+    async function stopClip(r) {
+      if (r.phase !== 'recording') return;
+      r.phase = 'stopping';
+      clearTimeout(r.cap);
+      cancelAnimationFrame(r.raf);
+      const seconds = Math.min(CLIP_MAX_MS, performance.now() - r.startedAt) / 1000;
+      const [full, silent] = await Promise.all([r.full.finish(), r.silent?.finish()]);
+      r.mic?.stop();
+      if (r.torch) camTrack()?.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      status.textContent = '';
+      if (state.recording === r) state.recording = null;
+      if (r.aborted || state.tab !== 'camera' || !video.isConnected) return;
+      if (!(await hasPicture(full))) {
+        looks(false);
+        toast("That video didn't record. Hold a little longer.");
+        return;
+      }
+      openVideoEditor({ blob: full, type: full.type, sound: Boolean(r.mic), silent: silent || null, seconds,
+        mirror: video.classList.contains('mirror') });
+    }
+
+    shutter.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary || e.button !== 0) return;
+      try { shutter.setPointerCapture(e.pointerId); } catch {}
+      down();
+    });
+    shutter.addEventListener('pointerup', up);
+    shutter.addEventListener('pointercancel', up);
+    shutter.addEventListener('contextmenu', (e) => e.preventDefault()); // a long press is a recording, not a menu
+    shutter.addEventListener('keydown', (e) => { if (e.key === ' ' && !e.repeat) down(); });
+    shutter.addEventListener('keyup', (e) => { if (e.key === ' ') up(); });
+    shutter.addEventListener('click', () => {
+      if (performance.now() < swallowUntil || state.recording) return;
+      capture(video);
+    });
+  }
+
   // ---------- editor (S03) ----------
   function openEditor(photo) {
     stopCamera();
@@ -766,10 +978,96 @@
         h('button', { class: 'icon-btn', 'aria-label': 'Discard', onclick: () => go('camera') }, icon('close'))),
       h('div', { class: 'editor-foot' },
         h('button', { class: 'icon-btn', 'aria-label': 'Save to device', onclick: saveToDevice }, icon('download')),
-        h('button', { class: 'btn', onclick: () => renderSendTo() }, 'Send to', icon('send', 20))));
+        h('button', { class: 'btn', onclick: () => renderSendTo(() => ({ image: flatten(), duration: state.editor.timer })) },
+          'Send to', icon('send', 20))));
+    screen.resume = layout; // back from Send to
     show(screen);
     requestAnimationFrame(layout);
     window.onresize = layout;
+  }
+
+  // ---------- video editor (S14) ----------
+  // The clip loops while you add a caption (sent beside the video and shown
+  // over it) or mute it. One thing to do next: Send to.
+  function dropClip() {
+    if (state.clip?.url) URL.revokeObjectURL(state.clip.url);
+    state.clip = null;
+  }
+
+  // Play a video; where the browser won't start one with sound on its own,
+  // play it silently rather than not at all.
+  function playClip(v) {
+    const p = v.play();
+    if (!p) return;
+    p.catch((e) => {
+      if (e?.name !== 'NotAllowedError' || !v.isConnected) return;
+      v.muted = true;
+      v.play().catch(() => {});
+    });
+  }
+
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read the video.'));
+    reader.readAsDataURL(blob);
+  });
+
+  function dataUrlToBlob(url) {
+    const comma = url.indexOf(',');
+    const bin = atob(url.slice(comma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: url.slice(5, comma).split(';')[0] });
+  }
+
+  function openVideoEditor(clip) {
+    stopCamera();
+    dropClip();
+    clip.url = URL.createObjectURL(clip.blob);
+    state.clip = clip;
+    state.photo = null;
+    const ed = (state.editor = { kind: 'video', muted: false });
+    const video = h('video', { class: clip.mirror ? 'mirror' : null, loop: true, playsInline: true, 'aria-label': 'Your video' });
+    video.muted = !clip.sound;
+    video.src = clip.url;
+    const caption = h('input', { class: 'caption', placeholder: 'Add a caption', maxlength: '80', 'aria-label': 'Caption', hidden: true });
+    const openCaption = () => { caption.hidden = false; caption.focus(); };
+    video.addEventListener('click', openCaption); // tap the video to add a caption, as on a photo
+    caption.addEventListener('blur', () => { if (!caption.value.trim()) caption.hidden = true; });
+    caption.addEventListener('keydown', (e) => { if (e.key === 'Enter') caption.blur(); });
+
+    const tools = [h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Add caption', onclick: openCaption }, icon('text'))];
+    if (clip.sound) {
+      const mute = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Mute', onclick: () => {
+        ed.muted = !ed.muted;
+        video.muted = ed.muted;
+        paintMute();
+      } });
+      const paintMute = () => {
+        mute.setAttribute('aria-pressed', String(ed.muted));
+        mute.replaceChildren(icon(ed.muted ? 'sound-off' : 'sound'));
+      };
+      paintMute();
+      tools.push(mute);
+    }
+
+    // muted, it sends a copy with no sound track
+    const payload = async () => {
+      const blob = ed.muted ? await silentCopy(clip) : clip.blob;
+      if (blob.size > CLIP_MAX_BYTES) throw new Error('This video is too big to send. Try a shorter one.');
+      return { video: await blobToDataUrl(blob), caption: caption.value.trim(), duration: Math.round(clip.seconds * 10) / 10, mirror: clip.mirror };
+    };
+    const screen = h('section', { class: 'screen editor video-editor', 'aria-label': 'Edit video' },
+      h('div', { class: 'stage' }, video, caption),
+      h('div', { class: 'tools' }, tools),
+      h('header', { class: 'bar overlay', style: 'right:auto' },
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Discard', onclick: () => { dropClip(); go('camera'); } }, icon('close'))),
+      h('div', { class: 'editor-foot end' },
+        h('button', { class: 'btn', type: 'button', onclick: () => renderSendTo(payload) }, 'Send to', icon('send', 20))));
+    screen.resume = () => playClip(video); // a video taken out of the page pauses
+    show(screen);
+    playClip(video);
   }
 
   // burn the drawing and caption into one JPEG
@@ -807,15 +1105,18 @@
   }
 
   // ---------- send to (S04) ----------
-  async function renderSendTo() {
-    const image = flatten();
+  // `payload` gives the snap's media fields: {image, duration} from the photo
+  // editor, {video, caption, duration, mirror} from the video editor.
+  async function renderSendTo(payload) {
+    const media = Promise.resolve().then(payload); // ready by the time Send is tapped
+    media.catch(() => {}); // reported when Send is tapped
     const picked = new Set();
     let story = false;
     const who = h('span', { class: 'who' }, 'Pick who gets it');
     const sendLabel = () => ['Send', icon('send', 18)];
     const sendBtn = h('button', { class: 'btn small', disabled: true, onclick: send }, sendLabel());
     const list = h('div', { class: 'scroll', style: 'padding-bottom:96px' }, h('p', { class: 'hint' }, 'Loading friends…'));
-    const back = backButton('Back to editing', () => { show(editorScreen); window.onresize?.(); });
+    const back = backButton('Back to editing', () => { show(editorScreen); editorScreen.resume?.(); });
     const editorScreen = app.firstElementChild;
     show(h('section', { class: 'screen', 'aria-label': 'Send to' }, header('Send to', back), list,
       h('div', { class: 'send-bar' }, who, sendBtn)));
@@ -830,7 +1131,8 @@
       sendBtn.disabled = true;
       sendBtn.textContent = 'Sending…';
       try {
-        await api('/api/snaps', { to: [...picked], story, image, duration: state.editor.timer });
+        await api('/api/snaps', { to: [...picked], story, ...(await media) });
+        dropClip();
         puffPop(story && !picked.size ? 'Posted to your story' : 'Poof! Sent', story && !picked.size ? 'party' : 'wink');
         go('chat');
       } catch (e) {
@@ -914,10 +1216,13 @@
   }
 
   // ---------- snap viewer (S06) ----------
+  // A photo shows for its timer; a video plays once with its caption over it,
+  // the ring following along, and moves on when it ends. Tap for the next.
   async function openSnaps(friend, ids) {
     state.refresh = null;
     const queue = [...ids];
-    const img = h('img', { alt: 'Snap from ' + friend.displayName });
+    const media = h('div', { class: 'media' });
+    const caption = h('p', { class: 'media-caption', hidden: true });
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('class', 'ring-timer');
@@ -933,33 +1238,64 @@
     let timer = null;
     let raf = null;
     let viewed = 0;
+    let clip = null; // the video on screen: { el, url }
+    const stopClip = () => {
+      if (!clip) return;
+      clip.el.pause();
+      URL.revokeObjectURL(clip.url);
+      clip = null;
+    };
+    const ring = (p) => { bar.style.strokeDashoffset = String(p * 2 * Math.PI * 15); };
     const close = () => {
-      clearTimeout(timer); cancelAnimationFrame(raf); go('chat');
+      clearTimeout(timer); cancelAnimationFrame(raf); stopClip(); go('chat');
       if (viewed) puffPop('Poof! Gone for good', 'wow');
     };
     const next = async () => {
       clearTimeout(timer);
       cancelAnimationFrame(raf);
+      stopClip();
       const id = queue.shift();
       if (!id) return close();
       let snap;
       try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) { puffPop(e.message, 'sad'); return next(); }
-      img.src = snap.image;
       viewed++;
+      caption.textContent = snap.caption || '';
+      caption.hidden = !snap.caption;
+      if (snap.video) {
+        const v = h('video', { class: snap.mirror ? 'mirror' : null, playsInline: true, 'aria-label': 'Snap from ' + friend.displayName });
+        clip = { el: v, url: URL.createObjectURL(dataUrlToBlob(snap.video)) };
+        v.src = clip.url;
+        media.replaceChildren(v);
+        svg.style.visibility = 'visible';
+        // the recorded length, where the file itself doesn't say
+        const length = () => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : snap.duration || 10);
+        const tick = () => {
+          ring(Math.min(1, v.currentTime / length()));
+          raf = requestAnimationFrame(tick);
+        };
+        v.addEventListener('ended', () => { if (clip?.el === v) next(); });
+        v.addEventListener('error', () => { if (clip?.el === v) toast('This video could not play. Tap to go on.'); });
+        ring(0);
+        tick();
+        playClip(v);
+        return undefined;
+      }
+      media.replaceChildren(h('img', { alt: 'Snap from ' + friend.displayName, src: snap.image }));
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
       if (snap.duration) {
         const startAt = performance.now();
         const total = snap.duration * 1000;
         const tick = () => {
           const p = Math.min(1, (performance.now() - startAt) / total);
-          bar.style.strokeDashoffset = String(p * 2 * Math.PI * 15);
+          ring(p);
           if (p < 1) raf = requestAnimationFrame(tick);
         };
         tick();
         timer = setTimeout(next, total);
       }
+      return undefined;
     };
-    show(h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, img,
+    show(h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, media, caption,
       h('button', { class: 'tap', 'aria-label': 'Next', onclick: next }),
       h('div', { class: 'head' }, avatar(friend), h('span', { class: 'who' }, friend.displayName), svg,
         h('button', { class: 'icon-btn', 'aria-label': 'Close', onclick: close }, icon('close')))));
@@ -1035,33 +1371,63 @@
     if (si < 0 || mine) si = 0;
     let timer = null;
     let raf = null;
-    const img = h('img', { alt: '' });
+    let clip = null; // the video story on screen
+    const media = h('div', { class: 'media' });
+    const caption = h('p', { class: 'media-caption', hidden: true });
     const progress = h('div', { class: 'progress' });
     const who = h('span', { class: 'who' });
     const sub = h('span', { class: 'sub', style: 'font-size:.8rem;opacity:.8' });
     const av = h('span');
-    const close = () => { clearTimeout(timer); cancelAnimationFrame(raf); go('stories'); };
+    const stopClip = () => { clip?.pause(); clip = null; };
+    const close = () => { clearTimeout(timer); cancelAnimationFrame(raf); stopClip(); go('stories'); };
     function play() {
       clearTimeout(timer);
       cancelAnimationFrame(raf);
+      stopClip();
       const g = groups[gi];
       const s = g.stories[si];
-      img.src = `/api/stories/${s.id}/media`;
-      img.alt = 'Story from ' + g.user.displayName;
+      const src = `/api/stories/${s.id}/media`;
+      const label = 'Story from ' + g.user.displayName;
+      caption.textContent = s.caption || '';
+      caption.hidden = !s.caption;
       who.textContent = mine ? 'My Story' : g.user.displayName;
       sub.textContent = ago(s.createdAt) + (mine ? ` · seen by ${s.viewers.length}${s.viewers.length ? ': ' + s.viewers.map((v) => v.displayName).join(', ') : ''}` : '');
       av.replaceChildren(avatar(g.user));
       progress.replaceChildren(...g.stories.map((_, i) => h('div', {}, h('i', { style: `width:${i < si ? 100 : 0}%` }))));
       if (!mine && !s.seen) { s.seen = true; api(`/api/stories/${s.id}/view`, {}).catch(() => {}); }
       const fill = progress.children[si].firstChild;
+      if (s.type === 'video') {
+        // plays once, its bar following the video, then on to the next story
+        const v = h('video', { class: s.mirror ? 'mirror' : null, playsInline: true, preload: 'auto', 'aria-label': label });
+        v.src = src;
+        clip = v;
+        media.replaceChildren(v);
+        const length = () => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : s.duration || 10);
+        const tick = () => {
+          fill.style.width = Math.min(1, v.currentTime / length()) * 100 + '%';
+          raf = requestAnimationFrame(tick);
+        };
+        v.addEventListener('playing', () => { if (clip !== v) return; cancelAnimationFrame(raf); tick(); });
+        v.addEventListener('ended', () => { if (clip === v) step(1); });
+        v.addEventListener('error', () => { if (clip === v) toast('This video could not play. Tap to go on.'); });
+        playClip(v);
+        return;
+      }
+      const img = h('img', { alt: label });
       const total = (s.duration || 5) * 1000;
-      const startAt = performance.now();
-      const tick = () => {
+      const tick = (startAt) => {
         const p = Math.min(1, (performance.now() - startAt) / total);
         fill.style.width = p * 100 + '%';
-        if (p < 1) raf = requestAnimationFrame(tick);
+        if (p < 1) raf = requestAnimationFrame(() => tick(startAt));
       };
-      img.onload = () => { tick(); timer = setTimeout(step.bind(null, 1), total); };
+      // a photo that finishes loading after you've tapped on is no longer shown: leave it be
+      img.onload = () => {
+        if (!img.isConnected) return;
+        tick(performance.now());
+        timer = setTimeout(step.bind(null, 1), total);
+      };
+      img.src = src;
+      media.replaceChildren(img);
     }
     function step(dir) {
       si += dir;
@@ -1072,7 +1438,7 @@
       }
       play();
     }
-    show(h('section', { class: 'screen viewer', 'aria-label': 'Story' }, img, progress,
+    show(h('section', { class: 'screen viewer', 'aria-label': 'Story' }, media, caption, progress,
       h('button', { class: 'tap', style: 'right:66%', 'aria-label': 'Previous', onclick: () => step(-1) }),
       h('button', { class: 'tap', style: 'left:34%', 'aria-label': 'Next', onclick: () => step(1) }),
       h('div', { class: 'head', style: 'top:12px' }, av,

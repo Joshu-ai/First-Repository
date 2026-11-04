@@ -19,7 +19,7 @@ function load() {
 
 const REQUIRED = ['chat', 'camera', 'stories', 'back', 'close', 'plus', 'search', 'flip', 'flash', 'flash-off',
   'image', 'text', 'pen', 'undo', 'timer', 'download', 'send', 'share', 'scan', 'settings', 'trash', 'user',
-  'puff-plus', 'check', 'shuffle'];
+  'puff-plus', 'check', 'shuffle', 'sound', 'sound-off'];
 
 // every open tag is closed in order (no stray or unbalanced markup)
 function balanced(markup) {

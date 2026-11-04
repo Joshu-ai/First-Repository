@@ -11,6 +11,12 @@
 - **Client:** plain HTML/CSS/JS, mobile-first, installable (web manifest).
   Camera via `getUserMedia`, editing on a `<canvas>`; caption and drawing are
   burned into the JPEG before upload.
+- **Video snaps:** holding the shutter records with `MediaRecorder` (WebM
+  VP8/Opus, else MP4), up to 10 seconds. The caption travels beside the
+  video and is shown over it. Mute takes the sound track out of the WebM
+  (`public/webm.js`, no re-encoding); for MP4 a second copy records without
+  the microphone. Only one encoder runs for WebM: two VP8 encoders at
+  1080x1920 starve each other on a computer and one comes out empty.
 
 ## Security
 
@@ -18,10 +24,16 @@
 - Session: random 32-byte token in an `HttpOnly; SameSite=Lax` cookie.
 - Every write is JSON-only (`Content-Type: application/json`), which with
   SameSite cookies blocks cross-site form posts.
-- Request bodies capped at 6 MB; images must be JPEG/PNG data URLs.
+- Request bodies capped at 6 MB, except `POST /api/snaps` at 16 MB (videos
+  up to 11 MB, photos up to 5 MB). A body over its cap is read to the end
+  and dropped, then answered with 413, so the client hears why (cutting it
+  off mid-upload reset the connection); past twice the cap it is cut off.
+- Images must be JPEG/PNG data URLs; videos WebM/MP4 data URLs, checked by
+  their first bytes (the EBML magic, or an MP4 `ftyp` box) as well as the label.
 - Snap media is never served by URL: `POST /api/snaps/:id/open` returns it
   once to the recipient and deletes the file in the same request.
-- Story media is served only to the owner and their friends.
+- Story media is served only to the owner and their friends, with
+  `nosniff` and byte ranges (video players ask for ranges; Safari requires them).
 - Login and signup are rate limited per IP (30 tries per 15 minutes). The
   live username check has its own bucket with the same limit, so typing a
   username never uses up log in attempts.
@@ -33,8 +45,9 @@ users        { id, username, displayName, salt, hash, createdAt }
 sessions     { token: userId }
 friendships  { id, a, b, requester, status: pending|accepted, createdAt }
 snaps        { id, from, to, media, duration, createdAt, openedAt }
+             video snaps add { type: 'video', caption, mirror }; duration is their length
 messages     { id, from, to, text, createdAt, readAt, saved }
-stories      { id, userId, media, duration, createdAt, viewers[] }
+stories      { id, userId, media, duration, createdAt, viewers[] } (+ type, caption, mirror for video)
 streaks      { "a|b": { days: {a: 'YYYY-MM-DD', b: ...}, count, lastDay } }
 ```
 
@@ -62,14 +75,15 @@ GET  /api/friends                      friends, incoming, outgoing
 POST /api/friends/request {username}
 POST /api/friends/accept  {userId}
 POST /api/friends/remove  {userId}
-POST /api/snaps {to[], image, duration, story}
-POST /api/snaps/:id/open
+POST /api/snaps {to[], story, image, duration}               photo (duration: seconds shown, 0 = no limit)
+POST /api/snaps {to[], story, video, caption, duration, mirror}  video (duration: its length, up to 10s)
+POST /api/snaps/:id/open               {image, duration} or {video, caption, duration, mirror}; deleted
 GET  /api/inbox
 GET  /api/chat/:friendId
 POST /api/chat/:friendId {text}
 POST /api/messages/:id/save
 GET  /api/stories
-GET  /api/stories/:id/media
+GET  /api/stories/:id/media            photo or video; Range requests answered with 206
 POST /api/stories/:id/view
 ```
 

@@ -113,6 +113,7 @@ stored (default `./data`).
 | --- | --- |
 | Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
+| Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
 | Snaps | Send to several friends and/or your story. Each snap opens once, then the file is deleted on the server |
 | Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it |
 | Stories | Post for 24 hours, tap through friends' stories, see who watched yours |
@@ -120,13 +121,34 @@ stored (default `./data`).
 | Puffcode | Your scannable profile code with your avatar inside; share or save it; scan friends' codes; `/add/<username>` links |
 | Live | New snaps, chats and "opened" updates arrive instantly (Server-Sent Events) |
 
-Not built: video snaps, group chats, AR lenses, map, discover feed, screenshot
-alerts. See [`replica/parity.md`](replica/parity.md).
+Not built: group chats, AR lenses, map, discover feed, screenshot alerts.
+Videos can't be drawn on or saved to the device yet. See
+[`replica/parity.md`](replica/parity.md).
+
+## Video snaps
+
+Hold the shutter for a moment (350ms) and it records with the browser's
+`MediaRecorder`: WebM (VP8 picture, Opus sound) where the browser can,
+otherwise MP4 (older Safari). It stops when you let go, or at 10 seconds.
+The microphone is asked for only once a hold starts, so taking a photo
+never turns it on. If the microphone is blocked, the video records without
+sound and says so.
+
+**Mute sends no sound at all**, not a silenced player: the WebM's sound
+track is taken out of the file before it is sent, without re-encoding it
+(`public/webm.js`, which reads the file's EBML structure and drops the
+audio track and its blocks). For MP4, a second copy records without the
+microphone. A front-camera video plays mirrored, the way you saw it.
+
+The server takes a video only on `POST /api/snaps` (the one route allowed a
+body up to 16 MB, for videos up to 11 MB) and checks it really is a WebM or
+MP4 by its first bytes. A video snap opens once like a photo and is deleted.
+Story videos are served with byte ranges, which Safari needs to play them.
 
 ## Tests
 
 ```bash
-npm test             # API: auth, friends, open-once snaps, chat expiry, stories, streaks, security
+npm test             # API: auth, friends, open-once snaps and videos, chat expiry, stories, streaks, security; WebM sound removal
 npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
 npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
 ```

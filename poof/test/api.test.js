@@ -4,10 +4,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createApp } = require('../server');
+const { createApp, LIMITS } = require('../server');
 
 // 1x1 transparent PNG
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+// Stand-in clips: the first bytes of a real WebM (the EBML magic) and of a
+// real MP4 (a box size, then "ftyp"), padded out to `size` bytes
+const webmBytes = (size = 256) => Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(size - 4, 7)]);
+const mp4Bytes = (size = 256) => Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(size - 12, 7)]);
+const dataUrl = (type, buf) => `data:${type};base64,` + buf.toString('base64');
+const WEBM = dataUrl('video/webm', webmBytes());
+const MP4 = dataUrl('video/mp4', mp4Bytes());
 const DAY = 24 * 3600 * 1000;
 
 async function boot() {
@@ -33,7 +40,9 @@ function client(base) {
     const data = await res.json().catch(() => null);
     return { status: res.status, data };
   };
-  return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b) };
+  // fetch with this client's session, for responses that are not JSON
+  const raw = (p, headers = {}) => fetch(base + p, { headers: { cookie, ...headers } });
+  return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), raw };
 }
 
 async function friends(base) {
@@ -337,5 +346,152 @@ test('/add/<username> links open the app (the page a Puffcode points at)', async
     }
     // the app's scripts load from the root, so they work from /add/<username> too
     assert.equal((await fetch(s.base + '/puffcode.js')).headers.get('content-type'), 'text/javascript; charset=utf-8');
+  } finally { await s.close(); }
+});
+
+test('a video snap opens once with its caption, and its file is deleted', async () => {
+  const s = await boot();
+  try {
+    const { a, b, bId } = await friends(s.base);
+    const mediaDir = path.join(s.dataDir, 'media');
+    const sent = await a.post('/api/snaps', { to: [bId], video: WEBM, caption: '  Puff   says\nhi  ', duration: 2.345, mirror: true });
+    assert.equal(sent.status, 200);
+    assert.equal(sent.data.sent, 1);
+    assert.deepEqual(fs.readdirSync(mediaDir).map((f) => path.extname(f)), ['.webm'], 'stored as a .webm file');
+    const inbox = (await b.get('/api/inbox')).data;
+    assert.equal(inbox[0].status, 'new-snap');
+    const id = inbox[0].snapIds[0];
+    assert.equal((await a.post(`/api/snaps/${id}/open`)).status, 404, 'the sender cannot open it');
+    const opened = await b.post(`/api/snaps/${id}/open`);
+    assert.equal(opened.status, 200);
+    assert.deepEqual(opened.data, { video: WEBM, caption: 'Puff says hi', duration: 2.3, mirror: true });
+    assert.ok(!('image' in opened.data));
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'media deleted after open');
+    assert.equal((await b.post(`/api/snaps/${id}/open`)).status, 410, 'a video opens once too');
+    assert.equal((await a.get('/api/inbox')).data[0].status, 'opened');
+
+    // MP4 (what Safari records) works the same; no caption is an empty one,
+    // and the length is capped at 10 seconds
+    await a.post('/api/snaps', { to: [bId], video: MP4, duration: 42 });
+    assert.deepEqual(fs.readdirSync(mediaDir).map((f) => path.extname(f)), ['.mp4'], 'stored as a .mp4 file');
+    const id2 = (await b.get('/api/inbox')).data[0].snapIds[0];
+    assert.deepEqual((await b.post(`/api/snaps/${id2}/open`)).data, { video: MP4, caption: '', duration: 10, mirror: false });
+    assert.equal(fs.readdirSync(mediaDir).length, 0);
+
+    // a photo snap still answers with an image and its timer
+    await a.post('/api/snaps', { to: [bId], image: PNG, duration: 3, caption: 'ignored' });
+    const id3 = (await b.get('/api/inbox')).data[0].snapIds[0];
+    assert.deepEqual(Object.keys((await b.post(`/api/snaps/${id3}/open`)).data).sort(), ['duration', 'image']);
+  } finally { await s.close(); }
+});
+
+test('video snaps must really be WebM or MP4; captions are tidied and capped', async () => {
+  const s = await boot();
+  try {
+    const { a, b, bId } = await friends(s.base);
+    const post = (video, more = {}) => a.post('/api/snaps', { to: [bId], video, ...more });
+    for (const bad of [
+      dataUrl('video/ogg', webmBytes()), // not a type Poof keeps
+      dataUrl('video/webm', mp4Bytes()), // labelled WebM, isn't one
+      dataUrl('video/mp4', webmBytes()), // labelled MP4, isn't one
+      'data:text/html;base64,PGgxPg==', 'not a data url', 42, { evil: true },
+    ]) {
+      const r = await post(bad);
+      assert.equal(r.status, 400, String(bad).slice(0, 30));
+      assert.equal(r.data.error, 'Video must be a WebM or MP4.');
+    }
+    // a real recording (Chromium's MediaRecorder) passes the same checks
+    const real = fs.readFileSync(path.join(__dirname, 'fixtures', 'clip-with-sound.webm'));
+    assert.equal((await post(dataUrl('video/webm', real))).status, 200);
+    // the label may carry codecs, as browsers write them
+    assert.equal((await post(WEBM.replace('video/webm', 'video/webm;codecs=vp8'))).status, 200);
+    assert.equal((await post(WEBM, { caption: 'x'.repeat(200) })).status, 200);
+    assert.equal((await post(WEBM, { caption: { not: 'text' } })).status, 200);
+    const ids = (await b.get('/api/inbox')).data[0].snapIds;
+    const captions = [];
+    for (const id of ids) captions.push((await b.post(`/api/snaps/${id}/open`)).data.caption);
+    assert.deepEqual(captions, ['', '', 'x'.repeat(80), '']);
+    assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 0, 'nothing left behind by the rejected ones');
+  } finally { await s.close(); }
+});
+
+test('video size limits: 413 for big clips, and only snaps take big bodies', async () => {
+  const s = await boot();
+  try {
+    const { a, b, aId, bId } = await friends(s.base);
+    assert.ok(LIMITS.video < LIMITS.snapBody * 0.75 && LIMITS.snapBody > LIMITS.body);
+    // a clip under the limit goes through, even though its body is over 6 MB
+    const big = dataUrl('video/webm', webmBytes(LIMITS.video - 1024));
+    assert.ok(big.length > LIMITS.body, 'the body is bigger than other routes allow');
+    assert.equal((await a.post('/api/snaps', { to: [bId], video: big, duration: 9 })).status, 200);
+    const id = (await b.get('/api/inbox')).data[0].snapIds[0];
+    assert.equal((await b.post(`/api/snaps/${id}/open`)).data.video, big, 'and comes back whole');
+    // one byte over the video limit
+    const over = await a.post('/api/snaps', { to: [bId], video: dataUrl('video/webm', webmBytes(LIMITS.video + 1)) });
+    assert.equal(over.status, 413);
+    assert.equal(over.data.error, 'Video is too large.');
+    // a body over the snap limit is refused, and the client hears it (no reset connection)
+    const huge = await a.post('/api/snaps', { to: [bId], video: 'data:video/webm;base64,' + 'A'.repeat(LIMITS.snapBody) });
+    assert.equal(huge.status, 413);
+    assert.equal(huge.data.error, 'Too large.');
+    // photos keep their own limit inside the bigger body
+    const bigPhoto = await a.post('/api/snaps', { to: [bId], image: 'data:image/png;base64,' + 'A'.repeat(Math.ceil(LIMITS.image * 4 / 3) + 8) });
+    assert.equal(bigPhoto.status, 413);
+    assert.equal(bigPhoto.data.error, 'Image is too large.');
+    // every other route keeps the 6 MB cap
+    const chat = await a.post('/api/chat/' + bId, { text: 'x'.repeat(LIMITS.body + 1) });
+    assert.equal(chat.status, 413);
+    assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 0, 'nothing stored from refused uploads');
+    // and the server carries on as normal
+    assert.equal((await a.post('/api/chat/' + bId, { text: 'still here' })).status, 200);
+    assert.equal((await b.get('/api/chat/' + aId)).data.messages[0].text, 'still here');
+  } finally { await s.close(); }
+});
+
+test('video stories: listed as video, served with the right type and byte ranges, gone after 24h', async () => {
+  const s = await boot();
+  try {
+    const { a, b } = await friends(s.base);
+    const stranger = client(s.base);
+    await stranger.post('/api/signup', { username: 'zed', password: 'password1' });
+    await a.post('/api/snaps', { to: [], story: true, image: PNG, duration: 4 });
+    await a.post('/api/snaps', { to: [], story: true, video: WEBM, caption: 'my day', duration: 3.21, mirror: true });
+    await a.post('/api/snaps', { to: [], story: true, video: MP4, duration: 1 });
+    const [photo, webm, mp4] = (await b.get('/api/stories')).data.friends[0].stories;
+    assert.equal(photo.type, 'photo');
+    assert.ok(!('caption' in photo));
+    assert.deepEqual([webm.type, webm.caption, webm.duration, webm.mirror], ['video', 'my day', 3.2, true]);
+    assert.deepEqual([mp4.type, mp4.caption, mp4.duration, mp4.mirror], ['video', '', 1, false]);
+    assert.equal((await a.get('/api/stories')).data.mine[1].type, 'video', 'the poster sees it as video too');
+
+    const whole = await b.raw(`/api/stories/${webm.id}/media`);
+    assert.equal(whole.status, 200);
+    assert.equal(whole.headers.get('content-type'), 'video/webm');
+    assert.equal(whole.headers.get('accept-ranges'), 'bytes');
+    assert.equal(whole.headers.get('x-content-type-options'), 'nosniff');
+    assert.deepEqual(Buffer.from(await whole.arrayBuffer()), webmBytes());
+    assert.equal((await b.raw(`/api/stories/${mp4.id}/media`)).headers.get('content-type'), 'video/mp4');
+    assert.equal((await b.raw(`/api/stories/${photo.id}/media`)).headers.get('content-type'), 'image/png');
+
+    // ranges: the first bytes, an open end, the last bytes, and past the end
+    const first = await b.raw(`/api/stories/${webm.id}/media`, { range: 'bytes=0-3' });
+    assert.equal(first.status, 206);
+    assert.equal(first.headers.get('content-range'), 'bytes 0-3/256');
+    assert.deepEqual(Buffer.from(await first.arrayBuffer()), webmBytes().subarray(0, 4));
+    const rest = await b.raw(`/api/stories/${webm.id}/media`, { range: 'bytes=250-' });
+    assert.equal(rest.headers.get('content-range'), 'bytes 250-255/256');
+    assert.equal((await rest.arrayBuffer()).byteLength, 6);
+    const tail = await b.raw(`/api/stories/${webm.id}/media`, { range: 'bytes=-10' });
+    assert.equal(tail.headers.get('content-range'), 'bytes 246-255/256');
+    const past = await b.raw(`/api/stories/${webm.id}/media`, { range: 'bytes=999-' });
+    assert.equal(past.status, 416);
+    assert.equal(past.headers.get('content-range'), 'bytes */256');
+
+    assert.equal((await stranger.raw(`/api/stories/${webm.id}/media`)).status, 404, 'friends only');
+    assert.equal((await fetch(`${s.base}/api/stories/${webm.id}/media`)).status, 401, 'needs a session');
+    s.clock.t += DAY + 1000;
+    s.app.expire();
+    assert.equal((await a.get('/api/stories')).data.mine.length, 0);
+    assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 0, 'video files go with their stories');
   } finally { await s.close(); }
 });

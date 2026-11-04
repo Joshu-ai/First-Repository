@@ -8,7 +8,13 @@ const Avatar = require('./public/avatar');
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
-const MAX_BODY = 6 * 1024 * 1024;
+const MAX_BODY = 6 * 1024 * 1024; // any request body
+const MAX_SNAP_BODY = 16 * 1024 * 1024; // POST /api/snaps only: room for a 10 second video
+const MAX_IMAGE = 5 * 1024 * 1024;
+const MAX_VIDEO = 11 * 1024 * 1024; // a 10 second clip at the app's bitrate is about 3 MB
+// what's stored for each kind of media, by file extension
+const MEDIA_TYPES = { jpg: 'image/jpeg', png: 'image/png', webm: 'video/webm', mp4: 'video/mp4' };
+const EBML = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]); // every WebM file starts with this
 const PUBLIC = path.join(__dirname, 'public');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -75,9 +81,25 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     const m = /^data:image\/(jpeg|png);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
     if (!m) fail(400, 'Image must be a JPEG or PNG.');
     const buf = Buffer.from(m[2], 'base64');
-    if (buf.length > 5 * 1024 * 1024) fail(413, 'Image is too large.');
+    if (buf.length > MAX_IMAGE) fail(413, 'Image is too large.');
     return { buf, ext: m[1] === 'jpeg' ? 'jpg' : 'png' };
   }
+
+  // A video snap: a WebM or MP4 data URL (what browsers' MediaRecorder makes),
+  // checked by its first bytes as well as its label.
+  function parseVideo(dataUrl) {
+    const m = /^data:video\/(webm|mp4)(?:;[\w.+-]+=[\w.+-]+)*;base64,([A-Za-z0-9+/=]+)$/.exec(typeof dataUrl === 'string' ? dataUrl : '');
+    if (!m) fail(400, 'Video must be a WebM or MP4.');
+    if (Math.floor(m[2].length / 4) * 3 > MAX_VIDEO + 3) fail(413, 'Video is too large.');
+    const buf = Buffer.from(m[2], 'base64');
+    if (buf.length > MAX_VIDEO) fail(413, 'Video is too large.');
+    const real = m[1] === 'webm' ? buf.subarray(0, 4).equals(EBML) : buf.subarray(4, 8).toString('latin1') === 'ftyp';
+    if (!real) fail(400, 'Video must be a WebM or MP4.');
+    return { buf, ext: m[1] };
+  }
+
+  // a video's caption travels beside it (a photo's is drawn into the picture)
+  const cleanCaption = (value) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 80) : '');
 
   function expire() {
     const t = now();
@@ -134,21 +156,28 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
   }
 
-  function readBody(req) {
+  // A body over the limit is read to the end and dropped, then answered with
+  // 413, so the client gets the answer (cutting it off mid-upload resets the
+  // connection and the client sees only a network error). Past twice the
+  // limit the connection is cut anyway.
+  function readBody(req, limit) {
     return new Promise((resolve, reject) => {
       if (!/^application\/json/.test(req.headers['content-type'] || '')) {
         return reject(new HttpError(415, 'Send JSON.'));
       }
       let size = 0;
-      const chunks = [];
+      let chunks = [];
       req.on('data', (c) => {
         size += c.length;
-        if (size > MAX_BODY) { reject(new HttpError(413, 'Too large.')); req.destroy(); return; }
+        if (size > limit * 2) { reject(new HttpError(413, 'Too large.')); req.destroy(); return; }
+        if (size > limit) { chunks = null; return; }
         chunks.push(c);
       });
       req.on('end', () => {
+        if (!chunks) return reject(new HttpError(413, 'Too large.'));
         try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
         catch { reject(new HttpError(400, 'Bad JSON.')); }
+        return undefined;
       });
       req.on('error', reject);
     });
@@ -159,7 +188,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
   const route = (method, pattern, handler, opts = {}) => {
     const keys = [];
     const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => (keys.push(k), '([^/]+)')) + '$');
-    routes.push({ method, re, keys, handler, auth: opts.auth !== false });
+    routes.push({ method, re, keys, handler, auth: opts.auth !== false, maxBody: opts.maxBody || MAX_BODY });
   };
 
   route('POST', '/api/signup', ({ body, res, ip }) => {
@@ -295,38 +324,50 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     return { ok: true };
   });
 
+  // A snap is a photo {image, duration: seconds shown, 0 = no limit} or a
+  // video {video, caption, duration: its length in seconds, mirror: recorded
+  // on a front camera}. The only route that takes a body over 6 MB.
   route('POST', '/api/snaps', ({ me, body }) => {
     const to = Array.isArray(body.to) ? [...new Set(body.to)] : [];
     const story = body.story === true;
     if (!to.length && !story) fail(400, 'Pick at least one friend or your story.');
     if (to.some((id) => !areFriends(me.id, id))) fail(403, 'You can only snap friends.');
-    const duration = body.duration === 0 ? 0 : Math.min(10, Math.max(1, Math.round(Number(body.duration) || 5)));
-    const { buf, ext } = parseImage(body.image);
+    const isVideo = body.video != null;
+    let duration;
+    let extra = {};
+    if (isVideo) {
+      const secs = Number(body.duration);
+      duration = Number.isFinite(secs) && secs > 0 ? Math.min(10, Math.max(0.1, Math.round(secs * 10) / 10)) : 10;
+      extra = { type: 'video', caption: cleanCaption(body.caption), mirror: body.mirror === true };
+    } else {
+      duration = body.duration === 0 ? 0 : Math.min(10, Math.max(1, Math.round(Number(body.duration) || 5)));
+    }
+    const { buf, ext } = isVideo ? parseVideo(body.video) : parseImage(body.image);
     for (const id of to) {
-      db.snaps.push({ id: store.id(), from: me.id, to: id, media: store.putMedia(buf, ext), duration, createdAt: now(), openedAt: null });
+      db.snaps.push({ id: store.id(), from: me.id, to: id, media: store.putMedia(buf, ext), duration, ...extra, createdAt: now(), openedAt: null });
       recordStreak(me.id, id);
       push(id, { type: 'snap', from: me.id });
     }
     if (story) {
-      db.stories.push({ id: store.id(), userId: me.id, media: store.putMedia(buf, ext), duration: duration || 5, createdAt: now(), viewers: [] });
+      db.stories.push({ id: store.id(), userId: me.id, media: store.putMedia(buf, ext), duration: duration || 5, ...extra, createdAt: now(), viewers: [] });
       for (const id of friendIds(me.id)) push(id, { type: 'story', from: me.id });
     }
     store.save();
     return { sent: to.length, story };
-  });
+  }, { maxBody: MAX_SNAP_BODY });
 
   route('POST', '/api/snaps/:id/open', ({ me, params }) => {
     const s = db.snaps.find((x) => x.id === params.id && x.to === me.id);
     if (!s) fail(404, 'Snap not found.');
     if (s.openedAt || !s.media) fail(410, 'This snap has already been opened.');
-    const type = s.media.endsWith('.png') ? 'png' : 'jpeg';
-    const image = `data:image/${type};base64,` + store.readMedia(s.media).toString('base64');
+    const dataUrl = `data:${MEDIA_TYPES[path.extname(s.media).slice(1)]};base64,` + store.readMedia(s.media).toString('base64');
     store.deleteMedia(s.media);
     s.media = null;
     s.openedAt = now();
     store.save();
     push(s.from, { type: 'opened', by: me.id });
-    return { image, duration: s.duration };
+    if (s.type === 'video') return { video: dataUrl, caption: s.caption || '', duration: s.duration, mirror: !!s.mirror };
+    return { image: dataUrl, duration: s.duration };
   });
 
   route('GET', '/api/inbox', ({ me }) => {
@@ -389,7 +430,8 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
 
   route('GET', '/api/stories', ({ me }) => {
     const shape = (s) => ({
-      id: s.id, createdAt: s.createdAt, duration: s.duration,
+      id: s.id, createdAt: s.createdAt, duration: s.duration, type: s.type || 'photo',
+      ...(s.type === 'video' ? { caption: s.caption || '', mirror: !!s.mirror } : {}),
       seen: s.viewers.includes(me.id),
       ...(s.userId === me.id ? { viewers: s.viewers.map((v) => publicUser(user(v))).filter(Boolean) } : {}),
     });
@@ -402,14 +444,32 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     return { mine: by(me.id), friends };
   });
 
-  route('GET', '/api/stories/:id/media', ({ me, params, res }) => {
+  // Photos and videos, with byte ranges: video players ask for ranges, and
+  // Safari won't play a video from a server that can't answer them.
+  route('GET', '/api/stories/:id/media', ({ me, params, req, res }) => {
     const s = db.stories.find((x) => x.id === params.id);
     if (!s || (s.userId !== me.id && !areFriends(me.id, s.userId))) fail(404, 'Story not found.');
-    res.writeHead(200, {
-      'Content-Type': s.media.endsWith('.png') ? 'image/png' : 'image/jpeg',
-      'Cache-Control': 'private, max-age=86400',
-    });
-    res.end(store.readMedia(s.media));
+    const data = store.readMedia(s.media);
+    const head = {
+      'Content-Type': MEDIA_TYPES[path.extname(s.media).slice(1)] || 'application/octet-stream',
+      'Cache-Control': 'private, max-age=86400', 'Accept-Ranges': 'bytes', 'X-Content-Type-Options': 'nosniff',
+    };
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (range && (range[1] || range[2])) {
+      const last = data.length - 1;
+      const start = range[1] ? Number(range[1]) : Math.max(0, data.length - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), last) : last;
+      if (start > end) {
+        res.writeHead(416, { 'Content-Range': `bytes */${data.length}` });
+        res.end();
+        return undefined;
+      }
+      res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${data.length}`, 'Content-Length': end - start + 1 });
+      res.end(data.subarray(start, end + 1));
+      return undefined;
+    }
+    res.writeHead(200, { ...head, 'Content-Length': data.length });
+    res.end(data);
     return undefined;
   });
 
@@ -454,7 +514,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       catch { fail(400, 'Bad address.'); }
       const me = user(db.sessions[cookies(req).sid]);
       if (r.auth && !me) fail(401, 'Log in first.');
-      const body = req.method === 'POST' ? await readBody(req) : {};
+      const body = req.method === 'POST' ? await readBody(req, r.maxBody) : {};
       const ip = req.socket.remoteAddress;
       const out = await r.handler({ req, res, url, params, body, me, ip });
       if (out !== undefined) {
@@ -483,4 +543,4 @@ if (require.main === module) {
   server.listen(port, () => console.log(`Poof is running on http://localhost:${port}`));
 }
 
-module.exports = { createApp };
+module.exports = { createApp, LIMITS: { body: MAX_BODY, snapBody: MAX_SNAP_BODY, image: MAX_IMAGE, video: MAX_VIDEO } };

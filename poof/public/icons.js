@@ -38,6 +38,10 @@
     trash: '<path d="M4 7h16M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2M6 7l1 12.1A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.9L18 7M10 11v6M14 11v6"/>',
     user: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    // a speaker sending out two waves: the video's sound is on
+    sound: '<path d="M3.5 9.5h3l5-4.5v14l-5-4.5h-3z"/><path d="M15.5 9a3.5 3.5 0 0 1 0 6M18 6a7 7 0 0 1 0 12"/>',
+    // the same speaker with a cross where the waves were: muted
+    'sound-off': '<path d="M3.5 9.5h3l5-4.5v14l-5-4.5h-3z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>',
     // a die: pick something at random
     shuffle: `<rect x="4" y="4" width="16" height="16" rx="3.5"/>${DOT(8.75, 8.75)}${DOT(12, 12)}${DOT(15.25, 15.25)}`,
   };

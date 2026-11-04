@@ -24,7 +24,9 @@
   --tap: 48px;
   --nav-h: 64px;
   --shutter: 84px; /* the camera's take-photo button */
+  --record: var(--snap); /* the ring that fills round the shutter while a video records */
   --light: #ffffff; /* pure white: the screen flash and marks drawn over the live camera */
+  --caption-y: 68%; /* where a video's caption sits, editing and watching */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -122,7 +124,7 @@ button { cursor: pointer; }
 /* Camera: the live picture full bleed, controls floating over it */
 .camera { background: #000; }
 .camera video, .camera .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.camera video.mirror { transform: scaleX(-1); }
+.camera video.mirror, video.mirror { transform: scaleX(-1); }
 /* the tap surface over the picture: tap to focus, double-tap to flip */
 .viewfinder { position: absolute; inset: 0; z-index: 1; touch-action: manipulation; overflow: hidden; }
 .focus-ring { position: absolute; width: 72px; height: 72px; margin: -36px 0 0 -36px; border: 2px solid var(--light); border-radius: 50%; box-shadow: 0 0 0 1px rgb(0 0 0 / .25), inset 0 0 0 1px rgb(0 0 0 / .25); pointer-events: none; animation: focus-ring .8s ease-out forwards; }
@@ -138,13 +140,25 @@ button { cursor: pointer; }
 .cam-tools .icon-btn[aria-pressed="true"] { background: var(--brand); }
 .shutter-row { position: absolute; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--space-5)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center; z-index: 2; pointer-events: none; }
 .shutter-row > button { pointer-events: auto; }
-.shutter { width: var(--shutter); height: var(--shutter); border-radius: 50%; border: 6px solid var(--light); background: rgb(255 255 255 / .15); }
+.shutter { position: relative; width: var(--shutter); height: var(--shutter); border-radius: 50%; border: 6px solid var(--light); background: rgb(255 255 255 / .15); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform .15s ease-out, background-color .15s ease-out; }
 .shutter:active { transform: scale(.94); }
+/* Hold to record: the shutter grows, a ring fills round it over 10 seconds,
+   and everything else steps back so the picture is clear */
+.shutter-ring { position: absolute; left: calc(-1 * var(--space-4)); top: calc(-1 * var(--space-4)); width: calc(100% + 2 * var(--space-4)); height: calc(100% + 2 * var(--space-4)); transform: rotate(-90deg); pointer-events: none; overflow: visible; opacity: 0; }
+.shutter-ring circle { fill: none; stroke-width: 6; }
+.shutter-ring .track { stroke: rgb(255 255 255 / .35); }
+.shutter-ring .arc { stroke: var(--record); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
+.shutter.recording { transform: scale(1.12); background: rgb(255 255 255 / .3); }
+.shutter.recording .shutter-ring { opacity: 1; }
+.camera.recording .cam-bar, .camera.recording .nav, .camera.recording .scan-chip-slot,
+.camera.recording .shutter-row > :not(.shutter) { visibility: hidden; }
+.camera.recording .viewfinder { pointer-events: none; }
 .cam-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--space-6); text-align: center; color: var(--text-dim); }
 /* the front camera's flash: the whole screen white for a moment */
 .screen-flash { position: fixed; inset: 0; z-index: 90; background: var(--light); }
 @media (prefers-reduced-motion: reduce) {
   .focus-ring { animation: none; }
+  .shutter { transition: none; }
   .shutter:active { transform: none; }
 }
 /* for screen readers only: there, but not drawn */
@@ -170,6 +184,10 @@ button { cursor: pointer; }
 .editor-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--space-4); padding-bottom: max(var(--space-4), env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; z-index: 3; }
 .timer-btn { align-content: center; gap: 1px; }
 .timer-label { font-size: .65rem; font-weight: 700; line-height: 1; }
+/* Video editor: the clip loops, contained like a photo; the caption sits where the viewer shows it */
+.stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.video-editor .caption { top: var(--caption-y); }
+.editor-foot.end { justify-content: flex-end; }
 
 /* Lists */
 .row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border: 0; border-bottom: 1px solid var(--surface-2); width: 100%; background: none; text-align: left; }
@@ -203,7 +221,10 @@ button { cursor: pointer; }
 
 /* Viewer (snaps and stories) */
 .viewer { background: #000; z-index: 10; }
-.viewer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.viewer .media { position: absolute; inset: 0; }
+.viewer img, .viewer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+/* a video's caption, shown over it (a photo's is part of the picture) */
+.media-caption { position: absolute; left: 0; right: 0; top: var(--caption-y); z-index: 1; margin: 0; padding: var(--space-2) var(--space-4); background: rgb(0 0 0 / .55); color: var(--light); text-align: center; font-size: 1.15rem; line-height: 1.5; overflow-wrap: anywhere; pointer-events: none; }
 .viewer .tap { position: absolute; inset: 0; border: 0; background: none; z-index: 1; }
 .viewer .head { position: absolute; top: 0; left: 0; right: 0; padding: var(--space-4); padding-top: max(var(--space-4), env(safe-area-inset-top)); display: flex; align-items: center; gap: var(--space-3); z-index: 2; background: linear-gradient(rgb(0 0 0 / .55), transparent); pointer-events: none; }
 .viewer .head .icon-btn { pointer-events: auto; }

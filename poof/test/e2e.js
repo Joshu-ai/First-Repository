@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { createApp } = require('../server');
+const PoofWebm = require('../public/webm');
 
 const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
 
@@ -25,7 +26,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   // `context` adds browser context options; `before` runs on the page before it
   // loads; `path` is where it starts (a profile link, say)
   const open = async ({ context, before, path: start = '/' } = {}) => {
-    const ctx = await browser.newContext({ viewport, permissions: ['camera'], ...context });
+    const ctx = await browser.newContext({ viewport, permissions: ['camera', 'microphone'], ...context });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && !/40[0-9]|410/.test(m.text()) && errors.push(m.text()));
@@ -98,6 +99,22 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   // after a reload: wait for the launch splash to fade, so screenshots are clean
   const settled = (page) => page.locator('#splash').waitFor({ state: 'detached' });
   const noToast = (page) => page.locator('#toast').waitFor({ state: 'hidden' });
+  // video snaps: the upload as sent (its JSON and the clip's bytes), whether
+  // a <video> is really playing, and how far the shutter's ring has filled
+  const snapPost = (page) => page.waitForRequest((r) => r.url().endsWith('/api/snaps') && r.method() === 'POST');
+  const clipOf = (req) => {
+    const body = JSON.parse(req.postData());
+    return { body, bytes: Buffer.from(body.video.slice(body.video.indexOf(',') + 1), 'base64') };
+  };
+  const WEBM_MAGIC = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]);
+  const playing = (page, sel) => page.waitForFunction((q) => {
+    const v = document.querySelector(q);
+    return v && !v.paused && v.currentTime > 0 && v.readyState >= 2;
+  }, sel);
+  const ringFilled = (page, atLeast) => page.waitForFunction((min) => {
+    const c = document.querySelector('.shutter-ring .arc');
+    return c && c.style.strokeDashoffset !== '' && 100 - parseFloat(c.style.strokeDashoffset) >= min;
+  }, atLeast);
 
   // Controls show Poof's drawn icons (public/icons.js), never emoji or text
   // glyphs. `expected` maps a button's accessible name to its icon name.
@@ -184,7 +201,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await calm.context().close();
 
     // Ava may use the clipboard: Share profile copies her link where there is no share sheet
-    const ava = await open({ context: { permissions: ['camera', 'clipboard-read', 'clipboard-write'] } });
+    const ava = await open({ context: { permissions: ['camera', 'microphone', 'clipboard-read', 'clipboard-write'] } });
     const ben = await open();
 
     // S01 welcome: violet edge to edge, Puff, and both choices in the thumb zone
@@ -483,6 +500,125 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.getByText('Received').waitFor();
     await ava.getByText('Opened', { exact: true }).waitFor(); // live update to the sender
 
+    // S14 video snaps: hold the shutter and it records, a ring filling round
+    // it while everything else steps back; let go and the video editor opens
+    await ava.getByRole('button', { name: 'Camera', exact: true }).click();
+    await camVideo(ava, true);
+    const shutter = ava.getByRole('button', { name: 'Take photo', exact: true });
+    assert.equal(await shutter.evaluate((b) => document.getElementById(b.getAttribute('aria-describedby'))?.textContent),
+      'Hold to record a video.', 'the shutter says it can record');
+    const restBox = await shutter.boundingBox();
+    await ava.mouse.move(restBox.x + restBox.width / 2, restBox.y + restBox.height / 2);
+    await ava.mouse.down();
+    await ava.locator('.camera.recording').waitFor();
+    await ringFilled(ava, 4);
+    const ringBox = await ava.locator('.shutter-ring').boundingBox();
+    const recBox = await shutter.boundingBox();
+    assert.ok(ringBox.x < recBox.x && ringBox.y < recBox.y && ringBox.x + ringBox.width > recBox.x + recBox.width
+      && ringBox.y + ringBox.height > recBox.y + recBox.height, 'the ring is drawn round the shutter');
+    assert.ok(Math.abs(mid(ringBox).x - mid(restBox).x) <= 1 && Math.abs(mid(ringBox).y - mid(restBox).y) <= 1, 'centred on it');
+    assert.ok(recBox.width > restBox.width, 'the shutter grows while it records');
+    for (const name of ['Flip camera', 'Choose a photo', 'Chat']) {
+      assert.ok(await ava.getByRole('button', { name, exact: true }).isHidden(), `${name} steps back while recording`);
+    }
+    assert.equal(await ava.locator('.camera [role="status"]').textContent(), 'Recording. Let go to stop.');
+    await ringFilled(ava, 15);
+    await shot(ava, 'S14-video-recording');
+    await ava.mouse.up();
+    await ava.locator('[aria-label="Edit video"]').waitFor();
+    assert.equal(await ava.getByRole('button', { name: 'Draw' }).count(), 0, 'a hold makes a video, not a photo');
+    // the clip loops with its sound on; Mute switches the sound off and on
+    await playing(ava, '.video-editor video');
+    const preview = ava.locator('.video-editor video');
+    assert.deepEqual(await preview.evaluate((v) => [v.loop, v.muted, v.classList.contains('mirror')]), [true, false, true],
+      'loops, with sound, mirrored like the front camera');
+    assert.equal(await pressed(ava, 'Mute'), 'false');
+    await checkIcons(ava, 'video editor', { 'Add caption': 'text', Mute: 'sound', Discard: 'close', 'Send to': 'send' });
+    await ava.getByRole('button', { name: 'Mute' }).click();
+    assert.equal(await pressed(ava, 'Mute'), 'true');
+    assert.equal(await preview.evaluate((v) => v.muted), true, 'muted preview');
+    await checkIcons(ava, 'video editor, muted', { Mute: 'sound-off' });
+    await ava.getByRole('button', { name: 'Mute' }).click();
+    assert.equal(await pressed(ava, 'Mute'), 'false');
+    assert.equal(await preview.evaluate((v) => v.muted), false);
+    await ava.getByRole('button', { name: 'Add caption' }).click();
+    await ava.getByRole('textbox', { name: 'Caption' }).fill('Puff says hi');
+    for (const name of ['Add caption', 'Mute', 'Discard', 'Send to']) {
+      const b = await ava.getByRole('button', { name, exact: true }).boundingBox();
+      assert.ok(b.width >= 44 && b.height >= 44, `${name} is easy to tap`);
+    }
+    await shot(ava, 'S14-video-editor');
+    // to Ben and the story: up it goes as a real WebM with picture and sound,
+    // the caption beside it
+    await ava.getByRole('button', { name: 'Send to', exact: true }).click();
+    await ava.getByRole('checkbox', { name: /Ben/ }).click();
+    await ava.getByRole('checkbox', { name: /My Story/ }).click();
+    const [avaPost] = await Promise.all([snapPost(ava), ava.getByRole('button', { name: 'Send', exact: true }).click()]);
+    const avaClip = clipOf(avaPost);
+    assert.match(avaClip.body.video, /^data:video\/webm;base64,/);
+    assert.ok(avaClip.bytes.subarray(0, 4).equals(WEBM_MAGIC), 'a real WebM file');
+    const avaInfo = PoofWebm.info(avaClip.bytes);
+    assert.deepEqual(avaInfo.tracks.map((t) => t.codec).sort(), ['A_OPUS', 'V_VP8'], 'with a picture and a sound track');
+    assert.ok(avaInfo.tracks.every((t) => avaInfo.blocks[t.number] > 0), 'both of them recorded');
+    assert.equal(avaClip.body.caption, 'Puff says hi');
+    assert.equal(avaClip.body.mirror, true);
+    assert.ok(avaClip.body.duration >= 1 && avaClip.body.duration <= 10, `its length (${avaClip.body.duration}s)`);
+    assert.ok(!('image' in avaClip.body));
+    await ava.getByText('Delivered').waitFor();
+
+    // S15 Ben opens it: a <video> plays with its sound, the caption over it;
+    // when it ends the viewer moves on (here, it closes) and the snap is gone
+    await ben.getByText('New snap', { exact: true }).waitFor();
+    await ben.locator('.puff-pop').waitFor({ state: 'detached' });
+    await ben.getByRole('button', { name: /Ava, New snap/ }).click();
+    await playing(ben, '.viewer video');
+    await ben.waitForFunction(() => document.querySelector('.viewer video')?.webkitAudioDecodedByteCount > 0); // its sound plays
+    const clipEl = ben.locator('.viewer video');
+    assert.equal(await clipEl.getAttribute('aria-label'), 'Snap from Ava');
+    assert.deepEqual(await clipEl.evaluate((v) => [v.muted, v.loop, v.classList.contains('mirror'), v.src.startsWith('blob:')]),
+      [false, false, true, true], 'plays once, with sound, mirrored as Ava saw it');
+    const capBox = await ben.locator('.media-caption').boundingBox();
+    assert.equal(await ben.locator('.media-caption').textContent(), 'Puff says hi');
+    assert.ok(capBox.y > viewport.height / 2 && capBox.y + capBox.height < viewport.height, 'the caption sits over the video');
+    await shot(ben, 'S15-video-snap');
+    await ben.getByText('Received').waitFor();
+    await ava.getByText('Opened', { exact: true }).waitFor();
+
+    // S14 from the keyboard: hold Space on the shutter. On the back camera
+    // with Flash on, its light stays on for the recording. Muted, the clip
+    // that goes up has no sound in it at all, not just a quiet one
+    await ben.getByRole('button', { name: 'Camera', exact: true }).click();
+    await camVideo(ben, true);
+    await ben.getByRole('button', { name: 'Flip camera' }).click();
+    await camVideo(ben, false);
+    assert.equal(await pressed(ben, 'Flash'), 'true');
+    await fakeTorch(ben, true);
+    await ben.getByRole('button', { name: 'Take photo', exact: true }).focus();
+    await ben.keyboard.down(' ');
+    await ben.locator('.camera.recording').waitFor();
+    await ringFilled(ben, 12);
+    assert.deepEqual(await ben.evaluate(() => window.torchCalls), [true], 'the light is on while it records');
+    await ben.keyboard.up(' ');
+    await ben.locator('[aria-label="Edit video"]').waitFor();
+    assert.deepEqual(await ben.evaluate(() => window.torchCalls), [true, false], 'and off once it stops');
+    await fakeTorch(ben, false);
+    assert.equal(await ben.getByRole('button', { name: 'Draw' }).count(), 0, 'letting go of Space does not also take a photo');
+    assert.equal(await ben.locator('.video-editor video').evaluate((v) => v.classList.contains('mirror')), false,
+      'the back camera is not mirrored');
+    await ben.getByRole('button', { name: 'Mute' }).click();
+    await ben.getByRole('button', { name: 'Send to', exact: true }).click();
+    await ben.getByRole('checkbox', { name: /My Story/ }).click();
+    const [benPost] = await Promise.all([snapPost(ben), ben.getByRole('button', { name: 'Send', exact: true }).click()]);
+    const benClip = clipOf(benPost);
+    assert.ok(benClip.bytes.subarray(0, 4).equals(WEBM_MAGIC));
+    const benInfo = PoofWebm.info(benClip.bytes);
+    assert.deepEqual(benInfo.tracks.map((t) => t.codec), ['V_VP8'], 'muted: a picture and no sound track');
+    assert.ok(benInfo.blocks[benInfo.tracks[0].number] > 0, 'with its frames');
+    assert.ok(!benClip.bytes.includes('A_OPUS') && !benClip.bytes.includes('OpusHead'), 'nothing of the sound is left in the file');
+    assert.equal(benClip.body.caption, '');
+    assert.equal(benClip.body.mirror, false);
+    await ben.getByText('Received').waitFor();
+
     // S07 chat both ways, keep a message
     await ben.getByRole('button', { name: 'Chat with Ava' }).click();
     await ben.getByLabel('Message').fill('nice photo');
@@ -505,10 +641,25 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await checkIcons(ben, 'story viewer', { Close: 'close' });
     await shot(ben, 'S08-story-viewer');
-    await ben.getByRole('button', { name: 'Close' }).click();
+    // Ava's next story is her video: it plays with its caption, and when it
+    // ends the viewer moves on by itself (it was her last, so it closes)
+    await ben.getByRole('button', { name: 'Next' }).click();
+    await playing(ben, '.viewer video');
+    assert.equal(await ben.locator('.viewer video').getAttribute('aria-label'), 'Story from Ava');
+    assert.equal(await ben.locator('.media-caption').textContent(), 'Puff says hi');
+    await ben.waitForFunction(() => parseFloat(document.querySelectorAll('.progress i')[1]?.style.width) > 0, null,
+      { polling: 50 }); // its bar follows the video
+    await ben.getByRole('heading', { name: 'Stories' }).waitFor();
     await ava.getByRole('button', { name: 'Back' }).click();
     await ava.getByRole('button', { name: 'Stories', exact: true }).click();
     await ava.getByText(/1 viewers/).waitFor();
+    // Ben's muted story: Ava's browser plays its picture and has no sound to play
+    await ava.locator('.scroll .row').nth(1).click();
+    await playing(ava, '.viewer video');
+    assert.equal(await ava.locator('.viewer video').getAttribute('aria-label'), 'Story from Ben');
+    assert.deepEqual(await ava.locator('.viewer video').evaluate((v) => [v.webkitVideoDecodedByteCount > 0, v.webkitAudioDecodedByteCount]),
+      [true, 0], 'picture, and not a byte of sound');
+    await ava.getByRole('heading', { name: 'Stories' }).waitFor(); // it ended and the viewer closed
 
     // S10 profile: Ava's Puffcode, large at the top with her avatar inside it
     await ava.getByRole('button', { name: 'Profile' }).click();
@@ -587,6 +738,27 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     // S02 with a code reader: the camera spots a Puffcode and offers to add them
     await cal.getByRole('button', { name: 'Done' }).click();
     await cal.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+    // S14 with the microphone blocked: it still records and says it has no
+    // sound. Held on and on, it stops by itself at 10 seconds. There is
+    // nothing to mute, and Discard goes back to the camera
+    await cal.evaluate(() => {
+      const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = (c) => (c?.audio ? Promise.reject(new DOMException('No', 'NotAllowedError')) : real(c));
+    });
+    const calShutter = await cal.getByRole('button', { name: 'Take photo', exact: true }).boundingBox();
+    await cal.mouse.move(calShutter.x + calShutter.width / 2, calShutter.y + calShutter.height / 2);
+    await cal.mouse.down();
+    await cal.getByText('Recording without sound. Allow the microphone to add sound.').waitFor();
+    const recordingFrom = Date.now();
+    await cal.locator('[aria-label="Edit video"]').waitFor({ timeout: 15000 }); // still holding
+    const recordedFor = Date.now() - recordingFrom;
+    assert.ok(recordedFor > 9000 && recordedFor < 11000, `a recording stops itself at 10 seconds (${recordedFor}ms)`);
+    await cal.mouse.up();
+    assert.equal(await cal.getByRole('button', { name: 'Draw' }).count(), 0, 'letting go afterwards takes no photo');
+    assert.equal(await cal.getByRole('button', { name: 'Mute' }).count(), 0, 'no sound, nothing to mute');
+    await playing(cal, '.video-editor video');
+    await cal.getByRole('button', { name: 'Discard' }).click();
+    await cal.waitForFunction(() => document.querySelector('.camera video')?.videoWidth > 0);
     await cal.evaluate((url) => { window.fakeCode = { url, from: 'video' }; }, base + '/add/ben');
     await cal.getByRole('button', { name: 'Add @ben' }).waitFor();
     await checkIcons(cal, 'camera with a Puffcode in view', { 'Add @ben': 'puff-plus' });

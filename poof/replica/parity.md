@@ -3,7 +3,7 @@
 Scored with the replica-diff rules (must 3, should 2, could 1, partial half,
 `skip` rows left out). Computed 2026-11-04 from `features.csv`.
 
-**Feature score: 94 / 100 (83 of 88 points). Must-haves: 15 of 15. Shippable for this slice.**
+**Feature score: 95 / 100 (83.5 of 88 points). Must-haves: 15 of 15. Shippable for this slice.**
 
 Partial (counted half): scanning a profile code in the app, and the camera
 spotting one, need the browser's code reader (`BarcodeDetector`), which
@@ -16,9 +16,15 @@ focus `pointsOfInterest`, both Chrome on Android). Elsewhere the focus ring
 still shows, the front camera's screen flash still works, and a back camera
 that cannot be lit says "This camera has no flash."
 
-Missing (could-haves, in build order):
+Also partial: saving a snap to the device works for photos; videos can't be
+saved yet.
+
+Video snaps are in: hold the shutter to record up to 10 seconds, a caption
+and Mute in the video editor (Mute takes the sound out of the file itself),
+open once, and stories play video. Drawing on a video is not built.
+
+Missing (could-haves):
 1. Group chats
-2. Video snaps
 
 Out of scope on purpose (not scored): Lenses/AR, the map, Discover/Spotlight,
 avatars, screenshot alerts (a web page can't detect screenshots).
