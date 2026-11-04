@@ -116,8 +116,9 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     return c && c.style.strokeDashoffset !== '' && 100 - parseFloat(c.style.strokeDashoffset) >= min;
   }, atLeast);
   // gestures: a mouse drag from one point to another over about `ms`, in
-  // even steps (its speed is what makes a flick or not); `mid` runs halfway
-  const drag = async (page, [x0, y0], [x1, y1], { ms = 240, steps = 12, mid } = {}) => {
+  // even steps (its speed is what makes a flick or not); `mid` runs halfway,
+  // `end` at the end, before letting go
+  const drag = async (page, [x0, y0], [x1, y1], { ms = 240, steps = 12, mid, end } = {}) => {
     await page.mouse.move(x0, y0);
     await page.mouse.down();
     for (let i = 1; i <= steps; i++) {
@@ -125,8 +126,34 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       if (mid && i === Math.ceil(steps / 2)) await mid();
       await page.waitForTimeout(ms / steps);
     }
+    if (end) await end();
     await page.mouse.up();
   };
+  // pull to refresh on the list in front: where the list and Puff are, his
+  // mood, how he is scaled, and what the status line says
+  const pullNow = (page) => page.evaluate(() => {
+    const pull = document.querySelector('#app > .screen:not(.peek) .pull');
+    const list = pull.nextElementSibling;
+    const puff = pull.querySelector('.pull-puff');
+    const box = puff.getBoundingClientRect();
+    const m = getComputedStyle(puff).transform.match(/^matrix\(([^)]+)\)$/);
+    const [sx, , , sy] = m ? m[1].split(',').map(Number) : [1, 0, 0, 1];
+    return { state: pull.dataset.state, mood: pull.dataset.mood, top: pull.getBoundingClientRect().top,
+      listY: list.getBoundingClientRect().top, moved: list.style.transform, puffTop: box.top, puffBottom: box.bottom,
+      opacity: Number(getComputedStyle(puff).opacity), sx, sy, status: pull.querySelector('[role="status"]').textContent };
+  });
+  const pullIdle = (page) => page.waitForFunction(() => document.querySelector('#app > .screen:not(.peek) .pull')?.dataset.state === 'idle');
+  // every change of a pull's state, when it came and how Puff was moving then
+  const logPulls = (page) => page.evaluate(() => {
+    window.pullLog = [];
+    new MutationObserver((ms) => ms.forEach((m) => {
+      if (!m.target.classList.contains('pull')) return;
+      const svg = m.target.querySelector('.pull-puff svg');
+      window.pullLog.push({ state: m.target.dataset.state, t: performance.now(), anim: svg ? getComputedStyle(svg).animationName : '' });
+    })).observe(document.getElementById('app'), { subtree: true, attributes: true, attributeFilter: ['data-state'] });
+  });
+  const pulls = (page) => page.evaluate(() => window.pullLog.splice(0));
+  const loaded = (page, pathname) => page.waitForResponse((r) => new URL(r.url()).pathname === pathname);
   // the tab the screen in front says it is on
   const currentTab = (page) => page.evaluate(() =>
     document.querySelector('#app > .screen:not(.peek) .nav [aria-current="page"]')?.getAttribute('aria-label'));
@@ -609,6 +636,103 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await currentTab(ava), 'Chat');
     await swipeSettled(ava);
     assert.equal(await ava.locator('#app > .leaving').count(), 0, 'the camera screen has slid away');
+
+    // S05 pull to refresh. At the top of the Chat list, drag down: the list
+    // follows, though less far than the pointer, with Puff rising behind it.
+    // Let go early and it springs back, nothing reloaded.
+    await logPulls(ava);
+    const inboxLoads = [];
+    const countInbox = (r) => { if (new URL(r.url()).pathname === '/api/inbox') inboxLoads.push(r); };
+    ava.on('request', countInbox);
+    const atRest = await pullNow(ava);
+    assert.equal(atRest.state, 'idle');
+    assert.ok(Math.abs(atRest.listY - atRest.top) <= 1 && !atRest.moved, 'the list starts right under the header');
+    let shortPull;
+    await drag(ava, [195, 240], [195, 310], { end: async () => { shortPull = await pullNow(ava); } });
+    assert.equal(shortPull.state, 'pulling');
+    assert.equal(shortPull.mood, 'happy', 'Puff looks happy before the threshold');
+    const earlyBy = shortPull.listY - atRest.listY;
+    assert.ok(earlyBy > 20 && earlyBy < 60, `the list follows with resistance (${earlyBy}px for 70px)`);
+    assert.ok(shortPull.opacity > 0, 'Puff is showing');
+    await pullIdle(ava);
+    assert.deepEqual((await pulls(ava)).map((p) => p.state), ['pulling', 'idle'], 'a short pull springs back');
+    const sprung = await pullNow(ava);
+    assert.ok(!sprung.moved && Math.abs(sprung.listY - atRest.listY) <= 1, 'the list is back where it was');
+    assert.equal(inboxLoads.length, 0, 'a short pull does not refresh');
+    // Pull past the threshold (starting on Ben's row): Puff's eyes go wide and
+    // he stretches. Let go: the list reloads while Puff bobs (400ms at least),
+    // then he drifts off and the list settles back; the row was not tapped.
+    const pullRow = await benRow.boundingBox();
+    const rowMid = pullRow.y + pullRow.height / 2;
+    const oldRow = await ava.evaluateHandle(() => document.querySelector('.chat-row'));
+    let halfway;
+    let armed;
+    const inboxReload = loaded(ava, '/api/inbox');
+    await drag(ava, [195, rowMid], [195, rowMid + 220], { steps: 16,
+      mid: async () => { halfway = await pullNow(ava); },
+      end: async () => { armed = await pullNow(ava); await shot(ava, 'S05-pull-to-refresh'); } });
+    await ava.waitForFunction(() => document.querySelector('#app > .screen:not(.peek) .pull').dataset.state !== 'pulling');
+    await shot(ava, 'S05-pull-refreshing');
+    assert.equal(halfway.mood, 'happy');
+    assert.ok(halfway.opacity > 0.5, 'Puff fades in with the pull');
+    assert.equal(armed.mood, 'wow', 'past the threshold his eyes go wide');
+    const armedBy = armed.listY - atRest.listY;
+    assert.ok(armedBy >= 72 && armedBy <= 160 && armedBy < 220 - 40, `the list comes down past the threshold, resisting (${armedBy}px for 220px)`);
+    assert.ok(armed.opacity === 1 && armed.puffTop >= atRest.top - 1 && armed.puffBottom <= armed.listY + 1,
+      `Puff shows in the gap above the list (${JSON.stringify(armed)})`);
+    assert.ok(armed.sy > armed.sx, 'and stretches with the pull');
+    await inboxReload;
+    await pullIdle(ava);
+    assert.equal(inboxLoads.length, 1, 'letting go reloads the list once');
+    assert.equal(await oldRow.evaluate((el) => el.isConnected), false, 'the rows are drawn afresh');
+    await ava.getByRole('button', { name: /^Ben, / }).waitFor();
+    assert.equal(await ava.locator('section.screen[aria-label="Chat with Ben"]').count(), 0, 'letting go on a row is not a tap');
+    const full = await pulls(ava);
+    assert.deepEqual(full.map((p) => p.state), ['pulling', 'refreshing', 'done', 'idle']);
+    const [, busy, gone] = full;
+    assert.equal(busy.anim, 'pull-bob', 'Puff bobs while it refreshes');
+    assert.equal(gone.anim, 'pull-drift', 'then drifts off');
+    assert.ok(gone.t - busy.t >= 390, `Puff stays long enough to read (${Math.round(gone.t - busy.t)}ms)`);
+    const settledPull = await pullNow(ava);
+    assert.ok(!settledPull.moved && Math.abs(settledPull.listY - atRest.listY) <= 1, 'the list settles back');
+    assert.equal(settledPull.status, 'All up to date', 'and says so to screen readers');
+    // with reduced motion: no stretch while pulling, no bob, and a fade, not a drift
+    await ava.emulateMedia({ reducedMotion: 'reduce' });
+    let calmPull;
+    const calmReload = loaded(ava, '/api/inbox');
+    await drag(ava, [195, 240], [195, 460], { steps: 16, end: async () => { calmPull = await pullNow(ava); } });
+    assert.equal(calmPull.mood, 'wow');
+    assert.ok(calmPull.sx === 1 && calmPull.sy === 1, `no stretch with reduced motion (${calmPull.sx}, ${calmPull.sy})`);
+    await calmReload;
+    await pullIdle(ava);
+    const calmLog = await pulls(ava);
+    assert.deepEqual(calmLog.map((p) => p.state), ['pulling', 'refreshing', 'done', 'idle']);
+    assert.deepEqual([calmLog[1].anim, calmLog[2].anim], ['none', 'pull-fade'], 'Puff keeps still, then fades');
+    await ava.emulateMedia({ reducedMotion: 'no-preference' });
+    // scrolled down the list, a drag down is just a drag: no pull
+    await ava.evaluate(() => {
+      const list = document.querySelector('#app > .screen:not(.peek) .pullable');
+      list.append(Object.assign(document.createElement('div'), { className: 'test-spacer', style: 'height:2000px' }));
+      list.scrollTop = 120;
+    });
+    const loadsBefore = inboxLoads.length;
+    await drag(ava, [195, 300], [195, 520]);
+    assert.deepEqual(await pulls(ava), [], 'no pull unless the list is at the top');
+    assert.equal(inboxLoads.length, loadsBefore);
+    await ava.evaluate(() => document.querySelector('.test-spacer')?.remove());
+    ava.off('request', countInbox);
+    // the Stories list pulls the same way (letting go on My Story does not open it)
+    await ava.getByRole('button', { name: 'Stories', exact: true }).click();
+    await ava.getByRole('heading', { name: 'Stories' }).waitFor();
+    const myStory = await ava.getByRole('button', { name: /My Story/ }).boundingBox();
+    const storiesReload = loaded(ava, '/api/stories');
+    await drag(ava, [195, myStory.y + myStory.height / 2], [195, myStory.y + myStory.height / 2 + 220], { steps: 16 });
+    await storiesReload;
+    await pullIdle(ava);
+    assert.deepEqual((await pulls(ava)).map((p) => p.state), ['pulling', 'refreshing', 'done', 'idle']);
+    assert.equal(await ava.locator('.viewer').count(), 0, 'letting go on My Story is not a tap');
+    await ava.getByRole('button', { name: 'Chat', exact: true }).click();
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
 
     // S05 Ben sees a new snap live, S06 opens it once
     await ben.getByRole('button', { name: 'Back' }).click();

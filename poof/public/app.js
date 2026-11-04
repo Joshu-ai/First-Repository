@@ -482,6 +482,127 @@
     });
   }
 
+  // ---------- pull to refresh ----------
+  // At the top of the Chat or Stories list, drag down: the list follows with
+  // growing resistance and Puff rises from behind its top edge, stretching a
+  // little. Past PULL_AT his eyes go wide; let go there and the list waits
+  // while state.refresh() runs (Puff bobs, his trail puffs pulse), then he
+  // drifts off up and to the right as the list settles back. Let go sooner
+  // and it springs back. Less motion: no rise, stretch, bob or drift; Puff
+  // just fades in and out. Only a drag that starts with the list at the top
+  // and goes down is a pull; everything else stays the browser's.
+  const PULL_AT = 72; // px the list comes down to refresh, and where it waits meanwhile
+  const PULL_MAX = 160; // the furthest it ever comes, however far the pointer goes
+  const PULL_MIN_MS = 400; // Puff stays at least this long, so the refresh reads
+  const PULL_PUFF = 60; // Puff's width
+  const PULL_DONE_MS = 700; // the fallback for his drift (or fade) reporting back
+  const pulled = (dy) => PULL_MAX * (1 - Math.exp((-0.8 * Math.max(0, dy)) / PULL_MAX)); // rubber band
+
+  function pullToRefresh(screen, list) {
+    const status = h('p', { class: 'sr-only', role: 'status' });
+    const holder = h('span', { class: 'pull-puff' });
+    const pull = h('div', { class: 'pull', 'data-state': 'idle' }, holder, status);
+    list.before(pull);
+    list.classList.add('pullable');
+    let busy = false; // a pull is under way, from the press to Puff gone
+
+    const setMood = (mood) => {
+      if (pull.dataset.mood === mood) return;
+      pull.dataset.mood = mood;
+      holder.replaceChildren(puff(mood, PULL_PUFF));
+    };
+    // Puff for the list `d` px down. He rises from behind the list's edge to
+    // the middle of the gap by PULL_AT, growing and stretching; past it he
+    // keeps to the middle and stretches a little more.
+    function place(d, { stretch = true, reduce = reduceMotion() } = {}) {
+      const p = Math.min(1, d / PULL_AT);
+      holder.style.opacity = String(Math.min(1, p * 1.2));
+      if (reduce) {
+        holder.style.transform = `translate(-50%, -50%) translateY(${PULL_AT / 2}px)`;
+        return;
+      }
+      const over = Math.max(0, d - PULL_AT) / (PULL_MAX - PULL_AT);
+      const y = p < 1 ? d - (PULL_AT / 2) * p * p : d / 2;
+      const s = 0.5 + 0.5 * p;
+      const sx = stretch ? s * (1 - 0.04 * p - 0.06 * over) : s;
+      const sy = stretch ? s * (1 + 0.06 * p + 0.12 * over) : s;
+      holder.style.transform = `translate(-50%, -50%) translateY(${y.toFixed(1)}px) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    }
+    function settle() {
+      pull.dataset.state = 'idle';
+      holder.style.transform = holder.style.opacity = '';
+      busy = false;
+    }
+    function springBack() {
+      glide([list, holder], () => { list.style.transform = ''; place(0); }, settle);
+    }
+    async function refresh(load) {
+      pull.dataset.state = 'refreshing';
+      setMood('happy');
+      status.textContent = 'Refreshing…';
+      glide([list, holder], () => { list.style.transform = `translateY(${PULL_AT}px)`; place(PULL_AT, { stretch: false }); });
+      let ok;
+      try { [ok] = await Promise.all([load(), wait(PULL_MIN_MS)]); } catch { ok = false; }
+      status.textContent = ok === false ? 'Couldn’t refresh' : 'All up to date';
+      // off he goes over the list as it settles back (with less motion: he fades, then it moves)
+      const reduce = reduceMotion();
+      setMood('wink');
+      pull.dataset.state = 'done';
+      const back = () => glide([list], () => { list.style.transform = ''; });
+      if (!reduce) back();
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (reduce) back();
+        settle();
+      };
+      const svg = holder.querySelector('svg');
+      svg?.addEventListener('animationend', (e) => { if (e.target === svg) finish(); });
+      setTimeout(finish, PULL_DONE_MS);
+    }
+
+    pointerDrag(list, {
+      accept: () => !busy && !screen.inert && list.scrollTop <= 0,
+      lock: (g) => {
+        if (g.axis !== 'y' || g.dy <= 0 || list.scrollTop > 0) return false;
+        busy = true;
+        g.from = g.dy; // the list starts moving from here, not with a jump
+        g.d = 0;
+        g.reduce = reduceMotion();
+        status.textContent = '';
+        setMood('happy');
+        pull.dataset.state = 'pulling';
+        return true;
+      },
+      move: (g) => {
+        g.d = pulled(g.dy - g.from);
+        list.style.transform = `translateY(${g.d.toFixed(1)}px)`;
+        place(g.d, { reduce: g.reduce });
+        setMood(g.d >= PULL_AT ? 'wow' : 'happy');
+      },
+      end: (g, { cancelled }) => {
+        if (!g.dragging) return;
+        swallowClick();
+        const load = state.refresh;
+        if (!cancelled && g.d >= PULL_AT && load && app.firstElementChild === screen) refresh(load);
+        else springBack();
+      },
+    });
+
+    // On a touch screen the browser would take a drag down as its own (the
+    // list can't scroll up, but it would still try), and the pull would never
+    // start: at the top, a drag down is kept back for it. A drag up scrolls.
+    let touchY = null;
+    list.addEventListener('touchstart', (e) => {
+      touchY = list.scrollTop <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
+    }, { passive: true });
+    list.addEventListener('touchmove', (e) => {
+      if (touchY == null || !e.cancelable) return;
+      if (pull.dataset.state === 'pulling' || e.touches[0].clientY > touchY) e.preventDefault();
+    }, { passive: false });
+  }
+
   // A countdown that can pause: onTick(0..1) each frame, then onDone.
   function countdown(ms, onTick, onDone) {
     let spent = 0;
@@ -1667,10 +1788,12 @@
     const list = h('div', { class: 'scroll' }, h('p', { class: 'hint' }, 'Loading…'));
     const screen = h('section', { class: 'screen', 'aria-label': 'Chats' }, header('Chat', meButton(), addButton()), list, nav('chat'));
     tabGestures(screen, 'chat');
+    pullToRefresh(screen, list);
     show(screen);
+    // false when it couldn't load (pull to refresh says so)
     const load = async () => {
       let rows;
-      try { rows = await api('/api/inbox'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
+      try { rows = await api('/api/inbox'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return false; }
       state.unread = rows.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
       app.querySelector('.nav')?.replaceWith(nav('chat'));
       if (!rows.length) {
@@ -1880,10 +2003,11 @@
     const list = h('div', { class: 'scroll' }, h('p', { class: 'hint' }, 'Loading…'));
     const screen = h('section', { class: 'screen', 'aria-label': 'Stories' }, header('Stories', meButton(), addButton()), list, nav('stories'));
     tabGestures(screen, 'stories');
+    pullToRefresh(screen, list);
     show(screen);
     const load = async () => {
       let data;
-      try { data = await api('/api/stories'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
+      try { data = await api('/api/stories'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return false; }
       const mineRow = h('button', { class: 'row', onclick: () => (data.mine.length ? watch([{ user: state.me, stories: data.mine }], 0, true) : go('camera')) },
         avatar(state.me, data.mine.length ? 'ring' : ''),
         h('span', { class: 'main' }, h('div', { class: 'name' }, 'My Story'),

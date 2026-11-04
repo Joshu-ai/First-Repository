@@ -22,8 +22,9 @@ saved yet.
 Gestures are in: swipe sideways between Chat, Camera and Stories (the screen
 follows the finger and snaps over or back), tap through snaps and swipe them
 down to close, tap the sides of a story, hold to pause it, swipe it down to
-close, swipe a chat row right to open the chat, and press and hold a row for
-the friend card (with Remove friend). Escape closes viewers and sheets.
+close, swipe a chat row right to open the chat, press and hold a row for
+the friend card (with Remove friend), and pull down on the Chat or Stories
+list to refresh it, Puff showing above it. Escape closes viewers and sheets.
 
 Video snaps are in: hold the shutter to record up to 10 seconds, a caption
 and Mute in the video editor (Mute takes the sound out of the file itself),

@@ -111,7 +111,7 @@ stored (default `./data`).
 
 | | |
 | --- | --- |
-| Gestures | Swipe sideways between Chat, Camera and Stories (the screen follows your finger, the tab bar stays put). Tap a snap for the next, swipe it down to close. In a story, tap the right half for the next, the left half to go back, press and hold to pause, swipe down to close. Swipe a chat row right to open the chat; press and hold it (or tap the avatar) for the friend card. Escape closes viewers and sheets |
+| Gestures | Swipe sideways between Chat, Camera and Stories (the screen follows your finger, the tab bar stays put). Tap a snap for the next, swipe it down to close. In a story, tap the right half for the next, the left half to go back, press and hold to pause, swipe down to close. Swipe a chat row right to open the chat; press and hold it (or tap the avatar) for the friend card. Pull down on the Chat or Stories list to refresh it, Puff showing above it. Escape closes viewers and sheets |
 | Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
 | Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
@@ -148,6 +148,15 @@ mouse, and each has a button or key that does the same.
   name, @username, streak, their Puffcode, Send a chat and Remove friend,
   which asks first. It closes with Close, Escape, a tap above it or a drag
   down, and focus goes back where it was.
+- **Pull to refresh.** At the top of the Chat or Stories list, drag down:
+  the list follows, with more resistance the further it goes, and Puff
+  rises from behind it. Past the threshold his eyes go wide; let go there
+  and the list reloads while he bobs, then he drifts off and the list
+  settles back. Let go sooner and it springs back. It only starts with the
+  list at the top and a drag downwards, so scrolling is never taken over.
+  With reduced motion on, Puff just fades in and out. This one has no
+  button: both lists update live anyway, and reloading the page does the
+  same.
 
 ## Video snaps
 

@@ -17,7 +17,11 @@
   the browser. Tab swipes show the last drawn screen of the neighbour tab
   (kept when it was replaced, inert and hidden from assistive tech) and
   slide the real one in from there. The click after a drag or a hold is
-  swallowed, so it is never also a tap.
+  swallowed, so it is never also a tap. Pull to refresh (`pullToRefresh`)
+  is a second tracker on the Chat and Stories lists that only takes a drag
+  down that starts at `scrollTop` 0; on touch screens a non-passive
+  `touchmove` keeps that one drag from the browser, so a drag up still
+  scrolls natively.
 - **Video snaps:** holding the shutter records with `MediaRecorder` (WebM
   VP8/Opus, else MP4), up to 10 seconds. The caption travels beside the
   video and is shown over it. Mute takes the sound track out of the WebM
