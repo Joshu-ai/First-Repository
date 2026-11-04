@@ -4,7 +4,7 @@ import { logout } from "@/lib/actions";
 import { stripe } from "@/lib/payments";
 import { openBillingPortal } from "@/lib/store-actions";
 
-const tabs = [["/dashboard", "Purchases"], ["/dashboard/projects", "Projects"], ["/learn", "Course"], ["/dashboard/sites", "Hosting"]];
+const tabs = [["/dashboard/websites", "Websites"], ["/dashboard", "Purchases"], ["/dashboard/projects", "Projects"], ["/learn", "Course"], ["/dashboard/sites", "Hosting"]];
 
 export default async function DashLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
