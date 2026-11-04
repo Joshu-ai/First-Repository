@@ -58,6 +58,42 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       if (document.getElementById('splash')?.classList.contains('leaving')) window.splashFaded = true;
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ['class'] });
   });
+  // records each screen flash (the white cover the front camera's flash
+  // puts up): its colour, its size, and how long it stayed
+  const watchFlashes = (page) => page.evaluate(() => {
+    window.flashes = [];
+    new MutationObserver((ms) => ms.forEach((m) => {
+      m.addedNodes.forEach((n) => {
+        if (!n.classList?.contains('screen-flash')) return;
+        const r = n.getBoundingClientRect();
+        window.flashes.push({ el: n, bg: getComputedStyle(n).backgroundColor, w: r.width, h: r.height, at: performance.now() });
+      });
+      m.removedNodes.forEach((n) => {
+        const f = window.flashes.find((x) => x.el === n);
+        if (f) f.ms = performance.now() - f.at;
+      });
+    })).observe(document.body, { childList: true });
+  });
+  // the fake camera has no light of its own: stand one in (getCapabilities
+  // says torch) and record what the app asks of it, or put things back
+  const fakeTorch = (page, on) => page.evaluate((on) => {
+    const P = MediaStreamTrack.prototype;
+    if (!on) { Object.assign(P, window.realTrack); return; }
+    window.realTrack = { getCapabilities: P.getCapabilities, applyConstraints: P.applyConstraints };
+    window.torchCalls = [];
+    P.getCapabilities = function () { return { ...window.realTrack.getCapabilities.call(this), torch: true }; };
+    P.applyConstraints = function (c) {
+      const set = c?.advanced?.find((s) => 'torch' in s);
+      if (!set) return window.realTrack.applyConstraints.call(this, c);
+      window.torchCalls.push(set.torch);
+      return Promise.resolve();
+    };
+  }, on);
+  const camVideo = (page, mirrored) => page.waitForFunction((m) => {
+    const v = document.querySelector('.camera video');
+    return v && v.videoWidth > 0 && v.classList.contains('mirror') === m;
+  }, mirrored);
+  const pressed = (page, name) => page.getByRole('button', { name, exact: true }).getAttribute('aria-pressed');
   const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.png') });
   // after a reload: wait for the launch splash to fade, so screenshots are clean
   const settled = (page) => page.locator('#splash').waitFor({ state: 'detached' });
@@ -263,8 +299,41 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await shot(ben, 'S10-profile-placeholder');
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByRole('button', { name: 'Take photo' }).waitFor();
+
+    // S02 flash on the back camera. Flip camera keeps keyboard focus where it was.
+    await camVideo(ben, true);
+    await ben.getByRole('button', { name: 'Flip camera' }).click();
+    await camVideo(ben, false);
+    assert.equal(await ben.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Flip camera',
+      'focus stays on Flip camera after the screen redraws');
+    // a back camera the browser cannot light says so
+    assert.equal(await pressed(ben, 'Flash'), 'false', 'Flash starts off');
+    await ben.getByRole('button', { name: 'Flash' }).click();
+    await ben.getByText('This camera has no flash.').waitFor();
+    await ben.getByRole('button', { name: 'Flash' }).click();
+    assert.equal(await pressed(ben, 'Flash'), 'false');
+    // one that has a light: on for the shot, then off, and no white screen
+    await fakeTorch(ben, true);
+    await watchFlashes(ben);
+    await ben.getByRole('button', { name: 'Flash' }).click();
+    assert.equal(await pressed(ben, 'Flash'), 'true');
+    await ben.getByRole('button', { name: 'Take photo' }).click();
+    await ben.getByRole('button', { name: 'Discard' }).waitFor();
+    assert.deepEqual(await ben.evaluate(() => window.torchCalls), [true, false], 'the light goes on for the shot, then off');
+    assert.equal(await ben.evaluate(() => window.flashes.length), 0, 'no screen flash on the back camera');
+    await ben.getByRole('button', { name: 'Discard' }).click();
+    await ben.getByRole('button', { name: 'Take photo' }).waitFor();
+    assert.equal(await pressed(ben, 'Flash'), 'true', 'Flash stays on');
+    await fakeTorch(ben, false);
+    // and it is remembered next time Poof opens
+    await ben.reload();
+    await settled(ben);
+    await ben.getByRole('button', { name: 'Take photo' }).waitFor();
+    assert.equal(await pressed(ben, 'Flash'), 'true', 'Flash is remembered');
+    await checkIcons(ben, 'camera, flash on', { Flash: 'flash' });
+
     await checkIcons(ava, 'camera', {
-      'Choose a photo': 'image', 'Flip camera': 'flip', 'Add friends': 'puff-plus',
+      Search: 'search', 'Add friends': 'puff-plus', 'Flip camera': 'flip', Flash: 'flash-off', 'Choose a photo': 'image',
       Chat: 'chat', Camera: 'camera', Stories: 'stories',
     });
 
@@ -309,12 +378,65 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByRole('heading', { name: 'Add friends' }).waitFor();
 
-    // S02 camera -> S03 editor
+    // S02 camera: Back from Add friends returns to it
     await ava.getByRole('button', { name: 'Back' }).click();
-    await ava.getByRole('button', { name: 'Camera', exact: true }).click();
-    await ava.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+    await ava.getByRole('button', { name: 'Take photo' }).waitFor();
+    await camVideo(ava, true);
+    // you and search top left; add friends, flip and flash in a column top
+    // right; the shutter big and central with the gallery to its left
+    const cam = {};
+    for (const name of ['Profile', 'Search', 'Add friends', 'Flip camera', 'Flash', 'Choose a photo', 'Take photo']) {
+      cam[name] = await ava.getByRole('button', { name, exact: true }).boundingBox();
+      assert.ok(cam[name].width >= 44 && cam[name].height >= 44, `${name} is easy to tap`);
+    }
+    const mid = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+    assert.ok(cam.Profile.x < 30 && cam.Profile.y < 80, 'Profile sits top left');
+    assert.ok(cam.Search.x > cam.Profile.x + cam.Profile.width && cam.Search.x + cam.Search.width < viewport.width / 2
+      && Math.abs(mid(cam.Search).y - mid(cam.Profile).y) <= 1, 'Search sits next to Profile');
+    const column = [cam['Add friends'], cam['Flip camera'], cam.Flash];
+    assert.ok(column.every((b) => b.x > viewport.width / 2 && Math.abs(mid(b).x - mid(column[0]).x) <= 1),
+      'Add friends, Flip camera and Flash line up on the right');
+    assert.ok(column[0].y < column[1].y && column[1].y < column[2].y && Math.abs(column[0].y - cam.Profile.y) <= 1,
+      'top to bottom from the top bar: Add friends, Flip camera, Flash');
+    assert.ok(Math.abs(mid(cam['Take photo']).x - viewport.width / 2) <= 1 && cam['Take photo'].width >= 80,
+      'the shutter is big and centred');
+    assert.ok(cam['Choose a photo'].x + cam['Choose a photo'].width < cam['Take photo'].x
+      && Math.abs(mid(cam['Choose a photo']).y - mid(cam['Take photo']).y) <= 1, 'the gallery sits left of the shutter');
+    assert.ok(cam['Take photo'].y + cam['Take photo'].height < (await ava.locator('.nav').boundingBox()).y, 'above the tabs');
+    assert.equal(await pressed(ava, 'Flash'), 'false');
     await shot(ava, 'S02-camera');
+    // Search opens Add friends, ready to type, and Back comes back here
+    await ava.getByRole('button', { name: 'Search', exact: true }).click();
+    await ava.getByRole('heading', { name: 'Add friends' }).waitFor();
+    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Search users');
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await camVideo(ava, true);
+    // tap: a focus ring where you tapped, and the camera stays put
+    await ava.mouse.click(120, 420);
+    const ring = await ava.locator('.viewfinder .focus-ring').boundingBox();
+    assert.ok(Math.abs(mid(ring).x - 120) <= 2 && Math.abs(mid(ring).y - 420) <= 2, `focus ring at the tap (${mid(ring).x}, ${mid(ring).y})`);
+    assert.equal(await ava.locator('.viewfinder .focus-ring').getAttribute('aria-hidden'), 'true');
+    await ava.locator('.viewfinder .focus-ring').waitFor({ state: 'detached' });
+    await camVideo(ava, true);
+    // Flash switches on, and stays on through a flip
+    await ava.getByRole('button', { name: 'Flash' }).click();
+    assert.equal(await pressed(ava, 'Flash'), 'true');
+    await checkIcons(ava, 'camera, flash on', { Flash: 'flash' });
+    // double-tap the picture: the other camera (the front one is mirrored, the back one is not)
+    await ava.mouse.dblclick(260, 540);
+    await camVideo(ava, false);
+    assert.equal(await pressed(ava, 'Flash'), 'true', 'Flash stays on after a flip');
+    await ava.mouse.dblclick(260, 540);
+    await camVideo(ava, true);
+    // S02 -> S03: the front camera's flash turns the whole screen white for the shot
+    await watchFlashes(ava);
     await ava.getByRole('button', { name: 'Take photo' }).click();
+    await ava.getByRole('button', { name: 'Add caption' }).waitFor();
+    const flashes = await ava.evaluate(() => window.flashes.map(({ bg, w, h, ms }) => ({ bg, w, h, ms })));
+    assert.equal(flashes.length, 1, 'one screen flash');
+    assert.equal(flashes[0].bg, 'rgb(255, 255, 255)');
+    assert.deepEqual([flashes[0].w, flashes[0].h], [viewport.width, viewport.height], 'it covers the screen');
+    assert.ok(flashes[0].ms >= 140 && flashes[0].ms < 600, `it is brief (${Math.round(flashes[0].ms)}ms)`);
     await ava.getByRole('button', { name: 'Add caption' }).click();
     await ava.getByRole('textbox', { name: 'Caption' }).fill('hello from the test');
     // draw a stroke

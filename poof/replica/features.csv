@@ -4,8 +4,12 @@ Launch splash,onboarding,should,yes,yes,brand-violet screen with the white Puff 
 Welcome screen with Log in and Sign up,onboarding,must,yes,yes,violet full bleed with Puff; the wordmark and tagline; both buttons full width in the thumb zone; shown on log out
 Live username availability check,onboarding,should,yes,yes,GET /api/users/available uses the same rule as sign up; rate limited per IP in its own bucket so typing never uses up log in attempts
 Opens straight to the camera,camera,must,yes,yes,
-Take a photo with front or back camera,camera,must,yes,yes,browser camera; falls back to picking a file when blocked
-Pick a photo from the device instead,camera,should,yes,yes,
+Camera screen layout,camera,should,yes,yes,your avatar (Profile) and Search top left; a column top right of Add friends then Flip camera and Flash; a big centred shutter with Choose a photo to its left; the tabs below; controls float over the full-bleed picture and taps between them reach the picture
+Double-tap the picture to flip the camera,camera,should,yes,yes,two taps within 320ms and 48px anywhere on the viewfinder; a drag is not a tap; the Flip camera button is the keyboard way
+Tap to focus,camera,could,yes,partial,a focus ring at the tap point (no zoom-in with reduced motion); the camera also refocuses there only where the browser takes a point of interest (Chrome on Android); elsewhere it is the ring alone
+Flash,camera,should,yes,partial,Flash switch (pressed state shown) remembered on the device; back camera: its light goes on for the shot through the browser's torch control then off; front camera: the whole screen goes white for 150ms for the shot; back cameras the browser cannot light (Safari on iPhone; most laptops) say This camera has no flash
+Take a photo with front or back camera,camera,must,yes,yes,browser camera; falls back to picking a file when blocked; Flip camera sits in the top right column and keeps keyboard focus after the switch
+Pick a photo from the device instead,camera,should,yes,yes,Choose a photo sits left of the shutter
 Add a text caption,editor,must,yes,yes,
 Draw on the photo in colours,editor,should,yes,yes,
 Set how long the snap shows (1-10s or no limit),editor,must,yes,yes,
@@ -19,7 +23,7 @@ Save a message in chat,chat,should,yes,yes,
 Post a snap to My Story for 24 hours,stories,must,yes,yes,
 Watch friends' stories with auto-advance,stories,must,yes,yes,
 See who viewed my story,stories,should,yes,yes,
-Search users and send a friend request,friends,must,yes,yes,
+Search users and send a friend request,friends,must,yes,yes,the camera's Search button opens Add friends ready to type; Back from Add friends returns to the tab it was opened from
 Accept a friend request,friends,must,yes,yes,
 Remove a friend,friends,could,yes,yes,
 Streak count for consecutive days,friends,should,yes,yes,UTC days; shown from 2 days

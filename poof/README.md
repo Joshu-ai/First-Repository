@@ -111,7 +111,7 @@ stored (default `./data`).
 
 | | |
 | --- | --- |
-| Camera | Opens straight to the camera, front/back flip, or pick a photo |
+| Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
 | Snaps | Send to several friends and/or your story. Each snap opens once, then the file is deleted on the server |
 | Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it |

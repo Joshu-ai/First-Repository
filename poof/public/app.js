@@ -4,11 +4,14 @@
   const toastEl = document.getElementById('toast');
   const TIMERS = [1, 3, 5, 10, 0]; // 0 = no limit
   const COLORS = ['#ffffff', '#ff5d8f', '#ffd23f', '#3ddc97', '#3db4ff', '#7c5cff', '#111111'];
+  const FLASH_KEY = 'poof.flash'; // the camera's Flash switch, remembered on this device
 
   const state = {
     me: null,
     tab: 'camera',
     facing: 'user',
+    flash: (() => { try { return localStorage.getItem(FLASH_KEY) === 'on'; } catch { return false; } })(),
+    friendsBack: null, // the tab Add friends goes back to: wherever it was opened from
     stream: null,
     photo: null, // canvas with the captured image
     editor: null, // { draw canvas, caption, captionY, timer }
@@ -135,6 +138,7 @@
   function renderWelcome() {
     stopCamera();
     state.me = null;
+    state.friendsBack = null;
     clearTimeout(toastTimer); // news from the last session is not for whoever logs in next
     toastEl.hidden = true;
     show(h('section', { class: 'screen welcome', 'aria-label': 'Welcome' },
@@ -336,6 +340,9 @@
   }
 
   function go(tab) {
+    // Add friends opened from a main tab goes back there; from its own
+    // sub-screens (scanner, someone's card) it keeps the tab it had
+    if (tab === 'friends' && ['camera', 'chat', 'stories'].includes(state.tab)) state.friendsBack = state.tab;
     state.tab = tab;
     state.refresh = null;
     if (tab !== 'camera') stopCamera();
@@ -364,9 +371,96 @@
     state.stream = null;
   }
 
-  async function renderCamera() {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const camTrack = () => state.stream?.getVideoTracks()[0] || null;
+  function trackCaps(track) {
+    try { return track?.getCapabilities?.() || {}; } catch { return {}; }
+  }
+  // The front camera, by what the camera says about itself where it does
+  // (laptop webcams often say nothing), else by which one was asked for.
+  function onFrontCamera(track) {
+    let said;
+    try { said = track?.getSettings?.().facingMode; } catch {}
+    return said ? said === 'user' : state.facing === 'user';
+  }
+  // How the flash fires on the camera in use: the back camera's light where
+  // the browser can switch it on, a white screen on the front camera, else none.
+  function flashKind(track) {
+    if (onFrontCamera(track)) return 'screen';
+    return trackCaps(track).torch ? 'torch' : null;
+  }
+
+  // Tap the viewfinder: a focus ring where you tapped, and the camera focuses
+  // there where it can. Double-tap: switch cameras.
+  function viewfinderGestures(viewfinder, video, flip) {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+    let down = null;
+    let lastTap = null;
+    viewfinder.addEventListener('pointerdown', (e) => {
+      down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null;
+    });
+    viewfinder.addEventListener('pointerup', (e) => {
+      if (!down || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12;
+      down = null;
+      if (moved) return; // a drag, not a tap
+      if (lastTap && e.timeStamp - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 48) {
+        lastTap = null;
+        flip();
+        return;
+      }
+      lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+      if (video.videoWidth) focusAt(e.clientX, e.clientY);
+    });
+    viewfinder.addEventListener('pointercancel', () => { down = null; });
+
+    function focusAt(x, y) {
+      const box = viewfinder.getBoundingClientRect();
+      viewfinder.querySelector('.focus-ring')?.remove();
+      const ring = h('span', { class: 'focus-ring', 'aria-hidden': 'true',
+        style: `left:${x - box.left}px;top:${y - box.top}px` });
+      viewfinder.append(ring);
+      ring.addEventListener('animationend', () => ring.remove());
+      setTimeout(() => ring.remove(), reduce.matches ? 700 : 900);
+      // where the browser lets us, focus on that spot of the picture: map the
+      // tap through the cover crop (and the mirror) to 0..1 of the frame
+      const track = camTrack();
+      if (!track || !trackCaps(track).focusMode) return;
+      if (!navigator.mediaDevices.getSupportedConstraints?.().pointsOfInterest) return;
+      const vb = video.getBoundingClientRect();
+      const scale = Math.max(vb.width / video.videoWidth, vb.height / video.videoHeight);
+      const fx = (x - vb.left - (vb.width - video.videoWidth * scale) / 2) / (video.videoWidth * scale);
+      const fy = (y - vb.top - (vb.height - video.videoHeight * scale) / 2) / (video.videoHeight * scale);
+      const clamp = (v) => Math.min(1, Math.max(0, v));
+      const point = { x: clamp(video.classList.contains('mirror') ? 1 - fx : fx), y: clamp(fy) };
+      track.applyConstraints({ advanced: [{ pointsOfInterest: [point] }] }).catch(() => {});
+    }
+  }
+
+  // `focus` names a control to keep focus on after the screen is redrawn
+  // (Flip camera redraws it), so keyboard users stay where they were.
+  async function renderCamera(focus) {
     const video = h('video', { autoplay: true, playsInline: true, muted: true, class: state.facing === 'user' ? 'mirror' : '' });
     const msg = h('div', { class: 'cam-msg', hidden: true });
+    const viewfinder = h('div', { class: 'viewfinder' });
+    const flip = (from) => {
+      state.facing = state.facing === 'user' ? 'environment' : 'user';
+      stopCamera();
+      renderCamera(from);
+    };
+    viewfinderGestures(viewfinder, video, () => flip());
+    const flashBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Flash', onclick: () => {
+      state.flash = !state.flash;
+      try { localStorage.setItem(FLASH_KEY, state.flash ? 'on' : 'off'); } catch {}
+      paintFlash();
+      const track = camTrack();
+      if (state.flash && track && !flashKind(track)) toast('This camera has no flash.');
+    } });
+    const paintFlash = () => {
+      flashBtn.setAttribute('aria-pressed', String(state.flash));
+      flashBtn.replaceChildren(icon(state.flash ? 'flash' : 'flash-off'));
+    };
+    paintFlash();
     const file = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => {
       const f = file.files[0];
       if (!f) return;
@@ -376,20 +470,25 @@
       img.src = URL.createObjectURL(f);
     } });
     const chipSlot = h('div', { class: 'scan-chip-slot', 'aria-live': 'polite' });
+    // top left: you and search; top right, a column: add friends, then the
+    // camera's own switches. The shutter is the one big thing, low and central.
     const screen = h('section', { class: 'screen camera', 'aria-label': 'Camera' },
-      video, msg,
-      h('header', { class: 'bar overlay' }, meButton(), h('h1', {}), addButton()),
+      video, msg, viewfinder,
+      h('header', { class: 'bar overlay cam-bar' },
+        h('h1', { class: 'sr-only' }, 'Camera'),
+        meButton(),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Search', onclick: () => go('friends') }, icon('search')),
+        h('div', { class: 'cam-tools' },
+          h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Add friends', onclick: () => go('friends') }, icon('puff-plus', 28)),
+          h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Flip camera', onclick: () => flip('Flip camera') }, icon('flip')),
+          flashBtn)),
       chipSlot,
       h('div', { class: 'shutter-row' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Choose a photo', onclick: () => file.click() }, icon('image')),
-        h('button', { class: 'shutter', 'aria-label': 'Take photo', onclick: () => capture(video) }),
-        h('button', { class: 'icon-btn', 'aria-label': 'Flip camera', onclick: () => {
-          state.facing = state.facing === 'user' ? 'environment' : 'user';
-          stopCamera();
-          renderCamera();
-        } }, icon('flip'))),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Choose a photo', onclick: () => file.click() }, icon('image')),
+        h('button', { class: 'shutter', type: 'button', 'aria-label': 'Take photo', onclick: () => capture(video) })),
       file, nav('camera'));
     show(screen);
+    if (focus) screen.querySelector(`[aria-label="${focus}"]`)?.focus();
     if (!navigator.mediaDevices?.getUserMedia) {
       msg.hidden = false;
       msg.textContent = 'This browser cannot open the camera. Use the photo button to pick one instead.';
@@ -518,9 +617,39 @@
     return c;
   }
 
-  function capture(video) {
+  // Take the frame, with the flash when it is on: the back camera's light
+  // (on, a moment for the picture to brighten, the frame, off), or on the
+  // front camera a full white screen that lights your face for the frame.
+  const TORCH_SETTLE_MS = 300;
+  const SCREEN_FLASH_MS = 150;
+  let shooting = false;
+  async function capture(video) {
     if (!video.videoWidth) return toast('The camera is not ready yet.');
-    openEditor(imageToCanvas(video, video.videoWidth, video.videoHeight, state.facing === 'user'));
+    if (shooting) return undefined;
+    const track = camTrack();
+    const kind = state.flash ? flashKind(track) : null;
+    const take = () => imageToCanvas(video, video.videoWidth, video.videoHeight, state.facing === 'user');
+    if (!kind) return openEditor(take());
+    shooting = true;
+    let photo = null;
+    let light = null;
+    try {
+      if (kind === 'torch') {
+        try { await track.applyConstraints({ advanced: [{ torch: true }] }); await wait(TORCH_SETTLE_MS); } catch {}
+      } else {
+        light = h('div', { class: 'screen-flash', 'aria-hidden': 'true' });
+        document.body.append(light);
+        await wait(SCREEN_FLASH_MS);
+      }
+      if (video.isConnected && video.videoWidth) photo = take();
+    } finally {
+      if (kind === 'torch') track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      light?.remove();
+      shooting = false;
+    }
+    // they may have left the camera while the flash was firing
+    if (photo && state.tab === 'camera') openEditor(photo);
+    return undefined;
   }
 
   // ---------- editor (S03) ----------
@@ -963,7 +1092,7 @@
         clearTimeout(debounce);
         debounce = setTimeout(() => { q = search.value.trim(); runSearch(); }, 200);
       } });
-    const back = backButton('Back', () => go('chat'));
+    const back = backButton('Back', () => go(state.friendsBack || 'chat'));
     show(h('section', { class: 'screen', 'aria-label': 'Add friends' }, header('Add friends', back),
       h('div', { class: 'scroll' }, h('div', { class: 'field search-field' }, icon('search', 20), search),
         h('button', { class: 'btn ghost block scan-btn', type: 'button', onclick: renderScanner }, icon('scan', 20), 'Scan Puffcode'),
