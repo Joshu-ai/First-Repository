@@ -15,6 +15,8 @@
     unread: 0,
     events: null,
     refresh: null, // re-render hook for the current screen on live events
+    pendingAdd: null, // a username from a Puffcode or /add/<username> link, opened once logged in
+    scan: null, // { timer, busy } while the camera is looking for Puffcodes
   };
 
   // ---------- tiny DOM helper ----------
@@ -139,7 +141,8 @@
       h('div', { class: 'hero' },
         puff('happy', 220, 'Puff, the Poof mascot'),
         h('h1', {}, 'Poof'),
-        h('p', { class: 'tagline' }, 'Photos that vanish once they are seen.')),
+        h('p', { class: 'tagline' }, 'Photos that vanish once they are seen.'),
+        state.pendingAdd && h('p', { class: 'invite' }, `Log in or sign up to add @${state.pendingAdd}.`)),
       h('div', { class: 'actions' },
         h('button', { class: 'btn block on-brand-quiet', type: 'button', onclick: renderLogin }, 'Log in'),
         h('button', { class: 'btn block on-brand', type: 'button', onclick: () => renderSignup(1, {}) }, 'Sign up'))));
@@ -209,7 +212,7 @@
         note.set('');
         try {
           state.me = await api('/api/login', { username: username.value, password: password.input.value });
-          start('camera');
+          start();
         } catch (e) {
           note.set(e.message, 'bad');
           password.input.focus();
@@ -356,6 +359,7 @@
 
   // ---------- camera (S02) ----------
   function stopCamera() {
+    stopScan();
     if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
   }
@@ -371,9 +375,11 @@
       img.onerror = () => toast('That file is not a photo we can read.');
       img.src = URL.createObjectURL(f);
     } });
+    const chipSlot = h('div', { class: 'scan-chip-slot', 'aria-live': 'polite' });
     const screen = h('section', { class: 'screen camera', 'aria-label': 'Camera' },
       video, msg,
       h('header', { class: 'bar overlay' }, meButton(), h('h1', {}), addButton()),
+      chipSlot,
       h('div', { class: 'shutter-row' },
         h('button', { class: 'icon-btn', 'aria-label': 'Choose a photo', onclick: () => file.click() }, icon('image')),
         h('button', { class: 'shutter', 'aria-label': 'Take photo', onclick: () => capture(video) }),
@@ -399,7 +405,106 @@
     } catch {
       msg.hidden = false;
       msg.textContent = 'Camera is blocked. Allow camera access in your browser settings, or use the photo button.';
+      return undefined;
     }
+    // Point the camera at a friend's Puffcode and an "Add @name" chip pops up
+    // (where the browser can read codes). It goes again once the code is out of view.
+    const detector = await qrDetector();
+    if (!detector || state.tab !== 'camera' || !video.isConnected) return undefined;
+    let shown = null;
+    let hide;
+    watchForPuffcodes(detector, video, (name) => {
+      if (name === state.me.username) return;
+      clearTimeout(hide);
+      hide = setTimeout(() => { chipSlot.replaceChildren(); shown = null; }, 3000);
+      if (shown === name) return;
+      shown = name;
+      chipSlot.replaceChildren(h('button', { class: 'scan-chip', type: 'button', onclick: () => renderAddProfile(name) },
+        icon('puff-plus', 22), 'Add @' + name));
+    });
+    return undefined;
+  }
+
+  // ---------- reading Puffcodes ----------
+  // A QR reader from the browser (BarcodeDetector), or null where there is none.
+  let detectorReady = null;
+  function qrDetector() {
+    if (!detectorReady) {
+      detectorReady = (async () => {
+        if (!('BarcodeDetector' in window)) return null;
+        try {
+          const formats = await window.BarcodeDetector.getSupportedFormats?.();
+          if (Array.isArray(formats) && !formats.includes('qr_code')) return null;
+          return new window.BarcodeDetector({ formats: ['qr_code'] });
+        } catch { return null; }
+      })();
+    }
+    return detectorReady;
+  }
+
+  // a copy of a frame or photo with its colours flipped, on an opaque canvas
+  // (see-through parts of a saved Puffcode become a clear white margin)
+  let frameCanvas = null;
+  function flippedFrame(source, w, ht) {
+    const scale = Math.min(1, 720 / Math.max(w, ht));
+    const c = frameCanvas || (frameCanvas = document.createElement('canvas'));
+    c.width = Math.max(1, Math.round(w * scale));
+    c.height = Math.max(1, Math.round(ht * scale));
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(source, 0, 0, c.width, c.height);
+    const img = ctx.getImageData(0, 0, c.width, c.height);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2]; }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
+  // Look for a Puffcode for this server in a frame or photo. Puffcodes are
+  // white on violet, and some readers only see dark codes on light, so the
+  // picture is also tried with its colours flipped. -> { name } | { other } | null
+  async function findPuffcode(detector, source, w, ht, ways = ['as is', 'flipped']) {
+    let seen = false;
+    for (const way of ways) {
+      let codes = [];
+      try { codes = await detector.detect(way === 'as is' ? source : flippedFrame(source, w, ht)); } catch {}
+      for (const code of codes) {
+        const name = window.PoofPuffcode.parse(code.rawValue, location.host);
+        if (name) return { name };
+        seen = true;
+      }
+    }
+    return seen ? { other: true } : null;
+  }
+
+  // Check the camera for Puffcodes about every 600ms until it stops. Passive
+  // checks take turns between the frame as is and flipped, to stay light.
+  function watchForPuffcodes(detector, video, found, { other, both = false } = {}) {
+    stopScan();
+    let turn = 0;
+    const scan = { busy: false, timer: null };
+    scan.timer = setInterval(async () => {
+      if (!video.isConnected) {
+        clearInterval(scan.timer);
+        if (state.scan === scan) state.scan = null;
+        return;
+      }
+      if (scan.busy || video.readyState < 2 || !video.videoWidth) return;
+      scan.busy = true;
+      const ways = both ? ['as is', 'flipped'] : [turn++ % 2 ? 'flipped' : 'as is'];
+      const r = await findPuffcode(detector, video, video.videoWidth, video.videoHeight, ways);
+      scan.busy = false;
+      if (state.scan !== scan || !video.isConnected) return;
+      if (r?.name) found(r.name);
+      else if (r?.other && other) other();
+    }, 600);
+    state.scan = scan;
+  }
+
+  function stopScan() {
+    if (state.scan) clearInterval(state.scan.timer);
+    state.scan = null;
   }
 
   function imageToCanvas(source, w, ht, mirror) {
@@ -860,7 +965,9 @@
       } });
     const back = backButton('Back', () => go('chat'));
     show(h('section', { class: 'screen', 'aria-label': 'Add friends' }, header('Add friends', back),
-      h('div', { class: 'scroll' }, h('div', { class: 'field search-field' }, icon('search', 20), search), results, requests)));
+      h('div', { class: 'scroll' }, h('div', { class: 'field search-field' }, icon('search', 20), search),
+        h('button', { class: 'btn ghost block scan-btn', type: 'button', onclick: renderScanner }, icon('scan', 20), 'Scan Puffcode'),
+        results, requests)));
 
     async function act(path, body, okText, mood) {
       try {
@@ -901,6 +1008,139 @@
     loadRequests();
   }
 
+  // ---------- add a friend from a Puffcode or link (S12) ----------
+  // One person, where you stand with them, and the one thing to do next.
+  async function renderAddProfile(username) {
+    stopCamera();
+    state.tab = 'add';
+    const body = h('div', { class: 'scroll add-profile' }, h('p', { class: 'hint' }, 'Loading…'));
+    show(h('section', { class: 'screen', 'aria-label': 'Add friend' },
+      header('Add friend', backButton('Back', () => go('friends'))), body));
+    const load = async () => {
+      let u;
+      try {
+        u = await api('/api/users/by-username/' + encodeURIComponent(username));
+      } catch (e) {
+        body.replaceChildren(e.status === 404
+          ? h('div', { class: 'empty' }, puff('sad', 110), h('strong', {}, 'No one by that name'),
+            `There is nobody called @${username} on Poof. Check the code, or search by username.`,
+            h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn', type: 'button', onclick: () => go('friends') }, 'Find friends')))
+          : h('p', { class: 'error' }, e.message));
+        return;
+      }
+      // adding someone who already added you accepts them
+      const send = async (btn) => {
+        btn.disabled = true;
+        try {
+          const r = await api('/api/friends/request', { username: u.username });
+          if (r.status === 'accepted') puffPop('You are now friends', 'love');
+          else toast('Request sent');
+          await load();
+        } catch (e) { toast(e.message); btn.disabled = false; }
+      };
+      const note = (text) => h('p', { class: 'profile-note' }, text);
+      let next;
+      if (u.status === 'none') {
+        next = h('button', { class: 'btn block', type: 'button', onclick: () => send(next) }, icon('plus', 20), 'Add friend');
+      } else if (u.status === 'incoming') {
+        next = [note(`${u.displayName} added you.`),
+          h('button', { class: 'btn block', type: 'button', onclick: (e) => send(e.currentTarget) }, 'Accept')];
+      } else if (u.status === 'requested') {
+        next = [note(`Request sent. You will be friends once ${u.displayName} accepts.`),
+          h('button', { class: 'btn ghost block', type: 'button', onclick: () => go('camera') }, 'Done')];
+      } else if (u.status === 'friends') {
+        next = [note(`You and ${u.displayName} are friends.`),
+          h('button', { class: 'btn block', type: 'button', onclick: () => renderChat(u) }, icon('chat', 20), 'Send a chat')];
+      } else {
+        next = [note('This is your own Puffcode.'),
+          h('button', { class: 'btn block', type: 'button', onclick: () => go('profile') }, 'Go to your profile')];
+      }
+      body.replaceChildren(h('div', { class: 'profile-card' }, avatar(u, '', 96),
+        h('h2', { class: 'profile-name' }, u.displayName), h('p', { class: 'profile-user' }, '@' + u.username)),
+      h('div', { class: 'profile-next' }, next));
+    };
+    state.refresh = load;
+    await load();
+  }
+
+  // ---------- scan a Puffcode (S13) ----------
+  // A live camera that reads Puffcodes, plus reading one from a photo. Where
+  // the browser cannot read codes, it says to use the phone's camera app,
+  // which opens the code's /add/ link in the browser.
+  async function renderScanner() {
+    stopCamera();
+    state.tab = 'scan';
+    state.refresh = null;
+    const back = backButton('Back', () => go('friends'));
+    const detector = await qrDetector();
+    if (state.tab !== 'scan') return;
+    if (!detector) {
+      show(h('section', { class: 'screen', 'aria-label': 'Scan Puffcode' }, header('Scan Puffcode', back),
+        h('div', { class: 'scroll' }, h('div', { class: 'empty' }, puff('wink', 120),
+          h('strong', {}, "Use your phone's camera"),
+          "This browser can't read codes. Open your phone's camera app, point it at the Puffcode, then tap the link it shows."))));
+      return;
+    }
+    const found = (name) => renderAddProfile(name);
+    const video = h('video', { autoplay: true, playsInline: true, muted: true });
+    const AIM = 'Point your camera at a Puffcode.';
+    const note = h('p', { class: 'scan-note', 'aria-live': 'polite' }, AIM);
+    let reset;
+    const say = (text) => {
+      note.textContent = text;
+      clearTimeout(reset);
+      reset = setTimeout(() => { if (state.stream) note.textContent = AIM; }, 4000);
+    };
+    const file = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async () => {
+      const f = file.files[0];
+      file.value = '';
+      if (!f) return;
+      let bitmap;
+      try { bitmap = await createImageBitmap(f); } catch { say('That file is not a photo we can read.'); return; }
+      const r = await findPuffcode(detector, bitmap, bitmap.width, bitmap.height);
+      bitmap.close?.();
+      if (r?.name) found(r.name);
+      else say(r ? "That code isn't a Puffcode." : 'No Puffcode in that photo. Try another one.');
+    } });
+    show(h('section', { class: 'screen scanner', 'aria-label': 'Scan Puffcode' }, video,
+      h('div', { class: 'scan-frame', 'aria-hidden': 'true' }),
+      h('header', { class: 'bar overlay' }, back, h('h1', {}, 'Scan Puffcode'), h('span', { style: 'width:48px' })),
+      h('div', { class: 'scan-foot' }, note,
+        h('button', { class: 'btn', type: 'button', onclick: () => file.click() }, icon('image', 20), 'Scan from photo'), file)));
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      if (state.tab !== 'scan' || !video.isConnected) { stopCamera(); return; }
+      video.srcObject = state.stream;
+    } catch {
+      note.textContent = 'Camera is blocked. Allow camera access, or scan from a photo.';
+      return;
+    }
+    watchForPuffcodes(detector, video, found, { both: true, other: () => say("That code isn't a Puffcode.") });
+  }
+
+  // ---------- links to a profile: /add/<username> ----------
+  // A Puffcode holds this link. Opened before logging in, it is remembered
+  // (in this tab) through the welcome, log in and sign up screens.
+  const PENDING_KEY = 'poof.pendingAdd';
+  function rememberDeepLink() {
+    const name = window.PoofPuffcode.parse(location.href, location.host);
+    if (name) {
+      state.pendingAdd = name;
+      try { sessionStorage.setItem(PENDING_KEY, name); } catch {}
+      history.replaceState(null, '', '/');
+      return;
+    }
+    try { state.pendingAdd = sessionStorage.getItem(PENDING_KEY); } catch {}
+  }
+  // where someone lands once they are in: a remembered link first, else the camera
+  function home() {
+    const name = state.pendingAdd;
+    state.pendingAdd = null;
+    try { sessionStorage.removeItem(PENDING_KEY); } catch {}
+    if (name) renderAddProfile(name);
+    else go('camera');
+  }
+
   // ---------- avatar maker (S11) ----------
   const TABS = [
     ['expr', 'Expression'], ['face', 'Face'], ['skin', 'Skin'], ['eyeColor', 'Eyes'], ['hair', 'Hair'],
@@ -939,11 +1179,11 @@
       try {
         state.me = await api('/api/me/avatar', { avatar: cfg });
         puffPop(onboarding ? 'Hey, you!' : 'Looking good', 'wink');
-        go(onboarding ? 'camera' : 'profile');
+        if (onboarding) home(); else go('profile');
       } catch (e) { toast(e.message); saveBtn.disabled = false; }
     }
     const left = onboarding
-      ? h('button', { class: 'link', onclick: () => go('camera') }, 'Skip')
+      ? h('button', { class: 'link', onclick: home }, 'Skip')
       : backButton('Back', () => go('profile'));
     const shuffle = h('button', { class: 'icon-btn plain', 'aria-label': 'Shuffle', onclick: () => { cfg = A.random(); draw(); } },
       icon('shuffle'));
@@ -955,6 +1195,53 @@
   }
 
   // ---------- profile (S10) ----------
+  // Your Puffcode up top (your avatar inside it), then sharing, friends, log out.
+  const profileLink = () => window.PoofPuffcode.url(state.me.username, location.origin);
+  const puffcodeOptions = () => ({ url: profileLink(), username: state.me.username, avatar: state.me.avatar });
+  let codeCache = { key: '', markup: '' };
+  function puffcodeArt() {
+    const opts = puffcodeOptions();
+    const key = JSON.stringify(opts);
+    if (codeCache.key !== key) codeCache = { key, markup: window.PoofPuffcode.svg({ ...opts, size: 280 }) };
+    const el = h('div', { class: 'puffcode' });
+    el.innerHTML = codeCache.markup; // built from a checked username, avatar integers and the code's own modules
+    return el;
+  }
+
+  async function shareProfile() {
+    const url = profileLink();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Poof', text: `Add me on Poof: @${state.me.username}`, url });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // they closed the share sheet
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('Link copied');
+    } catch {
+      toast('Your link: ' + url);
+    }
+  }
+
+  async function savePuffcode(e) {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const a = h('a', { href: await window.PoofPuffcode.png(puffcodeOptions(), 1080), download: `puffcode-${state.me.username}.png` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      toast('Puffcode saved');
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function renderProfile() {
     const body = h('div', { class: 'scroll' });
     const back = backButton('Back', () => go('camera'));
@@ -963,11 +1250,16 @@
       let friends;
       try { friends = await api('/api/friends'); } catch (e) { body.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
       body.replaceChildren(
-        h('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:8px;margin:16px 0' },
-          avatar(state.me, '', 120),
-          h('button', { class: 'btn ghost small', onclick: () => go('avatar') }, state.me.avatar ? 'Edit avatar' : 'Make your avatar'),
-          h('div', { class: 'name', style: 'font-size:1.3rem;font-weight:800' }, state.me.displayName),
-          h('div', { class: 'sub', style: 'color:var(--text-dim)' }, '@' + state.me.username)),
+        h('div', { class: 'profile-head' },
+          puffcodeArt(),
+          h('h2', { class: 'profile-name' }, state.me.displayName),
+          h('p', { class: 'profile-user' }, '@' + state.me.username),
+          h('p', { class: 'hint' }, 'Friends scan your Puffcode to add you.'),
+          h('div', { class: 'profile-actions' },
+            h('button', { class: 'btn', type: 'button', onclick: shareProfile }, icon('share', 20), 'Share profile'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: savePuffcode }, icon('download', 20), 'Save Puffcode')),
+          h('button', { class: 'btn text', type: 'button', onclick: () => go('avatar') },
+            state.me.avatar ? 'Edit avatar' : 'Make your avatar')),
         h('h2', { class: 'section-title' }, `Friends (${friends.friends.length})`),
         ...friends.friends.map((f) => h('div', { class: 'row' }, avatar(f),
           h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), h('div', { class: 'sub' }, '@' + f.username + (f.streak > 1 ? ` · ${f.streak} 🔥` : ''))),
@@ -1007,7 +1299,7 @@
 
   async function start(first = 'camera') {
     listen();
-    go(first); // draw straight away; the unread badge follows
+    if (first === 'camera') home(); else go(first); // draw straight away; the unread badge follows
     try {
       const inbox = await api('/api/inbox');
       state.unread = inbox.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
@@ -1016,6 +1308,7 @@
   }
 
   (async () => {
+    rememberDeepLink();
     try { state.me = await api('/api/me'); } catch { state.me = null; }
     if (state.me) start(); else renderWelcome();
     hideSplash();

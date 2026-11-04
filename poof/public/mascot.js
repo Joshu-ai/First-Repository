@@ -13,13 +13,15 @@
   // silhouette: one big puff, two side puffs, a flat rounded base, traced as a
   // single outline. Wherever two puffs meet, a small concave fillet joins them,
   // so the edge flows instead of pinching into a notch.
-  function cloudPath() {
-    // clockwise round the outside: bottom-left corner, left puff, top puff,
-    // right puff, bottom-right corner; then a straight base back to the start
-    const C = [[61, 121, 21], [64, 106, 28], [104, 82, 40], [142, 102, 30], [147, 121, 21]];
+  // clockwise round the outside: bottom-left corner, left puff, top puff,
+  // right puff, bottom-right corner; then a straight base back to the start
+  const C = [[61, 121, 21], [64, 106, 28], [104, 82, 40], [142, 102, 30], [147, 121, 21]];
+  // The outline as a list of arcs: each puff's clockwise arc, then the
+  // fillet (anticlockwise) into the next puff. `cloudPath` writes it as SVG;
+  // `cloudOutline` walks it as points, for hit tests.
+  function cloudArcs() {
     const FILLET = [18, 12, 12, 18];
     const MID = [104, 112];
-    const n = (v) => +v.toFixed(2);
     function fillet([x1, y1, r1], [x2, y2, r2], f) {
       const R1 = r1 + f;
       const R2 = r2 + f;
@@ -34,28 +36,56 @@
       const b = [mx + (dy * h) / d, my - (dx * h) / d];
       const P = Math.hypot(a[0] - MID[0], a[1] - MID[1]) > Math.hypot(b[0] - MID[0], b[1] - MID[1]) ? a : b;
       return {
+        P,
         t1: [x1 + ((P[0] - x1) * r1) / R1, y1 + ((P[1] - y1) * r1) / R1],
         t2: [x2 + ((P[0] - x2) * r2) / R2, y2 + ((P[1] - y2) * r2) / R2],
       };
     }
-    // clockwise arc on circle c from point p to point q (screen coords, y down)
-    function arc([cx, cy, r], p, q) {
+    // clockwise is the way angles grow in screen coords (y down)
+    const turn = ([cx, cy], p, q, clockwise) => {
       let delta = Math.atan2(q[1] - cy, q[0] - cx) - Math.atan2(p[1] - cy, p[0] - cx);
-      while (delta < 0) delta += Math.PI * 2;
-      return `A${r} ${r} 0 ${delta > Math.PI ? 1 : 0} 1 ${n(q[0])} ${n(q[1])}`;
-    }
+      if (clockwise) while (delta < 0) delta += Math.PI * 2;
+      else while (delta > 0) delta -= Math.PI * 2;
+      return delta;
+    };
+    const arcs = [];
     let cur = [C[0][0], C[0][1] + C[0][2]];
-    let d = `M${n(cur[0])} ${n(cur[1])}`;
     for (let i = 0; i < C.length; i++) {
       if (i < C.length - 1) {
-        const { t1, t2 } = fillet(C[i], C[i + 1], FILLET[i]);
-        d += arc(C[i], cur, t1) + `A${FILLET[i]} ${FILLET[i]} 0 0 0 ${n(t2[0])} ${n(t2[1])}`;
+        const { P, t1, t2 } = fillet(C[i], C[i + 1], FILLET[i]);
+        arcs.push({ c: C[i], from: cur, to: t1, delta: turn(C[i], cur, t1, true) });
+        arcs.push({ c: [P[0], P[1], FILLET[i]], from: t1, to: t2, delta: turn(P, t1, t2, false) });
         cur = t2;
       } else {
-        d += arc(C[i], cur, [C[i][0], C[i][1] + C[i][2]]) + 'Z';
+        const end = [C[i][0], C[i][1] + C[i][2]];
+        arcs.push({ c: C[i], from: cur, to: end, delta: turn(C[i], cur, end, true) });
       }
     }
-    return d;
+    return arcs;
+  }
+  function cloudPath() {
+    const n = (v) => +v.toFixed(2);
+    const arcs = cloudArcs();
+    let d = `M${n(arcs[0].from[0])} ${n(arcs[0].from[1])}`;
+    for (const { c: [, , r], to, delta } of arcs) {
+      d += `A${r} ${r} 0 ${Math.abs(delta) > Math.PI ? 1 : 0} ${delta > 0 ? 1 : 0} ${n(to[0])} ${n(to[1])}`;
+    }
+    return d + 'Z'; // the flat base, straight back to the start
+  }
+  // points round the outline, about `step` apart (the base closes the shape)
+  function cloudOutline(step = 2) {
+    const out = [];
+    for (const { c: [cx, cy, r], from, delta } of cloudArcs()) {
+      const a0 = Math.atan2(from[1] - cy, from[0] - cx);
+      const count = Math.max(1, Math.ceil((Math.abs(delta) * r) / step));
+      for (let i = 0; i < count; i++) {
+        const a = a0 + (delta * i) / count;
+        out.push([+(cx + r * Math.cos(a)).toFixed(3), +(cy + r * Math.sin(a)).toFixed(3)]);
+      }
+    }
+    const last = C[C.length - 1];
+    out.push([last[0], last[1] + last[2]]);
+    return out;
   }
   const BODY = `<path d="${cloudPath()}"/>`;
   const TRAIL = { normal: [[186, 122, 8.5], [204, 108, 5.5], [214, 95, 3]], droop: [[184, 132, 8], [198, 146, 5], [206, 158, 3]] };
@@ -124,4 +154,9 @@ ${m.face(INK, '#fff')}${m.hat ? m.hat(INK) : ''}`;
 
   window.mascotSVG = mascotSVG;
   window.mascotMoods = Object.keys(MOODS);
+  // Puff's body on its own (no trail, no face), for art that is built round
+  // the silhouette, like the Puffcode: the SVG path, the same outline as a
+  // closed polygon of points about 4 units apart, and the bounding box
+  // [x, y, width, height]. Same coordinates as mascotSVG.
+  window.mascotCloud = Object.freeze({ path: cloudPath(), outline: cloudOutline(4), box: [36, 42, 136, 100] });
 })();

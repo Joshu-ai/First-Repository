@@ -215,3 +215,36 @@ button { cursor: pointer; }
 .swatch-opt { border-color: rgb(255 255 255 / .15); }
 .maker-foot { padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); background: var(--surface); display: flex; justify-content: center; }
 .maker-foot .btn { width: 100%; }
+
+/* Welcome: a Puffcode or profile link opened before logging in */
+.welcome .invite { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-4); border-radius: var(--radius-pill); background: rgb(255 255 255 / .16); font-weight: 700; }
+
+/* Profile: your Puffcode up top, your avatar inside it */
+.profile-head { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); text-align: center; }
+.puffcode { width: min(280px, 100%); line-height: 0; }
+.puffcode svg { display: block; width: 100%; height: auto; }
+.profile-name { margin: var(--space-2) 0 0; font-size: 1.3rem; font-weight: 800; overflow-wrap: anywhere; }
+.profile-user { margin: 0; color: var(--text-dim); }
+.profile-head .hint { margin: 0; }
+.profile-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); margin: var(--space-2) 0; }
+/* a quiet full-height button: no fill, still a 48px tap target */
+.btn.text { background: none; color: var(--text); padding: 0 var(--space-4); }
+
+/* Add friend, from a Puffcode or link */
+.profile-card { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); margin: var(--space-6) 0 var(--space-5); text-align: center; }
+.profile-next { display: flex; flex-direction: column; gap: var(--space-3); }
+.profile-note { margin: 0; text-align: center; color: var(--text-dim); }
+.scan-btn { margin-top: var(--space-3); }
+
+/* Scanner: the live camera with a frame to aim with, and scan from a photo */
+.scanner { background: #000; }
+.scanner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; left: 50%; top: 44%; width: min(70%, 280px); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--brand-ink), 0 0 0 100vmax rgb(0 0 0 / .45); pointer-events: none; }
+.scan-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-4); padding-bottom: max(var(--space-5), env(safe-area-inset-bottom)); }
+.scan-note { margin: 0; min-height: 1.4em; text-align: center; font-weight: 600; color: var(--brand-ink); text-shadow: 0 1px 4px rgb(0 0 0 / .6); }
+
+/* Camera: "Add @name" when a Puffcode comes into view */
+.scan-chip-slot { position: absolute; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--space-5) + 80px + var(--space-4)); z-index: 3; display: flex; justify-content: center; pointer-events: none; }
+.scan-chip { pointer-events: auto; display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--tap); padding: 0 var(--space-5) 0 var(--space-4); border: 0; border-radius: var(--radius-pill); background: var(--brand-bg); color: var(--brand-ink); font-weight: 700; box-shadow: 0 8px 24px rgb(0 0 0 / .4); animation: chip-in .2s ease-out; }
+@keyframes chip-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .scan-chip { animation: none; } }

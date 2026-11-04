@@ -289,3 +289,53 @@ test('the launch splash is in the page before any script, drawn from mascot.js',
     assert.equal(manifest.background_color, '#6d4cff');
   } finally { await s.close(); }
 });
+
+test('profile by username: friendship status from each side, needs a session', async () => {
+  const s = await boot();
+  try {
+    const a = client(s.base);
+    const b = client(s.base);
+    const ra = await a.post('/api/signup', { username: 'ava', password: 'password1', displayName: 'Ava' });
+    await b.post('/api/signup', { username: 'ben', password: 'password2', displayName: 'Ben' });
+    const avatar = { expr: 4, face: 1, skin: 2, eyeColor: 3, hair: 3, hairColor: 4, beard: 0, acc: 2, shirt: 5, bg: 1 };
+    await a.post('/api/me/avatar', { avatar });
+    const look = async (c, name) => c.get('/api/users/by-username/' + name);
+
+    assert.equal((await client(s.base).get('/api/users/by-username/ava')).status, 401, 'needs a session');
+    const seen = await look(b, 'ava');
+    assert.equal(seen.status, 200);
+    assert.deepEqual(seen.data, { id: ra.data.id, username: 'ava', displayName: 'Ava', avatar, status: 'none' });
+    assert.ok(!('hash' in seen.data) && !('salt' in seen.data), 'only public fields');
+    assert.equal((await look(b, 'AVA')).data.username, 'ava', 'any case');
+    assert.equal((await look(a, 'ava')).data.status, 'self');
+
+    await b.post('/api/friends/request', { username: 'ava' });
+    assert.equal((await look(b, 'ava')).data.status, 'requested', 'ben asked ava');
+    assert.equal((await look(a, 'ben')).data.status, 'incoming', 'ava sees the request');
+    await a.post('/api/friends/request', { username: 'ben' }); // adding back accepts
+    assert.equal((await look(a, 'ben')).data.status, 'friends');
+    assert.equal((await look(b, 'ava')).data.status, 'friends');
+
+    const missing = await look(b, 'nobody');
+    assert.equal(missing.status, 404);
+    assert.equal(missing.data.error, 'No one by that username.');
+    assert.equal((await look(b, '%E0%A4%A')).status, 400, 'a broken address is a bad request, not a crash');
+    assert.equal((await look(b, '%3Cscript%3E')).status, 404);
+  } finally { await s.close(); }
+});
+
+test('/add/<username> links open the app (the page a Puffcode points at)', async () => {
+  const s = await boot();
+  try {
+    for (const p of ['/add/ava', '/add/ava.b_c', '/add/ava/']) {
+      const res = await fetch(s.base + p);
+      assert.equal(res.status, 200, p);
+      assert.match(res.headers.get('content-type'), /^text\/html/, p);
+      const html = await res.text();
+      assert.ok(html.includes('<main id="app"'), `${p} serves the app`);
+      for (const src of ['/qr.js', '/puffcode.js', '/app.js']) assert.ok(html.includes(`<script src="${src}">`), `${p} loads ${src}`);
+    }
+    // the app's scripts load from the root, so they work from /add/<username> too
+    assert.equal((await fetch(s.base + '/puffcode.js')).headers.get('content-type'), 'text/javascript; charset=utf-8');
+  } finally { await s.close(); }
+});

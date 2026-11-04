@@ -22,7 +22,8 @@ go "poof".
 
 ## Capabilities and Constraints
 - Camera, caption and drawing editor, open-once snaps, disappearing chat,
-  stories, friends, streaks, personal avatars, live updates.
+  stories, friends, streaks, personal avatars, live updates, Puffcodes
+  (scannable profile codes) and `/add/<username>` profile links.
 - Zero-dependency Node server and plain HTML/CSS/JS client.
 - Everything visual (mascot, avatars, icon, marketing art) is drawn in code
   as SVG so it stays sharp at any size.

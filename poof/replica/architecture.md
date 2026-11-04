@@ -57,6 +57,7 @@ GET  /api/me
 GET  /api/events                       SSE
 GET  /api/users/available?username=     {available, reason}; no session needed
 GET  /api/users/search?q=
+GET  /api/users/by-username/:username  publicUser + status: self|friends|requested|incoming|none
 GET  /api/friends                      friends, incoming, outgoing
 POST /api/friends/request {username}
 POST /api/friends/accept  {userId}
@@ -71,6 +72,19 @@ GET  /api/stories
 GET  /api/stories/:id/media
 POST /api/stories/:id/view
 ```
+
+## Puffcodes and profile links
+
+A Puffcode is a QR code (level H) of `<origin>/add/<username>`. Any path
+that is not a file serves `index.html`, so `/add/<username>` opens the app,
+which reads the username, remembers it in `sessionStorage` through log in
+or sign up, and opens Add friend for that person. The encoder
+(`public/qr.js`) and the art (`public/puffcode.js`) are plain browser
+scripts that also load in Node for tests; `test/fixtures/qr-reference.json`
+pins the encoder to the Python `qrcode` package bit for bit, and
+`test/puffcode-scan.py` decodes rendered Puffcodes with OpenCV. Scanning in
+the app uses the browser's `BarcodeDetector` where there is one; the server
+never sees a camera frame.
 
 ## Build order
 

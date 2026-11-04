@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/api.test.js test/icons.test.js test/avatar.test.js",
+    "test": "node --test test/api.test.js test/icons.test.js test/avatar.test.js test/qr.test.js test/puffcode.test.js",
+    "test:scan": "python3 test/puffcode-scan.py",
     "test:e2e": "node test/e2e.js"
   },
   "engines": { "node": ">=18" },

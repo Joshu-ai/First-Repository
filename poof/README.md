@@ -38,6 +38,37 @@ Puff has 10 moods too (happy, wink, sleepy, wow, love, laugh, sad, cool,
 shy, party), used around the app: party when you post a story, love when
 you make a friend, sad when a snap is already gone.
 
+## Puffcode
+
+Your profile code, large at the top of your profile: white dots on a
+brand-violet tile, with your avatar inside a white Puff (Puff's own face
+until you make one). It is a real QR code of `<your Poof address>/add/<username>`,
+made by Poof's own encoder (`public/qr.js`: byte mode, error correction
+level H, the smallest version that fits, all 8 masks scored with the
+standard penalty rules). Puff sits in a knock-out sized from the code's own
+layout (`public/puffcode.js`): it never covers a finder, timing or format
+module, and it uses at most two thirds of what level H can repair in any
+block, leaving the rest for glare and blur.
+
+- **Share profile** opens the share sheet, or copies your link where there
+  is none. **Save Puffcode** downloads it as a PNG.
+- Opening `/add/<username>`, which is what a phone's camera app does with a
+  Puffcode, opens Add friend for that person. Logged out, Poof remembers it
+  through log in or sign up.
+- **Add friends > Scan Puffcode** reads a code with the camera or from a
+  photo, in browsers with a built-in code reader (`BarcodeDetector`: Chrome
+  on Android, macOS and ChromeOS). Elsewhere it says to use the phone's
+  camera app instead. Where there is a reader, the main camera also spots
+  Puffcodes and offers "Add @name".
+- White on violet is a light-on-dark QR code, which the QR standard allows
+  and phone camera apps read. For readers that only read dark on light, the
+  app also tries each frame with its colours flipped.
+
+`npm run test:scan` proves they scan: it renders 48 Puffcodes in Chromium
+and decodes 168 images of them (saved PNGs on light and dark backgrounds,
+shrunk, blurred and tilted, plus the on-screen art) with OpenCV's
+`QRCodeDetector`, and with `zxing-cpp` too when it is installed.
+
 ## Icons
 
 Every control uses Poof's own drawn icons (`public/icons.js`): one 24px
@@ -86,6 +117,7 @@ stored (default `./data`).
 | Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it |
 | Stories | Post for 24 hours, tap through friends' stories, see who watched yours |
 | Friends | Search by username, requests, accept, remove, streaks for consecutive days |
+| Puffcode | Your scannable profile code with your avatar inside; share or save it; scan friends' codes; `/add/<username>` links |
 | Live | New snaps, chats and "opened" updates arrive instantly (Server-Sent Events) |
 
 Not built: video snaps, group chats, AR lenses, map, discover feed, screenshot
@@ -95,7 +127,15 @@ alerts. See [`replica/parity.md`](replica/parity.md).
 
 ```bash
 npm test             # API: auth, friends, open-once snaps, chat expiry, stories, streaks, security
-npm run test:e2e     # two real browsers through every flow (needs Playwright + Chromium)
+npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
+npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
+```
+
+The scan check needs OpenCV for Python, for example in a virtual env:
+
+```bash
+python3 -m venv /tmp/qrcheck && /tmp/qrcheck/bin/pip install opencv-python-headless
+/tmp/qrcheck/bin/python test/puffcode-scan.py
 ```
 
 ## Before a real launch

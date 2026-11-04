@@ -1,5 +1,6 @@
 'use strict';
-// End-to-end: two users in two browsers, using Chromium's fake camera.
+// End-to-end: users in separate browsers (Ava, Ben, and later Cal), using
+// Chromium's fake camera.
 // Run: npm run test:e2e   (needs Playwright + Chromium available)
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -21,16 +22,35 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   });
   const errors = [];
   const viewport = { width: 390, height: 844 };
-  // `context` adds browser context options; `before` runs on the page before it loads
-  const open = async ({ context, before } = {}) => {
+  // `context` adds browser context options; `before` runs on the page before it
+  // loads; `path` is where it starts (a profile link, say)
+  const open = async ({ context, before, path: start = '/' } = {}) => {
     const ctx = await browser.newContext({ viewport, permissions: ['camera'], ...context });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && !/40[0-9]|410/.test(m.text()) && errors.push(m.text()));
     if (before) await before(page);
-    await page.goto(base);
+    await page.goto(base + start);
     return page;
   };
+  // Headless Chromium on Linux has no BarcodeDetector. This stand-in reads a
+  // code only when told to (window.fakeCode = { url, from: 'video' | 'photo' })
+  // and counts what it was shown, so the app's own scanning flow can be tested.
+  // That real readers decode Puffcodes is test/puffcode-scan.py's job.
+  const fakeDetector = (page) => page.addInitScript(() => {
+    window.fakeCode = null;
+    window.detectCalls = { video: 0, photo: 0, flipped: 0 };
+    window.BarcodeDetector = class {
+      static async getSupportedFormats() { return ['qr_code']; }
+      constructor(options) { this.formats = options.formats; }
+      async detect(source) {
+        const kind = source instanceof HTMLVideoElement ? 'video' : source instanceof ImageBitmap ? 'photo' : 'flipped';
+        window.detectCalls[kind]++;
+        const code = window.fakeCode;
+        return code && code.from === kind ? [{ format: 'qr_code', rawValue: code.url }] : [];
+      }
+    };
+  });
   // records whether the launch splash ever started its fade
   const watchSplash = (page) => page.addInitScript(() => {
     window.splashFaded = false;
@@ -39,6 +59,9 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ['class'] });
   });
   const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.png') });
+  // after a reload: wait for the launch splash to fade, so screenshots are clean
+  const settled = (page) => page.locator('#splash').waitFor({ state: 'detached' });
+  const noToast = (page) => page.locator('#toast').waitFor({ state: 'hidden' });
 
   // Controls show Poof's drawn icons (public/icons.js), never emoji or text
   // glyphs. `expected` maps a button's accessible name to its icon name.
@@ -124,7 +147,8 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await calm.evaluate(() => window.splashFaded), false, 'no fade with reduced motion');
     await calm.context().close();
 
-    const ava = await open();
+    // Ava may use the clipboard: Share profile copies her link where there is no share sheet
+    const ava = await open({ context: { permissions: ['camera', 'clipboard-read', 'clipboard-write'] } });
     const ben = await open();
 
     // S01 welcome: violet edge to edge, Puff, and both choices in the thumb zone
@@ -207,14 +231,9 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     });
     assert.ok(offset.every((d) => Math.abs(d) <= 0.5), `avatar sits centred in the Profile button (${offset})`);
 
-    // S10 Ben's profile: the big placeholder and an invitation to make an avatar
-    await ben.getByRole('button', { name: 'Profile' }).click();
-    await ben.getByRole('button', { name: 'Make your avatar' }).waitFor();
-    await checkPlaceholder(ben.locator('.scroll .avatar'), 'profile', 120);
-    await shot(ben, 'S10-profile-placeholder');
     // the same placeholder holds up at 32, 44 and 120px
     await ben.evaluate(() => {
-      const src = document.querySelector('.scroll .avatar.placeholder');
+      const src = document.querySelector('.bar .avatar.placeholder');
       const strip = document.createElement('div');
       strip.id = 'avatar-sizes';
       strip.style.cssText = 'position:fixed;top:0;left:0;z-index:99;display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg)';
@@ -234,6 +253,14 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     }
     await ben.locator('#avatar-sizes').screenshot({ path: path.join(SHOTS, 'S10-placeholder-sizes.png') });
     await ben.evaluate(() => document.getElementById('avatar-sizes').remove());
+    // S10 Ben's profile: his Puffcode, with Puff's own face until he makes an avatar
+    await ben.getByRole('button', { name: 'Profile' }).click();
+    await ben.getByRole('button', { name: 'Make your avatar' }).waitFor();
+    const benCode = ben.getByRole('img', { name: 'Puffcode for @ben' });
+    await benCode.waitFor();
+    assert.equal(await benCode.locator('svg[viewBox="0 0 200 200"]').count(), 0, 'no avatar art in Ben\'s Puffcode');
+    assert.equal(await benCode.locator('mask').count(), 1, 'Puff\'s mark, its face knocked out, sits in the middle');
+    await shot(ben, 'S10-profile-placeholder');
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByRole('button', { name: 'Take photo' }).waitFor();
     await checkIcons(ava, 'camera', {
@@ -241,19 +268,46 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       Chat: 'chat', Camera: 'camera', Stories: 'stories',
     });
 
-    // S09 add friend, accept
+    // S09 add friends: search finds Ben, and there is a way to scan a Puffcode
     await ava.getByRole('button', { name: 'Add friends' }).click();
     await ava.getByLabel('Search users').fill('ben');
     await ava.getByRole('button', { name: 'Add', exact: true }).waitFor();
-    await checkIcons(ava, 'add friends', { Back: 'back', Add: 'plus' });
+    await checkIcons(ava, 'add friends', { Back: 'back', Add: 'plus', 'Scan Puffcode': 'scan' });
+    assert.ok((await ava.getByRole('button', { name: 'Scan Puffcode' }).boundingBox()).height >= 44, 'Scan Puffcode is easy to tap');
     assert.equal(await ava.locator('.search-field svg.i-search').count(), 1, 'search field shows the search icon');
-    await ava.getByRole('button', { name: 'Add', exact: true }).click();
-    await ava.getByText('Requested').waitFor();
-    await ben.getByRole('button', { name: 'Add friends' }).click();
-    await ben.getByRole('button', { name: 'Accept' }).click();
-    await ben.getByText('You are now friends').waitFor();
-    await shot(ben, 'S09-add-friends');
-    assert.ok(!(await ben.locator('.scroll').innerText()).includes('null'), 'stray null text on S09');
+    await ava.getByLabel('Search users').fill('');
+
+    // S12 Ben opens Ava's link (what her Puffcode holds) and sends a request from it
+    await ben.goto(base + '/add/ava');
+    await ben.getByRole('heading', { name: 'Ava' }).waitFor();
+    await settled(ben);
+    await ben.getByText('@ava', { exact: true }).waitFor();
+    assert.equal(await ben.evaluate(() => location.pathname), '/', 'the link is used up once it opens');
+    await checkIcons(ben, 'add from a link', { Back: 'back', 'Add friend': 'plus' });
+    const addBtn = await ben.getByRole('button', { name: 'Add friend' }).boundingBox();
+    assert.ok(addBtn.height >= 44 && addBtn.width >= viewport.width - 2 * 24, 'Add friend is a full-width button');
+    await shot(ben, 'S12-add-from-link');
+    await ben.getByRole('button', { name: 'Add friend' }).click();
+    await ben.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
+    // Ava sees it live and accepts; Ben's screen follows along
+    await ava.getByRole('button', { name: 'Accept' }).click();
+    await ava.getByText('You are now friends').waitFor();
+    await ben.getByText('You and Ava are friends.').waitFor();
+    await ben.getByRole('button', { name: 'Send a chat' }).waitFor();
+    await ava.locator('.puff-pop').waitFor({ state: 'detached' });
+    await ava.getByText('Find your friends').waitFor();
+    await shot(ava, 'S09-add-friends');
+    assert.ok(!(await ava.locator('.scroll').innerText()).includes('null'), 'stray null text on S09');
+
+    // S13 this browser cannot read codes, so the scanner says to use the phone's camera
+    await ben.getByRole('button', { name: 'Back' }).click();
+    await ben.getByRole('button', { name: 'Scan Puffcode' }).click();
+    await ben.getByText("Use your phone's camera").waitFor();
+    assert.equal(await ben.locator('video').count(), 0, 'no camera opens when it cannot read codes');
+    await noToast(ben);
+    await shot(ben, 'S13-scan-no-reader');
+    await ben.getByRole('button', { name: 'Back' }).click();
+    await ben.getByRole('heading', { name: 'Add friends' }).waitFor();
 
     // S02 camera -> S03 editor
     await ava.getByRole('button', { name: 'Back' }).click();
@@ -334,17 +388,46 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.getByRole('button', { name: 'Stories', exact: true }).click();
     await ava.getByText(/1 viewers/).waitFor();
 
-    // S10 profile + logout
+    // S10 profile: Ava's Puffcode, large at the top with her avatar inside it
     await ava.getByRole('button', { name: 'Profile' }).click();
     await ava.getByText('Friends (1)').waitFor();
-    await checkIcons(ava, 'profile', { Back: 'back' });
+    const avaCode = ava.getByRole('img', { name: 'Puffcode for @ava' });
+    await avaCode.waitFor();
+    const codeBox = await avaCode.boundingBox();
+    assert.ok(codeBox.width >= 260 && Math.abs(codeBox.width - codeBox.height) < 1, `Puffcode is large and square (${codeBox.width}px)`);
+    assert.ok(codeBox.y < 140, 'Puffcode sits at the top');
+    assert.equal(await avaCode.locator('svg[viewBox="0 0 200 200"]').count(), 1, 'her avatar is inside it');
+    assert.equal(await avaCode.locator('clipPath').count() >= 1, true, 'clipped to Puff\'s outline');
+    assert.equal(await avaCode.locator('rect').first().getAttribute('fill'), '#6d4cff', 'on the brand-violet tile');
+    await checkIcons(ava, 'profile', { Back: 'back', 'Share profile': 'share', 'Save Puffcode': 'download' });
+    for (const name of ['Share profile', 'Save Puffcode', 'Edit avatar']) {
+      assert.ok((await ava.getByRole('button', { name }).boundingBox()).height >= 44, `${name} is easy to tap`);
+    }
     await shot(ava, 'S10-profile');
+    // Share profile: no share sheet in this browser, so the link is copied
+    await ava.getByRole('button', { name: 'Share profile' }).click();
+    await ava.getByText('Link copied').waitFor();
+    assert.equal(await ava.evaluate(() => navigator.clipboard.readText()), base + '/add/ava');
+    // Save Puffcode: a PNG download
+    const [download] = await Promise.all([ava.waitForEvent('download'),
+      ava.getByRole('button', { name: 'Save Puffcode' }).click()]);
+    assert.equal(download.suggestedFilename(), 'puffcode-ava.png');
+    const savedPng = path.join(dataDir, 'puffcode-ava.png');
+    await download.saveAs(savedPng);
+    const png = fs.readFileSync(savedPng);
+    assert.equal(png.subarray(1, 4).toString(), 'PNG');
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1080, 1080], '1080px square');
+    await ava.getByText('Puffcode saved').waitFor();
     await ava.getByRole('button', { name: 'Log out' }).click();
 
     // S01 log out lands on the welcome screen; log back in from there
     await ava.getByRole('button', { name: 'Sign up' }).waitFor();
     assert.equal(await ava.evaluate(() => document.documentElement.dataset.chrome), 'brand');
     assert.ok(await ava.locator('#toast').isHidden(), 'no news from the last session on the welcome screen');
+    // a profile link opened while logged out is remembered through log in
+    await ava.goto(base + '/add/ben');
+    await ava.getByText('Log in or sign up to add @ben.').waitFor();
+    await settled(ava);
     await ava.getByRole('button', { name: 'Log in' }).click();
     await ava.getByRole('heading', { name: 'Log in' }).waitFor();
     await checkIcons(ava, 'log in', { Back: 'back' });
@@ -355,7 +438,71 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.getByText('Wrong username or password.').waitFor();
     await ava.getByLabel('Password', { exact: true }).fill('password123');
     await ava.keyboard.press('Enter');
-    await ava.getByRole('button', { name: 'Take photo' }).waitFor();
+    await ava.getByText('You and Ben are friends.').waitFor();
+    await ava.getByRole('button', { name: 'Send a chat' }).click();
+    await ava.getByText('nice photo').waitFor();
+
+    // S12 someone new opens Ava's link before they have an account: Poof
+    // remembers it through sign up and opens it once they are in
+    const cal = await open({ path: '/add/ava', before: fakeDetector });
+    await cal.getByText('Log in or sign up to add @ava.').waitFor();
+    await settled(cal);
+    await shot(cal, 'S01-welcome-invite');
+    await cal.getByRole('button', { name: 'Sign up' }).click();
+    await cal.getByLabel('Your name').fill('Cal');
+    await cal.keyboard.press('Enter');
+    await cal.getByLabel('Username').fill('cal');
+    await cal.getByText('cal is available').waitFor();
+    await cal.keyboard.press('Enter');
+    await cal.getByLabel('Password', { exact: true }).fill('password123');
+    await cal.keyboard.press('Enter');
+    await cal.getByRole('button', { name: 'Skip' }).click();
+    await cal.getByRole('heading', { name: 'Ava' }).waitFor();
+    assert.equal(await cal.locator('.profile-card .avatar.has-art').count(), 1, 'Ava\'s avatar');
+    await cal.getByRole('button', { name: 'Add friend' }).click();
+    await cal.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
+
+    // S02 with a code reader: the camera spots a Puffcode and offers to add them
+    await cal.getByRole('button', { name: 'Done' }).click();
+    await cal.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+    await cal.evaluate((url) => { window.fakeCode = { url, from: 'video' }; }, base + '/add/ben');
+    await cal.getByRole('button', { name: 'Add @ben' }).waitFor();
+    await checkIcons(cal, 'camera with a Puffcode in view', { 'Add @ben': 'puff-plus' });
+    assert.ok((await cal.getByRole('button', { name: 'Add @ben' }).boundingBox()).height >= 44);
+    await noToast(cal);
+    await shot(cal, 'S02-camera-puffcode');
+    await cal.waitForFunction(() => window.detectCalls.flipped > 0); // white-on-violet codes are tried flipped too
+    await cal.getByRole('button', { name: 'Add @ben' }).click();
+    await cal.evaluate(() => { window.fakeCode = null; });
+    await cal.getByRole('heading', { name: 'Ben' }).waitFor();
+    await cal.getByRole('button', { name: 'Add friend' }).waitFor();
+    await checkPlaceholder(cal.locator('.profile-card .avatar'), 'Ben on Add friend', 96);
+
+    // S13 the scanner: a live camera, plus scanning a saved Puffcode from a photo
+    await cal.getByRole('button', { name: 'Back' }).click();
+    await cal.getByRole('button', { name: 'Scan Puffcode' }).click();
+    await cal.waitForFunction(() => document.querySelector('.scanner video')?.videoWidth > 0);
+    await cal.getByText('Point your camera at a Puffcode.').waitFor();
+    await checkIcons(cal, 'scanner', { Back: 'back', 'Scan from photo': 'image' });
+    assert.ok((await cal.getByRole('button', { name: 'Scan from photo' }).boundingBox()).height >= 44, 'Scan from photo is easy to tap');
+    await noToast(cal);
+    await shot(cal, 'S13-scanner');
+    // a code that is not a Puffcode for this server says so
+    await cal.evaluate(() => { window.fakeCode = { url: 'https://example.com/menu', from: 'video' }; });
+    await cal.getByText("That code isn't a Puffcode.").waitFor();
+    await cal.evaluate((url) => { window.fakeCode = { url, from: 'photo' }; }, base + '/add/ava');
+    await cal.locator('.scanner input[type=file]').setInputFiles(savedPng);
+    await cal.getByRole('heading', { name: 'Ava' }).waitFor();
+    await cal.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
+    assert.equal(await cal.locator('video').count(), 0, 'the camera is off once the code is read');
+    // links to nobody, and to yourself
+    await cal.goto(base + '/add/nobody_here');
+    await cal.getByText('No one by that name').waitFor();
+    await cal.getByRole('button', { name: 'Find friends' }).waitFor();
+    await cal.goto(base + '/add/cal');
+    await cal.getByText('This is your own Puffcode.').waitFor();
+    await cal.getByRole('button', { name: 'Go to your profile' }).click();
+    await cal.getByRole('img', { name: 'Puffcode for @cal' }).waitFor();
 
     assert.deepEqual(errors, [], 'browser errors: ' + errors.join('\n'));
     console.log('e2e: all flows passed. Screenshots in replica/clone-screens/');

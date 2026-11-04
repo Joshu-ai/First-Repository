@@ -234,6 +234,18 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       .map((u) => ({ ...publicUser(u), status: friendship(me.id, u.id)?.status || null }));
   });
 
+  // one person by username, for Puffcodes and /add/<username> links, with
+  // where the two of you stand: self, friends, requested (you asked them),
+  // incoming (they asked you) or none
+  route('GET', '/api/users/by-username/:username', ({ me, params }) => {
+    const u = db.users.find((x) => x.username === cleanUsername(params.username));
+    if (!u) fail(404, 'No one by that username.');
+    if (u.id === me.id) return { ...publicUser(u), status: 'self' };
+    const f = friendship(me.id, u.id);
+    const status = !f ? 'none' : f.status === 'accepted' ? 'friends' : f.requester === me.id ? 'requested' : 'incoming';
+    return { ...publicUser(u), status };
+  });
+
   route('GET', '/api/friends', ({ me }) => {
     const mine = db.friendships.filter((f) => f.a === me.id || f.b === me.id);
     const other = (f) => publicUser(user(f.a === me.id ? f.b : f.a));
@@ -437,7 +449,9 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       let match;
       const r = routes.find((x) => x.method === req.method && (match = x.re.exec(url.pathname)));
       if (!r) fail(404, 'Not found.');
-      const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(match[i + 1])]));
+      let params;
+      try { params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(match[i + 1])])); }
+      catch { fail(400, 'Bad address.'); }
       const me = user(db.sessions[cookies(req).sid]);
       if (r.auth && !me) fail(401, 'Log in first.');
       const body = req.method === 'POST' ? await readBody(req) : {};
