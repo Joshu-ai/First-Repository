@@ -116,11 +116,11 @@ stored (default `./data`).
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
 | Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
 | Snaps | Send to several friends and/or your story. Each snap opens once, then the file is deleted on the server |
-| Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it |
+| Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it. While a friend types to you, their open thread shows their avatar and moving dots with "Ben is typing…", and their row in the Chat list says Typing… |
 | Stories | Post for 24 hours, tap through friends' stories, see who watched yours |
 | Friends | Search by username, requests, accept, remove, streaks for consecutive days |
 | Puffcode | Your scannable profile code with your avatar inside; share or save it; scan friends' codes; `/add/<username>` links |
-| Live | New snaps, chats and "opened" updates arrive instantly (Server-Sent Events) |
+| Live | New snaps, chats, "opened" updates and typing arrive instantly (Server-Sent Events) |
 
 Not built: group chats, AR lenses, map, discover feed, screenshot alerts.
 Videos can't be drawn on or saved to the device yet. See
@@ -181,7 +181,7 @@ Story videos are served with byte ranges, which Safari needs to play them.
 ## Tests
 
 ```bash
-npm test             # API: auth, friends, open-once snaps and videos, chat expiry, stories, streaks, security; WebM sound removal
+npm test             # API: auth, friends, open-once snaps and videos, chat expiry, typing (live, friends only), stories, streaks, security; WebM sound removal
 npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
 npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
 ```

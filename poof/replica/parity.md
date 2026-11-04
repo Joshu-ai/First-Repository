@@ -3,7 +3,7 @@
 Scored with the replica-diff rules (must 3, should 2, could 1, partial half,
 `skip` rows left out). Computed 2026-11-04 from `features.csv`.
 
-**Feature score: 95 / 100 (92.5 of 97 points). Must-haves: 15 of 15. Shippable for this slice.**
+**Feature score: 95.5 / 100 (95.5 of 100 points). Must-haves: 15 of 15. Shippable for this slice.**
 
 Partial (counted half): scanning a profile code in the app, and the camera
 spotting one, need the browser's code reader (`BarcodeDetector`), which
@@ -25,6 +25,10 @@ down to close, tap the sides of a story, hold to pause it, swipe it down to
 close, swipe a chat row right to open the chat, press and hold a row for
 the friend card (with Remove friend), and pull down on the Chat or Stories
 list to refresh it, Puff showing above it. Escape closes viewers and sheets.
+
+The typing indicator is in: while a friend types, their open thread shows
+their avatar and moving dots with "<Name> is typing…", and their Chat list
+row says Typing…, until 4 seconds after they stop or their message arrives.
 
 Video snaps are in: hold the shutter to record up to 10 seconds, a caption
 and Mute in the video editor (Mute takes the sound out of the file itself),

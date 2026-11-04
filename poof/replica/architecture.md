@@ -8,6 +8,14 @@
   `data/media/`. Fine for a demo or a few hundred users; swap `store.js` for
   Postgres before real launch (all reads and writes go through it).
 - **Realtime:** Server-Sent Events (`/api/events`), one stream per logged-in tab.
+  Typing is the one event with nothing behind it: `POST /api/chat/:friendId/typing`
+  is passed straight on as `{type: 'typing', from}` and not stored. The app
+  sends it at most every 2 seconds while you type (and holds a message until
+  its typing event is out, so the two never arrive the wrong way round); the
+  friend shows it until 4 seconds pass without another or the message
+  arrives. The server passes on at most one a second per pair, counting
+  afresh after each message. A typing event only redraws the typing line
+  and the Chat list row (`state.onTyping`); nothing is reloaded.
 - **Client:** plain HTML/CSS/JS, mobile-first, installable (web manifest).
   Camera via `getUserMedia`, editing on a `<canvas>`; caption and drawing are
   burned into the JPEG before upload.
@@ -92,6 +100,7 @@ POST /api/snaps/:id/open               {image, duration} or {video, caption, dur
 GET  /api/inbox
 GET  /api/chat/:friendId
 POST /api/chat/:friendId {text}
+POST /api/chat/:friendId/typing        friends only; pushes {type: 'typing', from} to them, never stored
 POST /api/messages/:id/save
 GET  /api/stories
 GET  /api/stories/:id/media            photo or video; Range requests answered with 206

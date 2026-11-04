@@ -5,6 +5,8 @@
   const TIMERS = [1, 3, 5, 10, 0]; // 0 = no limit
   const COLORS = ['#ffffff', '#ff5d8f', '#ffd23f', '#3ddc97', '#3db4ff', '#7c5cff', '#111111'];
   const FLASH_KEY = 'poof.flash'; // the camera's Flash switch, remembered on this device
+  const TYPING_SEND_MS = 2000; // while you type, your friend is told at most this often
+  const TYPING_SHOW_MS = 4000; // and a friend shows as typing until this long passes with no more from them
 
   const state = {
     me: null,
@@ -24,6 +26,8 @@
     scan: null, // { timer, busy } while the camera is looking for Puffcodes
     sheet: null, // the bottom sheet that is open: { layer, sheet, scrim, screen, back }
     onEscape: null, // what Escape does on this screen (the viewers close)
+    typing: new Map(), // friends typing to you now: their id -> the timer that ends it
+    onTyping: null, // how this screen shows a friend starting or stopping typing: (friendId) => {}
   };
 
   // ---------- tiny DOM helper ----------
@@ -48,6 +52,7 @@
   function show(screen) {
     closeSheet({ restore: false, animate: false });
     state.onEscape = null;
+    state.onTyping = null;
     const old = app.firstElementChild;
     app.replaceChildren(screen);
     // a tab's screen is kept (once out of the page, focus and all) to show beside its neighbour during a swipe
@@ -1752,28 +1757,56 @@
     'tap-to-chat': ['chat-c', 'outline', 'Tap to chat'],
   };
 
+  // ---------- typing (S07) ----------
+  // A friend shows as typing until TYPING_SHOW_MS pass with no new typing
+  // event from them, or their message arrives. The screen in front (the
+  // Chat list or their thread) redraws its part through state.onTyping.
+  function setTyping(friendId, on) {
+    const was = state.typing.has(friendId);
+    clearTimeout(state.typing.get(friendId));
+    if (on) state.typing.set(friendId, setTimeout(() => setTyping(friendId, false), TYPING_SHOW_MS));
+    else state.typing.delete(friendId);
+    if (was !== on) state.onTyping?.(friendId);
+  }
+
+  // three dots that rise and fall in turn (they hold still with less motion)
+  const typingDots = () => h('span', { class: 'typing-dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
+
   // A row per friend: their avatar opens their friend card (so does pressing
   // and holding the row), the row opens new snaps or the chat, and swiping
-  // the row right opens the chat too.
+  // the row right opens the chat too. While they type, Typing… stands in
+  // for the row's status.
   function inboxRow(r) {
-    const [color, shape, label] = STATUS[r.status];
     const f = r.friend;
     const find = (sel) => () => app.querySelector(`.chat-row[data-friend="${CSS.escape(f.id)}"] ${sel}`);
     const chat = () => renderChat(f);
+    const sub = h('div', { class: 'sub' });
+    const open = h('button', { class: 'row', type: 'button', onclick: () => (r.snapIds.length ? openSnaps(f, r.snapIds) : chat()) },
+      h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), sub),
+      r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null);
+    const setStatus = () => {
+      if (state.typing.has(f.id)) {
+        sub.className = 'sub chat-c typing-status';
+        sub.replaceChildren(typingDots(), h('span', {}, 'Typing…'));
+        open.setAttribute('aria-label', `${f.displayName}, Typing…`);
+        return;
+      }
+      const [color, shape, label] = STATUS[r.status];
+      sub.className = 'sub ' + color;
+      sub.replaceChildren(h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
+        h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
+        r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null);
+      open.setAttribute('aria-label', `${f.displayName}, ${label}`);
+    };
+    setStatus();
     const row = h('div', { class: 'chat-row', 'data-friend': f.id },
       h('div', { class: 'row-reveal', 'aria-hidden': 'true' }, icon('chat'), 'Chat'),
       h('div', { class: 'row-slide' },
         h('button', { class: 'row-avatar', type: 'button', 'aria-label': `${f.displayName}'s friend card`,
           onclick: () => openFriendCard(f, r.streak, find('.row-avatar')) }, avatar(f)),
-        h('button', { class: 'row', type: 'button', onclick: () => (r.snapIds.length ? openSnaps(f, r.snapIds) : chat()),
-          'aria-label': `${f.displayName}, ${label}` },
-        h('span', { class: 'main' },
-          h('div', { class: 'name' }, f.displayName),
-          h('div', { class: 'sub ' + color }, h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
-            h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
-            r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null)),
-        r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null),
+        open,
         h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Chat with ' + f.displayName, onclick: chat }, icon('chat'))));
+    row.setStatus = setStatus;
     row.openChat = chat;
     row.openCard = () => openFriendCard(f, r.streak, find('.row'));
     // a right click, the menu key or Shift+F10 opens the card too
@@ -1805,6 +1838,7 @@
       list.replaceChildren(...rows.map(inboxRow));
     };
     state.refresh = load;
+    state.onTyping = (id) => list.querySelector(`.chat-row[data-friend="${CSS.escape(id)}"]`)?.setStatus();
     await load();
   }
 
@@ -1966,23 +2000,50 @@
   // ---------- chat thread (S07) ----------
   async function renderChat(friend) {
     const thread = h('div', { class: 'thread', 'aria-live': 'polite' });
-    const input = h('input', { placeholder: 'Send a chat', 'aria-label': 'Message', maxlength: '2000', autofocus: true });
+    const nearBottom = () => thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
+    // while you type, your friend is told (at most every TYPING_SEND_MS);
+    // a message waits for the last of those so it never arrives first
+    let typingAt = 0;
+    let typingSent = null;
+    let canType = true;
+    const typed = () => {
+      if (!canType || !input.value.trim() || Date.now() - typingAt < TYPING_SEND_MS) return;
+      typingAt = Date.now();
+      typingSent = api(`/api/chat/${friend.id}/typing`, {}).catch((e) => { if (e.status === 403) canType = false; });
+    };
+    const input = h('input', { placeholder: 'Send a chat', 'aria-label': 'Message', maxlength: '2000', autofocus: true, oninput: typed });
     const form = h('form', { class: 'composer', onsubmit: async (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
       input.value = '';
+      await typingSent;
+      typingAt = 0; // the next message's first keystroke says so straight away
       try { await api('/api/chat/' + friend.id, { text }); await load(); } catch (e2) { toast(e2.message); input.value = text; }
     } }, input, h('button', { class: 'btn small', type: 'submit' }, 'Send'));
+    // your friend typing to you: their avatar, moving dots and the words,
+    // just above where you type, until they stop or their message arrives
+    const typing = h('div', { class: 'typing', role: 'status' });
+    const showTyping = () => {
+      const on = state.typing.has(friend.id);
+      if (on === typing.hasChildNodes()) return;
+      const stay = nearBottom();
+      typing.replaceChildren(...(on ? [avatar(friend, '', 32),
+        h('span', { class: 'typing-bubble' }, typingDots()),
+        h('span', { class: 'typing-text' }, friend.displayName + ' is typing…')] : []));
+      if (stay) thread.scrollTop = thread.scrollHeight;
+    };
     const back = backButton('Back', () => go('chat'));
     const cam = h('button', { class: 'icon-btn plain', 'aria-label': 'Snap ' + friend.displayName, onclick: () => go('camera') },
       icon('camera'));
     show(h('section', { class: 'screen', 'aria-label': 'Chat with ' + friend.displayName },
-      header(friend.displayName, back, cam), thread, form));
+      header(friend.displayName, back, cam), thread, typing, form));
+    state.onTyping = (id) => { if (id === friend.id) showTyping(); };
+    showTyping();
     async function load() {
       let data;
       try { data = await api('/api/chat/' + friend.id); } catch (e) { thread.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
-      const atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
+      const atBottom = nearBottom();
       thread.replaceChildren(h('p', { class: 'hint' }, 'Chats disappear 24 hours after they are read. Tap one to keep it.'),
         ...data.messages.map((m) => h('button', {
           class: 'msg' + (m.from === state.me.id ? ' mine' : '') + (m.saved ? ' saved' : ''),
@@ -2456,8 +2517,13 @@
     state.events?.close();
     const es = new EventSource('/api/events');
     state.events = es;
+    for (const timer of state.typing.values()) clearTimeout(timer);
+    state.typing.clear();
     es.onmessage = async (e) => {
       const ev = JSON.parse(e.data);
+      // typing only changes who shows as typing; nothing needs reloading
+      if (ev.type === 'typing') { setTyping(ev.from, true); return; }
+      if (ev.type === 'message') setTyping(ev.from, false);
       if (ev.type === 'snap') toast('New snap 📸');
       if (ev.type === 'message') toast('New chat 💬');
       if (ev.type === 'friends') toast('Friends updated');

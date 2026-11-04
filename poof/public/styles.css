@@ -32,6 +32,7 @@
   --pull-beat: 450ms; /* Puff's bob while a list refreshes (its trail pulses at half the pace) */
   --pull-drift: 450ms; /* Puff drifting off once it has (under PULL_DONE_MS in app.js) */
   --pull-fade: 200ms; /* and fading instead, with less motion */
+  --typing-beat: 1200ms; /* the typing dots rising and falling in turn, once round */
   --scrim: rgb(0 0 0 / .5); /* behind a bottom sheet */
   --on-chat: var(--bg); /* text and icons on the --chat colour */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -253,6 +254,22 @@ button { cursor: pointer; }
 .msg small { display: block; font-size: .7rem; opacity: .75; margin-top: 2px; }
 .composer { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); background: var(--surface); }
 .composer input { flex: 1; min-height: var(--tap); border-radius: var(--radius-pill); border: 0; padding: 0 var(--space-4); background: var(--surface-2); }
+/* a friend typing: their avatar, the dots in a bubble like their messages, and the words; empty (no height) otherwise */
+.typing { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); font-size: .85rem; color: var(--text-dim); }
+.typing:not(:empty) { padding-bottom: var(--space-2); animation: typing-in var(--slide) var(--ease-out); }
+.typing .avatar { flex: none; }
+.typing-bubble { display: inline-flex; align-items: center; min-height: var(--space-6); /* as tall as the 32px avatar beside it */ padding: 0 var(--space-3); border-radius: var(--radius); background: var(--surface-2); }
+.typing-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.typing-dots { --dot: 6px; display: inline-flex; align-items: center; gap: var(--space-1); height: calc(var(--dot) * 3); }
+.typing-dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: currentColor; animation: typing-dot var(--typing-beat) ease-in-out infinite; }
+.typing-dots i:nth-child(2) { animation-delay: calc(var(--typing-beat) / 8); }
+.typing-dots i:nth-child(3) { animation-delay: calc(var(--typing-beat) / 4); }
+/* in a Chat list row, small and in the chat colour where the status was */
+.row .sub.typing-status { color: var(--chat); }
+.typing-status .typing-dots { --dot: 4px; }
+@keyframes typing-dot { 0%, 60%, 100% { opacity: .4; transform: none; } 30% { opacity: 1; transform: translateY(calc(-1 * var(--dot) / 2)); } }
+@keyframes typing-in { from { opacity: 0; transform: translateY(var(--space-2)); } }
+@media (prefers-reduced-motion: reduce) { .typing:not(:empty), .typing-dots i { animation: none; } }
 .hint { font-size: .8rem; color: var(--text-dim); text-align: center; margin: var(--space-2) 0; }
 
 #toast { position: fixed; left: 50%; top: max(var(--space-4), env(safe-area-inset-top)); transform: translateX(-50%); z-index: 50; background: var(--surface); border: 1px solid var(--surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-pill); font-weight: 600; box-shadow: 0 8px 24px rgb(0 0 0 / .4); max-width: calc(100% - var(--space-6)); }

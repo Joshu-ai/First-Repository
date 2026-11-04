@@ -23,7 +23,8 @@ async function boot() {
   const app = createApp({ dataDir, now: () => clock.t });
   await new Promise((r) => app.server.listen(0, r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
-  const close = () => new Promise((r) => app.server.close(r));
+  // an event stream a test has stopped reading can leave its socket open, so close them all
+  const close = () => new Promise((r) => { app.server.close(r); app.server.closeAllConnections(); });
   return { app, base, clock, dataDir, close };
 }
 
@@ -41,8 +42,49 @@ function client(base) {
     return { status: res.status, data };
   };
   // fetch with this client's session, for responses that are not JSON
-  const raw = (p, headers = {}) => fetch(base + p, { headers: { cookie, ...headers } });
+  const raw = (p, headers = {}, opts = {}) => fetch(base + p, { headers: { cookie, ...headers }, ...opts });
   return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), raw };
+}
+
+// A client's live event stream (/api/events): `events` fills as they
+// arrive. until(type) waits for the next event of that type after the
+// call, so call it before whatever sends the event, then await it.
+async function listen(c) {
+  const stop = new AbortController();
+  const res = await c.raw('/api/events', {}, { signal: stop.signal });
+  assert.equal(res.headers.get('content-type'), 'text/event-stream');
+  const events = [];
+  const waiting = new Set();
+  const decoder = new TextDecoder();
+  let buf = '';
+  const pump = (async () => {
+    try {
+      for await (const chunk of res.body) {
+        buf += decoder.decode(chunk, { stream: true });
+        let end;
+        while ((end = buf.indexOf('\n\n')) >= 0) {
+          const data = buf.slice(0, end).split('\n').filter((l) => l.startsWith('data: ')).map((l) => l.slice(6)).join('\n');
+          buf = buf.slice(end + 2);
+          if (data) events.push(JSON.parse(data));
+          for (const w of waiting) w();
+        }
+      }
+    } catch (e) { if (e.name !== 'AbortError') throw e; }
+  })();
+  const until = (type, count = events.filter((e) => e.type === type).length + 1) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { waiting.delete(check); reject(new Error(`no "${type}" event`)); }, 2000);
+    function check() {
+      const found = events.filter((e) => e.type === type);
+      if (found.length < count) return;
+      clearTimeout(timer);
+      waiting.delete(check);
+      resolve(found.at(-1));
+    }
+    waiting.add(check);
+    check();
+  });
+  const close = async () => { stop.abort(); await pump; };
+  return { events, until, close };
 }
 
 async function friends(base) {
@@ -206,6 +248,72 @@ test('chat: read receipts, 24h expiry after reading, saved messages stay', async
     s.app.expire();
     const after = await a.get('/api/chat/' + bId);
     assert.deepEqual(after.data.messages.map((m) => m.text), ['keep me']);
+  } finally { await s.close(); }
+});
+
+test('typing: passed on to the friend live and never stored; at most once a second until a message', async () => {
+  const s = await boot();
+  try {
+    const { a, b, aId, bId } = await friends(s.base);
+    const live = await listen(b);
+    const typings = () => live.events.filter((e) => e.type === 'typing').length;
+    try {
+      const typed = live.until('typing');
+      const first = await a.post(`/api/chat/${bId}/typing`);
+      assert.deepEqual([first.status, first.data], [200, { ok: true }]);
+      assert.deepEqual(await typed, { type: 'typing', from: aId });
+      // another within the second is answered but not passed on: the story posted after it arrives first
+      s.clock.t += 999;
+      assert.equal((await a.post(`/api/chat/${bId}/typing`)).status, 200);
+      const story = live.until('story');
+      await a.post('/api/snaps', { to: [], story: true, image: PNG });
+      await story;
+      assert.equal(typings(), 1);
+      // a second after the last one passed on, it is passed on again
+      s.clock.t += 1;
+      const again = live.until('typing');
+      await a.post(`/api/chat/${bId}/typing`);
+      assert.deepEqual(await again, { type: 'typing', from: aId });
+      // and a message starts the count afresh: the next keystroke is passed on straight away
+      const message = live.until('message');
+      await a.post('/api/chat/' + bId, { text: 'hi' });
+      await message;
+      const next = live.until('typing');
+      await a.post(`/api/chat/${bId}/typing`);
+      await next;
+      assert.equal(typings(), 3);
+    } finally { await live.close(); }
+    // nothing about typing is kept: the one message is all there is
+    assert.equal(s.app.store.db.messages.length, 1);
+    assert.equal(JSON.stringify(s.app.store.db).includes('typing'), false);
+    const inbox = (await b.get('/api/inbox')).data[0];
+    assert.deepEqual([inbox.status, inbox.unread], ['new-chat', 1]);
+  } finally { await s.close(); }
+});
+
+test('typing to someone who is not a friend is 403, and they hear nothing', async () => {
+  const s = await boot();
+  try {
+    const { a, aId, bId } = await friends(s.base);
+    const zed = client(s.base);
+    const zedId = (await zed.post('/api/signup', { username: 'zed', password: 'password1' })).data.id;
+    const live = await listen(zed);
+    try {
+      assert.equal((await a.post(`/api/chat/${zedId}/typing`)).status, 403, 'a stranger');
+      const asked = live.until('friends');
+      await a.post('/api/friends/request', { username: 'zed' });
+      await asked;
+      assert.equal((await a.post(`/api/chat/${zedId}/typing`)).status, 403, 'asked, not yet accepted');
+      assert.equal((await zed.post(`/api/chat/${aId}/typing`)).status, 403, 'nor the other way');
+      assert.equal((await zed.post(`/api/chat/${bId}/typing`)).status, 403);
+      assert.equal((await a.post('/api/chat/nobody/typing')).status, 403, 'no one at all');
+      assert.equal((await a.post(`/api/chat/${aId}/typing`)).status, 403, 'yourself');
+      const removed = live.until('friends');
+      await a.post('/api/friends/remove', { userId: zedId });
+      await removed;
+      assert.deepEqual(live.events.map((e) => e.type), ['friends', 'friends'], 'no typing event reached zed');
+    } finally { await live.close(); }
+    assert.equal((await client(s.base).post(`/api/chat/${bId}/typing`)).status, 401, 'needs a session');
   } finally { await s.close(); }
 });
 

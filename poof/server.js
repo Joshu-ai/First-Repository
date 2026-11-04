@@ -41,6 +41,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
   const db = store.db;
   const streams = new Map(); // userId -> Set(res)
   const attempts = new Map(); // ip -> {count, reset}
+  const typingAt = new Map(); // "from>to" -> when a typing event was last passed on
 
   // ---------- helpers ----------
   const user = (id) => db.users.find((u) => u.id === id);
@@ -415,8 +416,27 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     const m = { id: store.id(), from: me.id, to: fid, text, createdAt: now(), readAt: null, saved: false };
     db.messages.push(m);
     store.save();
+    typingAt.delete(me.id + '>' + fid); // a message ends the typing; the next keystroke starts it afresh
     push(fid, { type: 'message', from: me.id });
     return m;
+  });
+
+  // Someone is typing to a friend: passed straight on over the friend's live
+  // stream as {type: 'typing', from}, never stored. The app sends it at most
+  // every 2 seconds while typing and the friend shows it for 4; a client
+  // that sends more often is answered but not passed on more than once a
+  // second (until it sends a message, which starts the count again).
+  route('POST', '/api/chat/:friendId/typing', ({ me, params }) => {
+    const fid = params.friendId;
+    if (!areFriends(me.id, fid)) fail(403, 'Not friends.');
+    const key = me.id + '>' + fid;
+    const t = now();
+    const last = typingAt.get(key);
+    if (last === undefined || t - last >= 1000) {
+      typingAt.set(key, t);
+      push(fid, { type: 'typing', from: me.id });
+    }
+    return { ok: true };
   });
 
   route('POST', '/api/messages/:id/save', ({ me, params }) => {

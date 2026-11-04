@@ -887,6 +887,57 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await checkIcons(ava, 'chat', { Back: 'back', 'Snap Ben': 'camera' });
     await shot(ava, 'S07-chat');
 
+    // S07 typing: while Ben types, Ava's open thread shows his avatar and
+    // moving dots with "Ben is typing…" (his app says so at most every 2
+    // seconds), and her Chat list says Typing… in place of his row's status.
+    // Both go 4 seconds after he stops, or as soon as his message arrives.
+    const typingPosts = [];
+    ben.on('request', (r) => { if (r.method() === 'POST' && /\/api\/chat\/[^/]+\/typing$/.test(r.url())) typingPosts.push(r.url()); });
+    const benTyping = ava.getByRole('status').filter({ hasText: 'Ben is typing…' });
+    assert.equal(await benTyping.count(), 0, 'nobody is typing yet');
+    await ben.getByLabel('Message', { exact: true }).pressSequentially('see you', { delay: 50 });
+    await benTyping.waitFor();
+    const typedAt = Date.now();
+    assert.equal(await benTyping.locator('.avatar').count(), 1, "with Ben's avatar");
+    const typingDots = benTyping.locator('.typing-dots i');
+    assert.equal(await typingDots.count(), 3);
+    assert.equal(await typingDots.first().evaluate((d) => getComputedStyle(d).animationName), 'typing-dot', 'the dots move');
+    assert.equal(typingPosts.length, 1, 'seven keystrokes, one typing event: at most one every 2 seconds');
+    assert.equal(await ben.getByText(/is typing/).count(), 0, 'Ben does not see himself typing');
+    const typingBox = await benTyping.boundingBox();
+    const composerBox = await ava.locator('.composer').boundingBox();
+    assert.ok(typingBox.y + typingBox.height <= composerBox.y + 1 && typingBox.width <= viewport.width,
+      'it sits just above where Ava types, inside the screen');
+    await shot(ava, 'S07-chat-typing');
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('button', { name: 'Ben, Typing…' }).waitFor();
+    assert.equal(await ava.locator('.chat-row .typing-dots i').count(), 3, 'small dots where the status was');
+    assert.equal(await ava.locator('.chat-row .typing-status').evaluate((el) => getComputedStyle(el).color),
+      await ava.evaluate(() => { const c = document.createElement('i'); c.style.color = 'var(--chat)'; document.body.append(c);
+        const v = getComputedStyle(c).color; c.remove(); return v; }), 'in the chat colour');
+    await shot(ava, 'S05-inbox-typing');
+    // 4 seconds after his last typing event, with no more, the row has its status back
+    await ava.getByRole('button', { name: 'Ben, Received' }).waitFor({ timeout: 8000 });
+    assert.ok(Date.now() - typedAt >= 3000, `Typing… stayed until 4 seconds had passed (${Date.now() - typedAt}ms)`);
+    assert.equal(await ava.locator('.chat-row .typing-dots').count(), 0);
+    // with the thread open again (and less motion: the dots hold still), Ben
+    // types on and sends: his message takes the place of the dots at once
+    await ava.getByRole('button', { name: 'Chat with Ben' }).click();
+    await ava.getByText('nice photo').waitFor();
+    assert.equal(await benTyping.count(), 0, 'it had stopped');
+    await ava.emulateMedia({ reducedMotion: 'reduce' });
+    await ben.getByLabel('Message', { exact: true }).pressSequentially(' tomorrow', { delay: 50 });
+    await benTyping.waitFor();
+    const typedAgainAt = Date.now();
+    assert.equal(await typingDots.first().evaluate((d) => getComputedStyle(d).animationName), 'none', 'still dots with less motion');
+    assert.equal(await typingDots.count(), 3);
+    assert.equal(typingPosts.length, 2, 'a new typing event once 2 seconds had passed');
+    await ben.getByRole('button', { name: 'Send', exact: true }).click();
+    await ava.getByText('see you tomorrow').waitFor();
+    assert.equal(await benTyping.count(), 0, 'the message arrived and the dots went');
+    assert.ok(Date.now() - typedAgainAt < 3500, 'gone with the message, not 4 seconds on');
+    await ava.emulateMedia({ reducedMotion: 'no-preference' });
+
     // S08 stories: Ben watches, Ava sees the viewer
     await ben.getByRole('button', { name: 'Back' }).click();
     await ben.getByRole('button', { name: 'Stories', exact: true }).click();
