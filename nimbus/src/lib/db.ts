@@ -13,6 +13,7 @@ export type Product = {
   kind: "download" | "service" | "course" | "hosting"; interval: string | null; plan_sites: number;
 };
 export type Project = { id: number; order_id: number; user_id: number; status: string; brief: string | null; live_url: string | null; created_at: string; updated_at: string };
+export type BuilderSite = { id: number; user_id: number; name: string; template: string; doc: string; site_id: number | null; published_at: string | null; created_at: string; updated_at: string };
 export type Site = { id: number; user_id: number; slug: string; name: string; deployed_at: string | null; file_count: number; bytes: number; created_at: string };
 export const PROJECT_STAGES = ["intake", "design", "build", "review", "launched"] as const;
 export type Order = {
@@ -111,6 +112,24 @@ function open() {
       deployed_at TEXT,
       file_count INTEGER NOT NULL DEFAULT 0,
       bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS builder_sites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      name TEXT NOT NULL,
+      template TEXT NOT NULL,
+      doc TEXT NOT NULL,                                      -- JSON SiteDoc (see src/lib/builder/types.ts)
+      site_id INTEGER REFERENCES sites(id) ON DELETE SET NULL, -- the hosting site it publishes to
+      published_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS builder_sites_user ON builder_sites(user_id);
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      builder_id INTEGER NOT NULL REFERENCES builder_sites(id) ON DELETE CASCADE,
+      data TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
@@ -280,6 +299,24 @@ export const q = {
   markDeployed: (id: number, files: number, bytes: number) =>
     db().prepare("UPDATE sites SET deployed_at = datetime('now'), file_count = ?, bytes = ? WHERE id = ?").run(files, bytes, id),
   deleteSite: (id: number) => db().prepare("DELETE FROM sites WHERE id = ?").run(id),
+  siteById: (id: number) => plain<Site | undefined>(db().prepare("SELECT * FROM sites WHERE id = ?").get(id)),
+  // website builder
+  builderSitesForUser: (userId: number) =>
+    plain<(Omit<BuilderSite, "doc"> & { slug: string | null; submissions: number })[]>(db().prepare(`SELECT b.id, b.user_id, b.name, b.template, b.site_id, b.published_at, b.created_at, b.updated_at, s.slug AS slug,
+      (SELECT COUNT(*) FROM form_submissions f WHERE f.builder_id = b.id) AS submissions FROM builder_sites b LEFT JOIN sites s ON s.id = b.site_id WHERE b.user_id = ? ORDER BY b.updated_at DESC`).all(userId)),
+  builderSite: (id: number) => plain<BuilderSite | undefined>(db().prepare("SELECT * FROM builder_sites WHERE id = ?").get(id)),
+  createBuilderSite: (userId: number, name: string, template: string, doc: string) =>
+    Number(db().prepare("INSERT INTO builder_sites (user_id, name, template, doc) VALUES (?, ?, ?, ?)").run(userId, name, template, doc).lastInsertRowid),
+  saveBuilderSite: (id: number, name: string, doc: string) =>
+    db().prepare("UPDATE builder_sites SET name = ?, doc = ?, updated_at = datetime('now') WHERE id = ?").run(name, doc, id),
+  markBuilderPublished: (id: number, siteId: number) =>
+    db().prepare("UPDATE builder_sites SET site_id = ?, published_at = datetime('now') WHERE id = ?").run(siteId, id),
+  deleteBuilderSite: (id: number) => db().prepare("DELETE FROM builder_sites WHERE id = ?").run(id),
+  addSubmission: (builderId: number, data: string) => db().prepare("INSERT INTO form_submissions (builder_id, data) VALUES (?, ?)").run(builderId, data),
+  recentSubmissionCount: (builderId: number) =>
+    (db().prepare("SELECT COUNT(*) AS n FROM form_submissions WHERE builder_id = ? AND created_at > datetime('now', '-1 hour')").get(builderId) as { n: number }).n,
+  submissions: (builderId: number) =>
+    plain<{ id: number; data: string; created_at: string }[]>(db().prepare("SELECT id, data, created_at FROM form_submissions WHERE builder_id = ? ORDER BY id DESC LIMIT 200").all(builderId)),
   upsertProduct: (p: { slug: string; name: string; tagline: string; description: string; price_cents: number; category: string; features: string; file_name: string | null; active: number; kind: string; interval: string | null; plan_sites: number }) =>
     db().prepare(`INSERT INTO products (slug, name, tagline, description, price_cents, category, features, file_name, active, kind, interval, plan_sites)
       VALUES (@slug, @name, @tagline, @description, @price_cents, @category, @features, @file_name, @active, @kind, @interval, @plan_sites)

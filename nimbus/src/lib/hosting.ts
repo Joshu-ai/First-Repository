@@ -96,6 +96,33 @@ export async function deployArchive(slug: string, fileName: string, data: Buffer
   }
 }
 
+/** Writes generated files (e.g. from the website builder) and atomically swaps them in as the live version. */
+export function deployFiles(slug: string, files: Record<string, string | Uint8Array>) {
+  const base = path.join(SITES_DIR, slug);
+  const stage = path.join(base, `stage-${crypto.randomBytes(4).toString("hex")}`);
+  fs.mkdirSync(stage, { recursive: true });
+  try {
+    let bytes = 0;
+    for (const [name, data] of Object.entries(files)) {
+      const rel = safeRel(name);
+      if (!rel) throw new Error(`Unsafe path: ${name}`);
+      const out = path.join(stage, rel);
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.writeFileSync(out, data);
+      bytes += typeof data === "string" ? Buffer.byteLength(data) : data.length;
+    }
+    if (bytes > MAX_BYTES) throw new Error("Site is too large (max 200 MB).");
+    const live = path.join(base, "current");
+    const old = path.join(base, `old-${Date.now()}`);
+    if (fs.existsSync(live)) fs.renameSync(live, old);
+    fs.renameSync(stage, live);
+    fs.rmSync(old, { recursive: true, force: true });
+    return { files: Object.keys(files).length, bytes };
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+}
+
 export function removeSiteFiles(slug: string) {
   fs.rmSync(path.join(SITES_DIR, slug), { recursive: true, force: true });
 }

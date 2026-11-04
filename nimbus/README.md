@@ -16,6 +16,12 @@ subscriptions, and products (add or edit any product, set prices, upload templat
 project messages in both directions, project stage updates to the customer, and password reset (one-time link, expires in
 1 hour, signs the user out of other devices).
 
+**Website builder** (`/builder`): customers pick one of 6 templates (or Blank), edit it visually in `/builder/[id]`
+(click any text in the preview to type, add/reorder 14 section types, multiple pages, colors/fonts/button shapes, photo
+uploads, undo/redo, desktop/tablet/phone preview, autosave), then publish to a live URL on their hosting plan or export a
+.zip of static HTML. Contact forms on published sites save to `/dashboard/websites` and email the owner.
+Code: `src/lib/builder/` (model, section specs, renderer, templates, publish) and `src/app/builder/`.
+
 The original marketing pages (docs, blog, showcase, Cmd+K search, newsletter, light/dark theme) are still there.
 
 ## Run locally

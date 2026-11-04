@@ -23,13 +23,13 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="grid-bg absolute inset-0 -z-10" />
         <div className="mx-auto max-w-5xl px-4 pt-24 pb-20 text-center md:pt-32">
-          <Link href="/learn" className="mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-bg-soft px-3 py-1 text-xs text-muted hover:text-fg">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> New: the Ship It course. First lesson free →
+          <Link href="/builder" className="mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-bg-soft px-3 py-1 text-xs text-muted hover:text-fg">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> New: the Nimbus website builder. Build your site in minutes →
           </Link>
           <h1 className="text-5xl font-bold tracking-tighter md:text-7xl">Everything you need<br className="hidden sm:block" /> to launch on the web</h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted md:text-xl">Start from a template, have us build it for you, learn to do it yourself, and host it with us. All in one place.</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/store" className="flex h-11 items-center rounded-md bg-fg px-6 font-medium text-bg hover:opacity-90">Browse templates</Link>
+            <Link href="/builder" className="flex h-11 items-center rounded-md bg-fg px-6 font-medium text-bg hover:opacity-90">Build a website</Link>
             <Link href="/services" className="flex h-11 items-center rounded-md border border-line px-6 font-medium hover:bg-bg-soft">Get a website built</Link>
           </div>
         </div>

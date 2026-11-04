@@ -6,6 +6,7 @@ import { Logo } from "./Logo";
 import { SearchButton } from "./CommandPalette";
 
 const nav = [
+  { href: "/builder", label: "Builder" },
   { href: "/docs", label: "Docs" },
   { href: "/store", label: "Templates" },
   { href: "/services", label: "Services" },
