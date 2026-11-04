@@ -22,6 +22,11 @@ uploads, undo/redo, desktop/tablet/phone preview, autosave), then publish to a l
 .zip of static HTML. Contact forms on published sites save to `/dashboard/websites` and email the owner.
 Code: `src/lib/builder/` (model, section specs, renderer, templates, publish) and `src/app/builder/`.
 
+**Custom domains**: any hosted site (built in the builder or uploaded) can use the customer's own domain. In
+`/dashboard/sites` they enter `example.com` or `shop.example.com` and get the exact DNS records to add, with copy buttons.
+The app checks DNS every 5 minutes (or on "Check now"), emails them when it's live, then serves the site there with
+HTTPS. `www.` redirects to the root domain, and the site's old `<slug>.HOSTING_DOMAIN` address redirects to the new one.
+
 The original marketing pages (docs, blog, showcase, Cmd+K search, newsletter, light/dark theme) are still there.
 
 ## Run locally
@@ -57,10 +62,11 @@ npm run dev                   # http://localhost:3000
    `*.yourbrandsites.com` pointing at this app, and set `HOSTING_DOMAIN=yourbrandsites.com`. Customer sites are then served at
    `https://<site>.yourbrandsites.com`. Use a separate domain so customer code can never touch your store's cookies.
    (Sites are also served with a sandbox Content-Security-Policy as a second layer of protection.)
-7. **Email.** Sign up at resend.com, verify your sending domain, then set `RESEND_API_KEY` and `EMAIL_FROM`.
+7. **Custom domains (optional).** See [Custom domains](#custom-domains) below.
+8. **Email.** Sign up at resend.com, verify your sending domain, then set `RESEND_API_KEY` and `EMAIL_FROM`.
    Until then, every email is saved to `DATA_DIR/outbox/` instead of sent (handy for testing).
    Alerts go to `ADMIN_NOTIFY_EMAIL` (set to joshualef@duck.com in `.env.example`).
-8. **Legal pages.** Write real Terms, Privacy and Refund policies and link them in `src/components/Footer.tsx`.
+9. **Legal pages.** Write real Terms, Privacy and Refund policies and link them in `src/components/Footer.tsx`.
 
 ## Deploy
 
@@ -77,11 +83,36 @@ docker run -p 3000:3000 -v nimbus-data:/data --env-file .env.production nimbus
 
 Back up `DATA_DIR` (it holds `store.db` and all uploaded files).
 
+## Custom domains
+
+How it works: a customer adds their domain, then sets two records at their DNS provider.
+
+| Their domain | Record that routes it | Ownership record |
+|---|---|---|
+| `shop.example.com` | `CNAME shop -> cname.<HOSTING_DOMAIN>` | `TXT _nimbus-verify.shop = nimbus-verify=<token>` |
+| `example.com` (root) | `A @ -> <your server IP>` (plus optional `CNAME www -> cname.<HOSTING_DOMAIN>`) | `TXT _nimbus-verify = nimbus-verify=<token>` |
+
+The TXT record proves they own the domain, so nobody can claim a domain whose DNS happens to point at you.
+Once both records check out, the domain is **active**: `src/middleware.ts` sends requests for it to that site.
+
+**HTTPS** comes from [Caddy](https://caddyserver.com) in front of the app, using on-demand TLS: it gets a free Let's Encrypt
+certificate the first time a domain is visited, and only after `/api/domains/allow` confirms the domain is connected.
+The same setup also covers `<site>.HOSTING_DOMAIN` and your main domain, so you don't need a wildcard certificate.
+
+To turn it on, on a VPS (Hetzner, DigitalOcean, Lightsail...) with ports 80 and 443 open:
+
+1. Point your main domain, and `*.HOSTING_DOMAIN`, at the server's IP.
+2. In `.env.production` set `HOSTING_DOMAIN`, `CUSTOM_DOMAIN_IPS=<server IP>`, and `NEXT_PUBLIC_SITE_URL=https://yourmaindomain.com`.
+3. `ACME_EMAIL=you@example.com docker compose up -d --build` (uses `docker-compose.yml` and `deploy/Caddyfile`).
+
+Managed hosts like Render or Fly terminate HTTPS themselves and can't run Caddy in front, so there you'd add each customer
+domain through the host's API instead (or put Cloudflare for SaaS in front). The verification and routing here stay the same.
+
 ## Not built yet (good next steps)
 
 - **Hosting from GitHub**: hosting currently takes uploaded static builds. Building customer repos automatically
   (and server-side apps) needs build workers and is a bigger project.
-- Custom domains per hosted site, usage analytics, coupons/discount codes, team accounts.
+- Usage analytics, coupons/discount codes, team accounts.
 
 ## Where things live
 
@@ -92,7 +123,9 @@ src/lib/payments.ts      Stripe, test checkout, fulfilment for each product type
 src/lib/store-actions.ts buy (one-time or subscription), billing portal
 src/lib/email.ts         email templates + Resend sender (dev: writes to data/outbox)
 src/lib/hosting.ts       safe archive extraction, atomic deploys, static file serving
-src/middleware.ts        routes <site>.HOSTING_DOMAIN to customer sites
+src/middleware.ts        routes <site>.HOSTING_DOMAIN and custom domains to customer sites
+src/lib/domains.ts       custom domains: DNS records, verification, background rechecks
+src/lib/serve-site.ts    serves a hosted site's files (sandboxed)
 src/app/api/stripe/webhook  payment + subscription events
 src/app/admin            admin dashboard
 ```

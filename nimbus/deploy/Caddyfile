@@ -1,0 +1,20 @@
+# HTTPS for the app, every <site>.HOSTING_DOMAIN, and every customer's custom domain.
+# Caddy fetches a free Let's Encrypt certificate the first time a hostname is visited, but only after
+# the app's /api/domains/allow endpoint says that hostname belongs to us (connected and verified).
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://app:3000/api/domains/allow
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	reverse_proxy app:3000
+}
+
+http:// {
+	redir https://{host}{uri} permanent
+}

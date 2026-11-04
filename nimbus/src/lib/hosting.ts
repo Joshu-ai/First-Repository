@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { unzipSync } from "fflate";
 import * as tar from "tar";
-import { DATA_DIR } from "./db";
+import { DATA_DIR, q } from "./db";
 
 export const SITES_DIR = path.join(DATA_DIR, "sites");
 const MAX_FILES = 5000;
@@ -12,11 +12,17 @@ const MAX_BYTES = 200 * 1024 * 1024;
 
 export const hostingDomain = () => (process.env.HOSTING_DOMAIN || "").toLowerCase().replace(/^\.+/, "");
 
-/** Public URL for a hosted site. Uses <slug>.HOSTING_DOMAIN in production, a path locally. */
-export function siteLiveUrl(slug: string) {
+/** Address of a hosted site on our own domain: <slug>.HOSTING_DOMAIN in production, a path locally. */
+export function siteDefaultUrl(slug: string) {
   const d = hostingDomain();
   if (d) return `https://${slug}.${d}/`;
   return `${(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")}/hosted/${slug}/`;
+}
+
+/** Public URL for a hosted site: its connected custom domain if it has one, otherwise its default address. */
+export function siteLiveUrl(slug: string) {
+  const custom = q.activeDomainForSlug(slug);
+  return custom ? `https://${custom.host}/` : siteDefaultUrl(slug);
 }
 
 export const siteRoot = (slug: string) => path.join(SITES_DIR, slug, "current");

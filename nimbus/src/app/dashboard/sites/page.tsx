@@ -2,9 +2,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { money } from "@/lib/brand";
-import { hostingDomain, siteLiveUrl } from "@/lib/hosting";
+import { hostingDomain, siteDefaultUrl, siteLiveUrl } from "@/lib/hosting";
 import { deleteSite } from "@/lib/hosting-actions";
 import { DeployForm, NewSiteForm } from "./forms";
+import { DomainPanel } from "./domain-panel";
 
 export const metadata = { title: "Hosting" };
 
@@ -36,19 +37,21 @@ export default async function Sites({ searchParams }: { searchParams: Promise<{ 
           )}
           <ul className="mt-6 space-y-4">
             {sites.map((s) => (
-              <li key={s.id} className="rounded-lg border border-line p-5">
+              <li key={s.id} id={`site-${s.slug}`} className="scroll-mt-24 rounded-lg border border-line p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{s.name}</p>
                     {s.deployed_at
                       ? <a href={siteLiveUrl(s.slug)} target="_blank" rel="noreferrer" className="text-sm text-accent underline">{siteLiveUrl(s.slug)}</a>
                       : <p className="text-sm text-muted">Not deployed yet</p>}
+                    {s.deployed_at && siteLiveUrl(s.slug) !== siteDefaultUrl(s.slug) && <p className="text-xs text-muted">Also at {siteDefaultUrl(s.slug)}{d ? " (redirects to your domain)" : ""}</p>}
                     {s.deployed_at && <p className="mt-1 text-xs text-muted">Last deploy {s.deployed_at} · {s.file_count} files · {size(s.bytes)}</p>}
                   </div>
                   <form action={deleteSite}><input type="hidden" name="slug" value={s.slug} /><button className="text-xs text-red-600 hover:underline dark:text-red-400">Delete site</button></form>
                 </div>
                 <div className="mt-4 border-t border-line pt-4"><DeployForm slug={s.slug} /></div>
                 <p className="mt-2 text-xs text-muted">Upload a .zip or .tar.gz of your built static site (for Next.js: set output: &quot;export&quot; and upload the out/ folder).</p>
+                <DomainPanel site={s} />
               </li>
             ))}
           </ul>
