@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const EMPTY = () => ({
   users: [], sessions: {}, friendships: [], snaps: [],
   messages: [], stories: [], streaks: {},
+  groups: [], groupMessages: [], groupSnaps: [],
 });
 
 class Store {

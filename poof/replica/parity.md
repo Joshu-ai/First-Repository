@@ -3,7 +3,7 @@
 Scored with the replica-diff rules (must 3, should 2, could 1, partial half,
 `skip` rows left out). Computed 2026-11-04 from `features.csv`.
 
-**Feature score: 95.5 / 100 (95.5 of 100 points). Must-haves: 15 of 15. Shippable for this slice.**
+**Feature score: 95.8 / 100 (103.5 of 108 points). Must-haves: 15 of 15. Shippable for this slice.**
 
 Partial (counted half): scanning a profile code in the app, and the camera
 spotting one, need the browser's code reader (`BarcodeDetector`), which
@@ -34,8 +34,16 @@ Video snaps are in: hold the shutter to record up to 10 seconds, a caption
 and Mute in the video editor (Mute takes the sound out of the file itself),
 open once, and stories play video. Drawing on a video is not built.
 
-Missing (could-haves):
-1. Group chats
+Group chats are in: New chat on the Chat list picks friends (one opens
+your chat with them; two or more, or a name, start a group of up to 32
+people), group rows show two stacked avatars and the usual statuses, the
+group's chat puts the others' messages under their names and avatars, and
+messages go 24 hours after everyone else has read them. Send to lists your
+groups, and each member opens a group snap once. The group card lists who
+is in it, with Leave group; the last one out deletes it. Not built: adding
+people or renaming a group after it is made, and typing in groups.
+
+Missing (could-haves): none.
 
 Out of scope on purpose (not scored): Lenses/AR, the map, Discover/Spotlight,
 avatars, screenshot alerts (a web page can't detect screenshots).

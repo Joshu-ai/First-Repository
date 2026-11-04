@@ -35,6 +35,7 @@
   --typing-beat: 1200ms; /* the typing dots rising and falling in turn, once round */
   --scrim: rgb(0 0 0 / .5); /* behind a bottom sheet */
   --on-chat: var(--bg); /* text and icons on the --chat colour */
+  --fab: 56px; /* the Chat list's New chat button */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -202,6 +203,7 @@ button { cursor: pointer; }
 .row .main { flex: 1; min-width: 0; }
 .row .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .sub { font-size: .85rem; color: var(--text-dim); display: flex; gap: var(--space-2); align-items: center; }
+.row .sub .when { color: var(--text-dim); }
 .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
 .avatar.has-art { overflow: hidden; }
 .avatar.has-art svg { display: block; width: 100%; height: 100%; }
@@ -428,3 +430,29 @@ html.dragging, html.dragging * { cursor: grabbing; user-select: none !important;
 .card-confirm p { margin: var(--space-1) 0 var(--space-2); color: var(--text-dim); }
 .card-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .btn.danger.outline { box-shadow: inset 0 0 0 2px var(--danger); }
+
+/* Groups: two of its people's avatars, one tucked behind the other */
+.avatar-stack { position: relative; flex: none; display: block; }
+.avatar-stack .avatar { position: absolute; }
+.avatar-stack .stack-back { top: 0; right: 0; }
+.avatar-stack .stack-front { left: 0; bottom: 0; box-shadow: 0 0 0 2px var(--bg); }
+.sheet .avatar-stack .stack-front { box-shadow: 0 0 0 2px var(--surface); }
+/* Chat list: New chat floats above the tabs, the list keeps clear of it */
+.fab { position: absolute; right: var(--space-4); bottom: calc(var(--nav-h) + var(--space-4)); z-index: 2; width: var(--fab); height: var(--fab); padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; box-shadow: 0 8px 24px rgb(0 0 0 / .4); }
+.scroll.has-fab { padding-bottom: calc(var(--nav-h) + var(--fab) + var(--space-6)); }
+/* New chat: the list keeps clear of the bar along the bottom */
+.scroll.pick-list { padding-bottom: calc(var(--tap) + 2 * var(--space-6)); }
+.pick-list .field .note { min-height: 0; font-size: .85rem; }
+/* Group chat: the others' messages in runs under their name and avatar */
+.msg-run { display: flex; align-items: flex-start; gap: var(--space-2); max-width: 85%; }
+.msg-run > .avatar { margin-top: var(--space-1); }
+.msg-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.msg-col .msg { max-width: 100%; }
+.msg-sender { margin-bottom: calc(-1 * var(--space-1)); font-size: .8rem; font-weight: 700; color: var(--text-dim); }
+.thread-note { margin: var(--space-2) 0; text-align: center; font-size: .8rem; color: var(--text-dim); }
+/* Group card: who is in it */
+.members { list-style: none; margin: 0 0 var(--space-2); padding: 0; }
+/* a group snap's viewer: who sent it, over the group's name */
+.head-avatar { flex: none; display: grid; }
+.viewer .head .who.stacked { display: flex; flex-direction: column; min-width: 0; }
+.viewer .head .who .sub { font-size: .8rem; font-weight: 400; opacity: .8; }

@@ -16,6 +16,8 @@
   arrives. The server passes on at most one a second per pair, counting
   afresh after each message. A typing event only redraws the typing line
   and the Chat list row (`state.onTyping`); nothing is reloaded.
+  Group events carry `group`: `{id, name}` on snap, message and group
+  events (`kind` `added` or `left`), the bare id on read and opened.
   Snap, message and friends events carry `from` (the id) and `sender`
   (`publicUser`), so the app can show a banner with the friend's name and
   avatar without asking again; friends events have a `kind` (`request`,
@@ -77,10 +79,19 @@ snaps        { id, from, to, media, duration, createdAt, openedAt }
 messages     { id, from, to, text, createdAt, readAt, saved }
 stories      { id, userId, media, duration, createdAt, viewers[] } (+ type, caption, mirror for video)
 streaks      { "a|b": { days: {a: 'YYYY-MM-DD', b: ...}, count, lastDay } }
+groups       { id, name, members[], createdBy, createdAt }   up to 32 members, all friends of the creator
+groupMessages { id, group, from, text, createdAt, readBy: {userId: ms}, saved } (+ event: 'left' for "X left the group")
+groupSnaps   { id, group, from, media, duration, createdAt, openedBy: {userId: ms} } (+ type, caption, mirror for video)
 ```
 
 Expiry runs every minute and on boot: unopened snaps after 30 days, read
-unsaved messages 24h after reading, stories 24h after posting.
+unsaved messages 24h after reading, stories 24h after posting. In a group,
+"read" and "opened" mean by every member other than the sender who is still
+in it: a group message goes 24h after the last of them read it (unless
+kept), and a group snap's one shared file goes once the last of them opens
+it (or after 30 days). Leaving can complete either. Non-members get 404 for
+everything about a group; the last member to leave deletes it, its chat,
+its snaps and their files.
 
 ## Streak rule
 
@@ -95,7 +106,7 @@ POST /api/signup {username, password, displayName}
 POST /api/login  {username, password}
 POST /api/logout
 GET  /api/me
-GET  /api/events                       SSE: snap, message, friends (with from + sender), typing, story, opened, read, story-view
+GET  /api/events                       SSE: snap, message, friends, group (with from + sender), typing, story, opened, read, story-view
 GET  /api/users/available?username=     {available, reason}; no session needed
 GET  /api/users/search?q=
 GET  /api/users/by-username/:username  publicUser + status: self|friends|requested|incoming|none
@@ -103,14 +114,20 @@ GET  /api/friends                      friends, incoming, outgoing
 POST /api/friends/request {username}
 POST /api/friends/accept  {userId}
 POST /api/friends/remove  {userId}
-POST /api/snaps {to[], story, image, duration}               photo (duration: seconds shown, 0 = no limit)
-POST /api/snaps {to[], story, video, caption, duration, mirror}  video (duration: its length, up to 10s)
+POST /api/snaps {to[], groupIds[], story, image, duration}   photo (duration: seconds shown, 0 = no limit)
+POST /api/snaps {to[], groupIds[], story, video, caption, duration, mirror}  video (duration: its length, up to 10s)
 POST /api/snaps/:id/open               {image, duration} or {video, caption, duration, mirror}; deleted
-GET  /api/inbox
+                                       a group snap adds {sender, group}; its file goes once all have opened it
+GET  /api/inbox                        a row per friend {friend, ...} and per group {group, ...}
 GET  /api/chat/:friendId
 POST /api/chat/:friendId {text}
 POST /api/chat/:friendId/typing        friends only; pushes {type: 'typing', from} to them, never stored
-POST /api/messages/:id/save
+POST /api/messages/:id/save           one-to-one or group (kept for everyone in it)
+POST /api/groups {name, members[]}     members: friends of yours; a blank name is made from theirs
+GET  /api/groups                       the groups you are in, with their members (publicUser)
+POST /api/groups/:id/leave             pushes {type: 'group', kind: 'left'} to the rest
+GET  /api/groups/:id/chat              {group, people, messages}; marks them read for you
+POST /api/groups/:id/chat {text}
 GET  /api/stories
 GET  /api/stories/:id/media            photo or video; Range requests answered with 206
 POST /api/stories/:id/view

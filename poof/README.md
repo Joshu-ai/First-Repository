@@ -121,7 +121,8 @@ stored (default `./data`).
 | Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
 | Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
-| Snaps | Send to several friends and/or your story. Each snap opens once, then the file is deleted on the server |
+| Snaps | Send to several friends, groups and/or your story. Each snap opens once, then the file is deleted on the server |
+| Groups | New chat on the Chat list: pick friends and name it to start a group of up to 32 people. Its row shows two of its people's avatars; its chat shows who said what, with their avatars; Send to lists your groups, and everyone in one opens a group snap once. The group card (tap its avatars) lists who is in it and has Leave group |
 | Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it. While a friend types to you, their open thread shows their avatar and moving dots with "Ben is typing…", and their row in the Chat list says Typing… |
 | Stories | Post for 24 hours, tap through friends' stories, see who watched yours |
 | Friends | Search by username, requests, accept, remove, streaks for consecutive days |
@@ -129,7 +130,8 @@ stored (default `./data`).
 | Live | New snaps, chats, "opened" updates and typing arrive instantly (Server-Sent Events) |
 | Notifications | A new snap, chat or friend request drops in as a banner at the top: the Puff mark on your friend's avatar, their name, and New snap or the start of their message. Tap it to open; swipe it up to put it away; it goes by itself after 4 seconds. Turn on Notifications in Profile to get system notifications while Poof is open in the background. The tab's title counts what is new: "(2) Poof" |
 
-Not built: group chats, AR lenses, map, discover feed, screenshot alerts.
+Not built: AR lenses, map, discover feed, screenshot alerts; adding people
+to a group or renaming it after it is made.
 Videos can't be drawn on or saved to the device yet. See
 [`replica/parity.md`](replica/parity.md).
 
@@ -188,7 +190,7 @@ Story videos are served with byte ranges, which Safari needs to play them.
 ## Tests
 
 ```bash
-npm test             # API: auth, friends, open-once snaps and videos, chat expiry, typing (live, friends only), live events with their sender, stories, streaks, security; WebM sound removal; app icons
+npm test             # API: auth, friends, open-once snaps and videos, chat expiry, groups (members only, open once each, leaving), typing (live, friends only), live events with their sender, stories, streaks, security; WebM sound removal; app icons
 npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
 npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
 ```

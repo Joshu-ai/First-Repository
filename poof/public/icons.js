@@ -10,6 +10,10 @@
   const ICONS = {
     // an oval speech bubble with its tail low on the left
     chat: '<path d="M12 4c4.97 0 9 3.36 9 7.5S16.97 19 12 19c-1.1 0-2.16-.16-3.13-.47L4 20l1.33-3.62C3.87 15.05 3 13.36 3 11.5 3 7.36 7.03 4 12 4z"/>',
+    // the chat bubble with a plus inside: start a new chat
+    'chat-new': '<path d="M12 4c4.97 0 9 3.36 9 7.5S16.97 19 12 19c-1.1 0-2.16-.16-3.13-.47L4 20l1.33-3.62C3.87 15.05 3 13.36 3 11.5 3 7.36 7.03 4 12 4z"/><path d="M12 8.5v6M9 11.5h6"/>',
+    // two people, one just behind the other: a group
+    group: '<circle cx="9.5" cy="8.5" r="3.5"/><path d="M3 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 5.3a3.2 3.2 0 0 1 0 6.4M18.5 14.6A6.5 6.5 0 0 1 21 20"/>',
     camera: '<path d="M4 8h3l1.5-2.25A1.7 1.7 0 0 1 9.9 5h4.2a1.7 1.7 0 0 1 1.4.75L17 8h3a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
     // a story ring broken into three segments, around a face-sized dot
     stories: '<path d="M13.56 3.14A9 9 0 0 1 20.46 15.08M18.89 17.79A9 9 0 0 1 5.11 17.79M3.54 15.08A9 9 0 0 1 10.44 3.14"/><circle cx="12" cy="12" r="4"/>',

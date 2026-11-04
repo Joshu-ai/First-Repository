@@ -1355,6 +1355,130 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.getByText('Received').waitFor();
     await swipeSettled(ava);
 
+    // Ben leaves his chat with Ava for his Chat list
+    await ben.getByRole('button', { name: 'Back' }).click();
+    await ben.getByRole('heading', { name: 'Chat' }).waitFor();
+    // S18 New chat, on the Chat list: Ava starts a group with Ben. One
+    // friend picked opens your chat with them; a name (or two or more
+    // friends) makes it a group, and the button says which
+    const newChat = ava.getByRole('button', { name: 'New chat' });
+    const fabBox = await newChat.boundingBox();
+    assert.ok(fabBox.width >= 44 && fabBox.height >= 44 && fabBox.x + fabBox.width <= viewport.width
+      && fabBox.y + fabBox.height <= (await ava.locator('.nav').boundingBox()).y, 'New chat is easy to tap, above the tabs');
+    await checkIcons(ava, 'chat list', { 'New chat': 'chat-new' });
+    await newChat.click();
+    await ava.getByRole('heading', { name: 'New chat' }).waitFor();
+    const startChat = ava.locator('.send-bar .btn');
+    assert.equal(await startChat.isDisabled(), true, 'nothing picked yet');
+    await ava.getByRole('checkbox', { name: /Ben/ }).click();
+    assert.equal(await startChat.textContent(), 'Chat', 'one friend: a chat with him');
+    await ava.getByLabel('Group name').fill('Weekend plans');
+    assert.equal(await startChat.textContent(), 'Start group', 'named: a group');
+    assert.equal(await ava.locator('.send-bar .who').textContent(), 'Ben');
+    await checkIcons(ava, 'new chat', { Back: 'back' });
+    await shot(ava, 'S18-new-chat');
+    await ava.getByRole('button', { name: 'Start group' }).click();
+    // S19 its chat opens; Ava says something, and it is new in Ben's Chat
+    // list: a row with two stacked avatars, and a banner with the group's name
+    const avaGroup = ava.locator('section.screen[aria-label="Chat in Weekend plans"]');
+    await avaGroup.waitFor();
+    await ava.getByRole('heading', { name: 'Weekend plans' }).waitFor();
+    await checkIcons(ava, 'group chat', { Back: 'back', 'Group details': 'group' });
+    await ava.getByLabel('Message', { exact: true }).fill('Who is in for Saturday?');
+    await ava.getByRole('button', { name: 'Send', exact: true }).click();
+    await ava.getByRole('button', { name: /^Message: Who is in for Saturday\?/ }).getByText(/· sent$/).waitFor();
+    const benGroupRow = ben.getByRole('button', { name: 'Weekend plans, New chat' });
+    await benGroupRow.waitFor();
+    assert.equal(await ben.locator('.chat-row[data-group] .avatar-stack .avatar').count(), 2, 'two stacked avatars');
+    const groupNote = bannerOf(ben);
+    await groupNote.getByText('Ava: Who is in for Saturday?', { exact: true }).waitFor();
+    assert.equal(await groupNote.locator('.banner-name').textContent(), 'Weekend plans');
+    // Ben opens the group's chat from his Chat list: Ava's message is there
+    // under her name and avatar. His reply reaches Ava's open chat (no
+    // banner), and each sees the other has read theirs
+    await benGroupRow.click();
+    await ben.locator('section.screen[aria-label="Chat in Weekend plans"]').waitFor();
+    const fromAva = ben.getByRole('button', { name: /^Message from Ava: Who is in for Saturday\?/ });
+    await fromAva.waitFor();
+    const avaRun = ben.locator('.msg-run').filter({ has: fromAva });
+    assert.equal(await avaRun.locator('.msg-sender').textContent(), 'Ava');
+    assert.equal(await avaRun.locator('.avatar.has-art').count(), 1, "with Ava's avatar");
+    assert.equal(await bannerOf(ben).count(), 0, 'the banner went as the chat opened');
+    await ben.getByLabel('Message', { exact: true }).fill('Count me in');
+    await ben.getByRole('button', { name: 'Send', exact: true }).click();
+    await ava.getByRole('button', { name: /^Message from Ben: Count me in/ }).waitFor();
+    assert.equal(await bannerOf(ava).count(), 0, 'no banner for a message into the group on screen');
+    await ava.getByRole('button', { name: /^Message: Who is in for Saturday\?/ }).getByText(/· read$/).waitFor();
+    await ben.getByRole('button', { name: /^Message: Count me in/ }).getByText(/· read$/).waitFor();
+    await shot(ben, 'S19-group-chat');
+
+    // S04 Send to lists groups: Ava snaps the group from the camera
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('button', { name: 'Weekend plans, Received' }).waitFor();
+    await ava.getByRole('button', { name: 'Camera', exact: true }).click();
+    await camVideo(ava, true);
+    await ava.getByRole('button', { name: 'Take photo', exact: true }).click();
+    await ava.getByRole('button', { name: 'Send to', exact: true }).click();
+    await ava.getByRole('heading', { name: 'Groups' }).waitFor();
+    await ava.getByRole('checkbox', { name: /Weekend plans/ }).click();
+    assert.equal(await ava.locator('.send-bar .who').textContent(), 'Weekend plans');
+    await shot(ava, 'S04-send-to-group');
+    const [groupPost] = await Promise.all([snapPost(ava), ava.getByRole('button', { name: 'Send', exact: true }).click()]);
+    const groupSnap = JSON.parse(groupPost.postData());
+    assert.deepEqual([groupSnap.to, groupSnap.groupIds.length, groupSnap.story], [[], 1, false]);
+    await ava.getByRole('button', { name: 'Weekend plans, Delivered' }).waitFor();
+    // Ben, still in the group's chat, hears it in a banner and opens it from
+    // there: the viewer says who sent it, over the group's name. It opens once
+    const groupSnapNote = bannerOf(ben);
+    await groupSnapNote.getByText('New snap from Ava', { exact: true }).waitFor();
+    assert.equal(await groupSnapNote.locator('.banner-name').textContent(), 'Weekend plans');
+    await groupSnapNote.click();
+    await ben.getByRole('img', { name: 'Snap from Ava' }).waitFor();
+    await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
+    assert.deepEqual(await ben.locator('.viewer .head .who > span').allTextContents(), ['Ava', 'Weekend plans']);
+    await ben.getByRole('button', { name: 'Next' }).click();
+    await ben.getByRole('button', { name: 'Weekend plans, Received' }).waitFor();
+    await ava.getByRole('button', { name: 'Weekend plans, Opened' }).waitFor();
+    await ben.locator('.puff-pop').waitFor({ state: 'detached' });
+    await shot(ben, 'S19-group-row');
+
+    // S19 the group card from Ben's row: who is in it (him first), Send a
+    // chat, and Leave group, which asks first with the safe choice focused
+    await ben.getByRole('button', { name: 'Weekend plans details' }).click();
+    const groupCard = ben.getByRole('dialog', { name: 'Weekend plans' });
+    await groupCard.waitFor();
+    await groupCard.getByText('2 people', { exact: true }).waitFor();
+    assert.deepEqual(await groupCard.locator('.members .name').allTextContents(), ['Ben (you)', 'Ava']);
+    for (const name of ['Send a chat', 'Leave group', 'Close']) {
+      const b = await groupCard.getByRole('button', { name, exact: true }).boundingBox();
+      assert.ok(b.width >= 44 && b.height >= 44, `${name} is easy to tap`);
+    }
+    await ben.locator('.sheet').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    await shot(ben, 'S19-group-card');
+    await groupCard.getByRole('button', { name: 'Leave group' }).click();
+    await groupCard.getByText('Leave Weekend plans?').waitFor();
+    assert.equal(await ben.evaluate(() => document.activeElement?.textContent), 'Cancel', 'the safe choice is focused');
+    await groupCard.getByRole('button', { name: 'Leave', exact: true }).click();
+    await groupCard.waitFor({ state: 'detached' });
+    await ben.getByText('You left Weekend plans').waitFor();
+    await ben.locator('.chat-row[data-group]').waitFor({ state: 'detached' });
+    // Ava's chat says he left. She leaves too, from Group details, and with
+    // nobody left in it the group is gone
+    await ava.getByRole('button', { name: /^Weekend plans, / }).click();
+    await avaGroup.waitFor();
+    await ava.getByText('Ben left the group.').waitFor();
+    await ava.getByRole('button', { name: 'Group details' }).click();
+    const avaCard = ava.getByRole('dialog', { name: 'Weekend plans' });
+    await avaCard.getByText('Just you', { exact: true }).waitFor();
+    assert.equal(await avaCard.getByRole('button', { name: 'Send a chat' }).count(), 0, 'she is in its chat already');
+    await avaCard.getByRole('button', { name: 'Leave group' }).click();
+    await avaCard.getByRole('button', { name: 'Leave', exact: true }).click();
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+    await ava.getByText('You left Weekend plans').waitFor();
+    await ava.locator('.chat-row[data-group]').waitFor({ state: 'detached' });
+    assert.equal(await ava.evaluate(() => document.activeElement?.closest('.chat-row')?.dataset.friend != null), true,
+      'focus lands on what is left');
+
     // S16 Ava removes Ben from his friend card: it asks first, then he is gone from her chats
     await ava.getByRole('button', { name: "Ben's friend card" }).click();
     const lastCard = ava.getByRole('dialog', { name: 'Ben' });

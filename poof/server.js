@@ -12,6 +12,8 @@ const MAX_BODY = 6 * 1024 * 1024; // any request body
 const MAX_SNAP_BODY = 16 * 1024 * 1024; // POST /api/snaps only: room for a 10 second video
 const MAX_IMAGE = 5 * 1024 * 1024;
 const MAX_VIDEO = 11 * 1024 * 1024; // a 10 second clip at the app's bitrate is about 3 MB
+const MAX_GROUP = 32; // people in a group, its creator included
+const GROUP_NAME = 40; // characters in a group's name
 // what's stored for each kind of media, by file extension
 const MEDIA_TYPES = { jpg: 'image/jpeg', png: 'image/png', webm: 'video/webm', mp4: 'video/mp4' };
 const EBML = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]); // every WebM file starts with this
@@ -73,6 +75,73 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     return chars.length > PREVIEW ? chars.slice(0, PREVIEW - 1).join('').trimEnd() + '\u2026' : chars.join('');
   }
 
+  // ---------- groups ----------
+  // A group is {id, name, members[], createdBy, createdAt}; its creator is a
+  // member like any other once it exists. Its chat and snaps live beside the
+  // one-to-one ones (groupMessages, groupSnaps), each keeping who has read or
+  // opened it: readBy / openedBy, {userId: when}.
+  const group = (id) => db.groups.find((g) => g.id === id);
+  const groupRef = (g) => ({ id: g.id, name: g.name });
+  const groupView = (g) => ({
+    id: g.id, name: g.name, createdBy: g.createdBy, createdAt: g.createdAt,
+    members: g.members.map((id) => publicUser(user(id))).filter(Boolean),
+  });
+  // the group, if `me` is in it; anyone else is told there is no such group
+  function memberGroup(id, me) {
+    const g = group(id);
+    if (!g || !g.members.includes(me.id)) fail(404, 'Group not found.');
+    return g;
+  }
+  function pushGroup(g, exceptId, event) {
+    for (const id of g.members) if (id !== exceptId) push(id, event);
+  }
+  // When every member but `from` has an entry in `seen` (read or opened),
+  // the time the last of them did, never before `since`; else null. Members
+  // who left no longer count, and with no one else in the group it is `since`.
+  function everyoneAt(g, from, seen, since) {
+    let at = since;
+    for (const id of g.members) {
+      if (id === from) continue;
+      if (!seen[id]) return null;
+      at = Math.max(at, seen[id]);
+    }
+    return at;
+  }
+  // whole characters, spaces tidied; a group with no name is named for its people
+  function cleanGroupName(value) {
+    if (typeof value !== 'string') return '';
+    return Array.from(value.replace(/\s+/g, ' ').trim()).slice(0, GROUP_NAME).join('').trim();
+  }
+  function defaultGroupName(members) {
+    const names = members.map((id) => user(id)?.displayName).filter(Boolean);
+    const named = names.length > 3 ? [...names.slice(0, 3), `${names.length - 3} more`] : names;
+    const text = named.length > 1 ? named.slice(0, -1).join(', ') + ' and ' + named.at(-1) : named.join('');
+    return Array.from(text).slice(0, GROUP_NAME).join('').trim();
+  }
+  // A group snap's media is deleted once every other member has opened it;
+  // the group, its chat and its snaps go when the last member leaves.
+  function settleGroupSnaps(g) {
+    for (const s of db.groupSnaps) {
+      if (s.group === g.id && s.media && everyoneAt(g, s.from, s.openedBy, s.createdAt) !== null) {
+        store.deleteMedia(s.media);
+        s.media = null;
+      }
+    }
+  }
+  function dropGroup(g) {
+    db.groups = db.groups.filter((x) => x !== g);
+    db.groupMessages = db.groupMessages.filter((m) => m.group !== g.id);
+    db.groupSnaps = db.groupSnaps.filter((s) => {
+      if (s.group !== g.id) return true;
+      store.deleteMedia(s.media);
+      return false;
+    });
+  }
+  const groupMessage = (m) => ({
+    id: m.id, from: m.from, text: m.text, createdAt: m.createdAt, saved: m.saved,
+    readBy: Object.keys(m.readBy), ...(m.event ? { event: m.event } : {}),
+  });
+
   function streakFor(a, b) {
     const s = db.streaks[pairKey(a, b)];
     if (!s) return 0;
@@ -125,14 +194,34 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       if (!keepRecord) changed = true;
       return keepRecord;
     });
-    const before = db.messages.length + db.stories.length;
+    const count = () => db.messages.length + db.stories.length + db.groupMessages.length + db.groupSnaps.length;
+    const before = count();
     db.messages = db.messages.filter((m) => m.saved || !m.readAt || t - m.readAt < DAY);
     db.stories = db.stories.filter((s) => {
       if (t - s.createdAt < DAY) return true;
       store.deleteMedia(s.media);
       return false;
     });
-    if (changed || before !== db.messages.length + db.stories.length) store.save();
+    // group chats: gone 24 hours after every other member has read them, unless kept
+    const groups = new Map(db.groups.map((g) => [g.id, g]));
+    db.groupMessages = db.groupMessages.filter((m) => {
+      const g = groups.get(m.group);
+      if (!g) return false;
+      if (m.saved) return true;
+      const readAt = everyoneAt(g, m.from, m.readBy, m.createdAt);
+      return readAt === null || t - readAt < DAY;
+    });
+    // group snaps: the media goes once everyone has opened it (or after 30
+    // days unopened), the record 30 days after that, as for one-to-one snaps
+    db.groupSnaps = db.groupSnaps.filter((s) => {
+      const g = groups.get(s.group);
+      if (!g) { store.deleteMedia(s.media); return false; }
+      const openedAt = everyoneAt(g, s.from, s.openedBy, s.createdAt);
+      const keep = openedAt === null && t - s.createdAt < 30 * DAY;
+      if (!keep && s.media) { store.deleteMedia(s.media); s.media = null; changed = true; }
+      return keep || (openedAt !== null && t - openedAt < 30 * DAY);
+    });
+    if (changed || before !== count()) store.save();
   }
 
   // 30 tries per IP per 15 minutes, counted per bucket so that checking
@@ -340,12 +429,15 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
 
   // A snap is a photo {image, duration: seconds shown, 0 = no limit} or a
   // video {video, caption, duration: its length in seconds, mirror: recorded
-  // on a front camera}. The only route that takes a body over 6 MB.
+  // on a front camera}, to friends (`to`), groups you are in (`groupIds`)
+  // and/or your story. The only route that takes a body over 6 MB.
   route('POST', '/api/snaps', ({ me, body }) => {
     const to = Array.isArray(body.to) ? [...new Set(body.to)] : [];
+    const groupIds = Array.isArray(body.groupIds) ? [...new Set(body.groupIds)] : [];
     const story = body.story === true;
-    if (!to.length && !story) fail(400, 'Pick at least one friend or your story.');
+    if (!to.length && !groupIds.length && !story) fail(400, 'Pick at least one friend, group or your story.');
     if (to.some((id) => !areFriends(me.id, id))) fail(403, 'You can only snap friends.');
+    const groups = groupIds.map((id) => memberGroup(id, me));
     const isVideo = body.video != null;
     let duration;
     let extra = {};
@@ -362,29 +454,80 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
       recordStreak(me.id, id);
       push(id, { type: 'snap', ...fromMe(me) });
     }
+    // one file per group, shared by its members: each opens it once
+    for (const g of groups) {
+      db.groupSnaps.push({ id: store.id(), group: g.id, from: me.id, media: store.putMedia(buf, ext), duration, ...extra, createdAt: now(), openedBy: {} });
+      pushGroup(g, me.id, { type: 'snap', ...fromMe(me), group: groupRef(g) });
+    }
     if (story) {
       db.stories.push({ id: store.id(), userId: me.id, media: store.putMedia(buf, ext), duration: duration || 5, ...extra, createdAt: now(), viewers: [] });
       for (const id of friendIds(me.id)) push(id, { type: 'story', from: me.id });
     }
     store.save();
-    return { sent: to.length, story };
+    return { sent: to.length, groups: groups.length, story };
   }, { maxBody: MAX_SNAP_BODY });
 
+  const mediaUrl = (name) => `data:${MEDIA_TYPES[path.extname(name).slice(1)]};base64,` + store.readMedia(name).toString('base64');
+  const snapShape = (s, dataUrl) => (s.type === 'video'
+    ? { video: dataUrl, caption: s.caption || '', duration: s.duration, mirror: !!s.mirror }
+    : { image: dataUrl, duration: s.duration });
+
+  // A one-to-one snap opens once for the friend it was sent to, a group snap
+  // once for each member but its sender (who it is from comes with it).
   route('POST', '/api/snaps/:id/open', ({ me, params }) => {
     const s = db.snaps.find((x) => x.id === params.id && x.to === me.id);
-    if (!s) fail(404, 'Snap not found.');
+    if (!s) return openGroupSnap(me, params.id);
     if (s.openedAt || !s.media) fail(410, 'This snap has already been opened.');
-    const dataUrl = `data:${MEDIA_TYPES[path.extname(s.media).slice(1)]};base64,` + store.readMedia(s.media).toString('base64');
+    const dataUrl = mediaUrl(s.media);
     store.deleteMedia(s.media);
     s.media = null;
     s.openedAt = now();
     store.save();
     push(s.from, { type: 'opened', by: me.id });
-    if (s.type === 'video') return { video: dataUrl, caption: s.caption || '', duration: s.duration, mirror: !!s.mirror };
-    return { image: dataUrl, duration: s.duration };
+    return snapShape(s, dataUrl);
   });
 
+  function openGroupSnap(me, id) {
+    const s = db.groupSnaps.find((x) => x.id === id);
+    const g = s && group(s.group);
+    if (!g || !g.members.includes(me.id) || s.from === me.id) fail(404, 'Snap not found.');
+    if (s.openedBy[me.id] || !s.media) fail(410, 'This snap has already been opened.');
+    const dataUrl = mediaUrl(s.media);
+    s.openedBy[me.id] = now();
+    settleGroupSnaps(g);
+    store.save();
+    if (g.members.includes(s.from)) push(s.from, { type: 'opened', by: me.id, group: g.id });
+    return { ...snapShape(s, dataUrl), sender: publicUser(user(s.from)), group: groupRef(g) };
+  }
+
+  // Each group you are in has a row like a friend's: {group, status, snapIds,
+  // unread, lastAt}. Your snap or chat there is Opened or Read once everyone
+  // else has; members leaving are shown in the chat but not here.
+  function groupRow(g, me) {
+    const snaps = db.groupSnaps.filter((s) => s.group === g.id);
+    const msgs = db.groupMessages.filter((m) => m.group === g.id && !m.event);
+    const newSnaps = snaps.filter((s) => s.from !== me.id && s.media && !s.openedBy[me.id]);
+    const unread = msgs.filter((m) => m.from !== me.id && !m.readBy[me.id]).length;
+    const last = [...snaps, ...msgs].sort((a, b) => b.createdAt - a.createdAt)[0];
+    let status = 'tap-to-chat';
+    if (newSnaps.length) status = 'new-snap';
+    else if (unread) status = 'new-chat';
+    else if (last && 'media' in last) {
+      status = last.from === me.id ? (everyoneAt(g, last.from, last.openedBy, 0) !== null ? 'opened' : 'delivered') : 'received';
+    } else if (last) {
+      status = last.from === me.id ? (everyoneAt(g, last.from, last.readBy, 0) !== null ? 'chat-opened' : 'chat-delivered') : 'chat-received';
+    }
+    return {
+      group: groupView(g),
+      status,
+      snapIds: newSnaps.sort((a, b) => a.createdAt - b.createdAt).map((s) => s.id),
+      unread,
+      lastAt: last ? last.createdAt : g.createdAt,
+    };
+  }
+
   route('GET', '/api/inbox', ({ me }) => {
+    const groups = db.groups.filter((g) => g.members.includes(me.id)).map((g) => groupRow(g, me));
     return friendIds(me.id).map((fid) => {
       const between = (x) => (x.from === me.id && x.to === fid) || (x.from === fid && x.to === me.id);
       const snaps = db.snaps.filter(between);
@@ -406,7 +549,7 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
         unread,
         lastAt: last ? last.createdAt : 0,
       };
-    }).sort((a, b) => b.lastAt - a.lastAt);
+    }).concat(groups).sort((a, b) => b.lastAt - a.lastAt);
   });
 
   route('GET', '/api/chat/:friendId', ({ me, params }) => {
@@ -452,13 +595,83 @@ function createApp({ dataDir, now = () => Date.now() } = {}) {
     return { ok: true };
   });
 
+  // Keep a message (or stop keeping it): in a group, for everyone in it.
   route('POST', '/api/messages/:id/save', ({ me, params }) => {
     const m = db.messages.find((x) => x.id === params.id && (x.from === me.id || x.to === me.id));
-    if (!m) fail(404, 'Message not found.');
+    if (!m) {
+      const gm = db.groupMessages.find((x) => x.id === params.id && !x.event);
+      const g = gm && group(gm.group);
+      if (!g || !g.members.includes(me.id)) fail(404, 'Message not found.');
+      gm.saved = !gm.saved;
+      store.save();
+      pushGroup(g, me.id, { type: 'read', by: me.id, group: g.id });
+      return { saved: gm.saved };
+    }
     m.saved = !m.saved;
     store.save();
     push(m.from === me.id ? m.to : m.from, { type: 'read', by: me.id });
     return { saved: m.saved };
+  });
+
+  // ---------- group chats ----------
+  // {name, members[]}: friends of yours, up to MAX_GROUP people with you.
+  // A blank name is made from the members' names.
+  route('POST', '/api/groups', ({ me, body }) => {
+    const ids = Array.isArray(body.members) ? [...new Set(body.members)].filter((id) => id !== me.id) : [];
+    if (!ids.length) fail(400, 'Pick at least one friend.');
+    if (ids.length + 1 > MAX_GROUP) fail(400, `Groups can have up to ${MAX_GROUP} people.`);
+    if (ids.some((id) => !areFriends(me.id, id))) fail(403, 'You can only add friends to a group.');
+    const members = [me.id, ...ids];
+    const g = { id: store.id(), name: cleanGroupName(body.name) || defaultGroupName(members), members, createdBy: me.id, createdAt: now() };
+    db.groups.push(g);
+    store.save();
+    pushGroup(g, me.id, { type: 'group', kind: 'added', group: groupRef(g), ...fromMe(me) });
+    return groupView(g);
+  });
+
+  route('GET', '/api/groups', ({ me }) => db.groups
+    .filter((g) => g.members.includes(me.id))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(groupView));
+
+  // Leaving says so in the chat and to everyone still in it. The last one
+  // out takes the group with them: its chat, its snaps and their files.
+  route('POST', '/api/groups/:id/leave', ({ me, params }) => {
+    const g = memberGroup(params.id, me);
+    g.members = g.members.filter((id) => id !== me.id);
+    if (!g.members.length) dropGroup(g);
+    else {
+      db.groupMessages.push({ id: store.id(), group: g.id, from: me.id, event: 'left', text: '', createdAt: now(), readBy: {}, saved: false });
+      settleGroupSnaps(g); // a snap waiting only on them is done with
+      pushGroup(g, me.id, { type: 'group', kind: 'left', group: groupRef(g), ...fromMe(me) });
+    }
+    store.save();
+    return { ok: true };
+  });
+
+  // Reading the chat marks it read for you. `people` is everyone the chat
+  // mentions (members, and anyone who has left since they wrote).
+  route('GET', '/api/groups/:id/chat', ({ me, params }) => {
+    const g = memberGroup(params.id, me);
+    const list = db.groupMessages.filter((m) => m.group === g.id).sort((a, b) => a.createdAt - b.createdAt);
+    let changed = false;
+    for (const m of list) {
+      if (m.from !== me.id && !m.readBy[me.id]) { m.readBy[me.id] = now(); changed = true; }
+    }
+    if (changed) { store.save(); pushGroup(g, me.id, { type: 'read', by: me.id, group: g.id }); }
+    const people = [...new Set([...g.members, ...list.map((m) => m.from)])].map((id) => publicUser(user(id))).filter(Boolean);
+    return { group: groupView(g), people, messages: list.map(groupMessage) };
+  });
+
+  route('POST', '/api/groups/:id/chat', ({ me, params, body }) => {
+    const g = memberGroup(params.id, me);
+    const text = String(body.text || '').trim().slice(0, 2000);
+    if (!text) fail(400, 'Say something.');
+    const m = { id: store.id(), group: g.id, from: me.id, text, createdAt: now(), readBy: {}, saved: false };
+    db.groupMessages.push(m);
+    store.save();
+    pushGroup(g, me.id, { type: 'message', ...fromMe(me), preview: preview(text), group: groupRef(g) });
+    return groupMessage(m);
   });
 
   route('GET', '/api/stories', ({ me }) => {

@@ -32,7 +32,7 @@
     onEscape: null, // what Escape does on this screen (the viewers close)
     typing: new Map(), // friends typing to you now: their id -> the timer that ends it
     onTyping: null, // how this screen shows a friend starting or stopping typing: (friendId) => {}
-    chatWith: null, // the friend whose chat is on screen: their messages need no banner
+    chatWith: null, // the chat on screen, a friend's id or 'g:' + a group's: its messages need no banner
     onLeave: null, // run when the screen is replaced (the viewers stop their clocks and videos)
   };
 
@@ -126,6 +126,19 @@
     el.innerHTML = window.mascotSVG('happy', Math.round(size * 0.8), '', 'mark', '#ffffff');
     return el;
   }
+
+  // A group's picture: two of its people's avatars, one tucked behind the
+  // other (the others in it first; with just one other, them and you).
+  // Decorative, like a single avatar: the group's name is beside it.
+  function groupAvatar(members, size = 44) {
+    const others = members.filter((u) => u.id !== state.me.id);
+    const shown = others.length === 1 ? [others[0], state.me] : (others.length ? others : members).slice(0, 2);
+    if (shown.length < 2) return avatar(shown[0] || state.me, '', size);
+    const small = Math.round(size * 0.68);
+    return h('span', { class: 'avatar-stack', 'aria-hidden': 'true', style: `width:${size}px;height:${size}px` },
+      avatar(shown[1], 'stack-back', small), avatar(shown[0], 'stack-front', small));
+  }
+  const peopleCount = (n) => (n === 1 ? 'Just you' : `${n} people`);
 
   // Puff, the mascot (see mascot.js). Decorative unless given a label.
   function puff(mood, size, label) {
@@ -937,12 +950,14 @@
     state.tab = tab;
     state.refresh = null;
     if (tab !== 'camera') stopCamera();
-    if (tab === 'camera') renderCamera(undefined, takeStill());
-    else if (tab === 'chat') renderInbox();
-    else if (tab === 'stories') renderStories();
-    else if (tab === 'friends') renderFriends();
-    else if (tab === 'profile') renderProfile();
-    else if (tab === 'avatar') renderAvatarMaker();
+    // the screen's drawing, for whoever wants to wait for it
+    if (tab === 'camera') return renderCamera(undefined, takeStill());
+    if (tab === 'chat') return renderInbox();
+    if (tab === 'stories') return renderStories();
+    if (tab === 'friends') return renderFriends();
+    if (tab === 'profile') return renderProfile();
+    if (tab === 'avatar') return renderAvatarMaker();
+    return undefined;
   }
 
   function header(title, left, right) {
@@ -1721,7 +1736,10 @@
     const media = Promise.resolve().then(payload); // ready by the time Send is tapped
     media.catch(() => {}); // reported when Send is tapped
     const picked = new Set();
+    const pickedGroups = new Set();
     let story = false;
+    let data;
+    let groups = [];
     const who = h('span', { class: 'who' }, 'Pick who gets it');
     const sendLabel = () => ['Send', icon('send', 18)];
     const sendBtn = h('button', { class: 'btn small', disabled: true, onclick: send }, sendLabel());
@@ -1731,19 +1749,21 @@
     show(h('section', { class: 'screen', 'aria-label': 'Send to' }, header('Send to', back), list,
       h('div', { class: 'send-bar' }, who, sendBtn)));
 
-    function update(friends) {
-      const names = friends.filter((f) => picked.has(f.id)).map((f) => f.displayName);
-      if (story) names.unshift('My Story');
+    function update() {
+      const names = [...(story ? ['My Story'] : []),
+        ...groups.filter((g) => pickedGroups.has(g.id)).map((g) => g.name),
+        ...data.friends.filter((f) => picked.has(f.id)).map((f) => f.displayName)];
       who.textContent = names.length ? names.join(', ') : 'Pick who gets it';
       sendBtn.disabled = !names.length;
     }
     async function send() {
       sendBtn.disabled = true;
       sendBtn.textContent = 'Sending…';
+      const storyOnly = story && !picked.size && !pickedGroups.size;
       try {
-        await api('/api/snaps', { to: [...picked], story, ...(await media) });
+        await api('/api/snaps', { to: [...picked], groupIds: [...pickedGroups], story, ...(await media) });
         dropClip();
-        puffPop(story && !picked.size ? 'Posted to your story' : 'Poof! Sent', story && !picked.size ? 'party' : 'wink');
+        puffPop(storyOnly ? 'Posted to your story' : 'Poof! Sent', storyOnly ? 'party' : 'wink');
         go('chat');
       } catch (e) {
         toast(e.message);
@@ -1751,15 +1771,27 @@
         sendBtn.replaceChildren(...sendLabel());
       }
     }
-    let data;
-    try { data = await api('/api/friends'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
+    try { [data, groups] = await Promise.all([api('/api/friends'), api('/api/groups')]); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
     const toggle = (row, on) => row.setAttribute('aria-checked', String(on));
     const storyRow = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
-      story = !story; toggle(storyRow, story); update(data.friends);
+      story = !story; toggle(storyRow, story); update();
     } }, h('span', { class: 'avatar ring', style: 'background:var(--surface-2)' }, icon('stories')),
     h('span', { class: 'main' }, h('div', { class: 'name' }, 'My Story'), h('div', { class: 'sub' }, 'Friends can watch for 24 hours')),
     h('span', { class: 'check' }, icon('check', 16)));
-    list.replaceChildren(storyRow, h('h2', { class: 'section-title' }, 'Friends'));
+    list.replaceChildren(storyRow);
+    // groups you are in: everyone in one gets the snap, to open once each
+    if (groups.length) list.append(h('h2', { class: 'section-title' }, 'Groups'));
+    for (const g of groups) {
+      const row = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
+        pickedGroups.has(g.id) ? pickedGroups.delete(g.id) : pickedGroups.add(g.id);
+        toggle(row, pickedGroups.has(g.id));
+        update();
+      } }, groupAvatar(g.members), h('span', { class: 'main' }, h('div', { class: 'name' }, g.name),
+        h('div', { class: 'sub' }, peopleCount(g.members.length))),
+      h('span', { class: 'check' }, icon('check', 16)));
+      list.append(row);
+    }
+    list.append(h('h2', { class: 'section-title' }, 'Friends'));
     if (!data.friends.length) {
       list.append(h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'No friends yet'),
         'Add someone by username to send them snaps. You can still post to your story.',
@@ -1769,7 +1801,7 @@
       const row = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
         picked.has(f.id) ? picked.delete(f.id) : picked.add(f.id);
         toggle(row, picked.has(f.id));
-        update(data.friends);
+        update();
       } }, avatar(f), h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName),
         h('div', { class: 'sub' }, '@' + f.username)),
       f.streak > 1 ? h('span', { class: 'streak' }, f.streak + ' 🔥') : null,
@@ -1806,6 +1838,17 @@
   // three dots that rise and fall in turn (they hold still with less motion)
   const typingDots = () => h('span', { class: 'typing-dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
 
+  // A Chat list row's status into `sub`: its shape and colour, how many new
+  // snaps, and how long ago. Returns the status's words, for the row's name.
+  function statusLine(sub, r) {
+    const [color, shape, label] = STATUS[r.status];
+    sub.className = 'sub ' + color;
+    sub.replaceChildren(...[h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
+      h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
+      r.lastAt ? h('span', { class: 'when' }, '· ' + ago(r.lastAt)) : null].filter(Boolean));
+    return label;
+  }
+
   // A row per friend: their avatar opens their friend card (so does pressing
   // and holding the row), the row opens new snaps or the chat, and swiping
   // the row right opens the chat too. While they type, Typing… stands in
@@ -1825,12 +1868,7 @@
         open.setAttribute('aria-label', `${f.displayName}, Typing…`);
         return;
       }
-      const [color, shape, label] = STATUS[r.status];
-      sub.className = 'sub ' + color;
-      sub.replaceChildren(h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
-        h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
-        r.lastAt ? h('span', { style: 'color:var(--text-dim)' }, '· ' + ago(r.lastAt)) : null);
-      open.setAttribute('aria-label', `${f.displayName}, ${label}`);
+      open.setAttribute('aria-label', `${f.displayName}, ${statusLine(sub, r)}`);
     };
     setStatus();
     const row = h('div', { class: 'chat-row', 'data-friend': f.id },
@@ -1851,9 +1889,39 @@
     return row;
   }
 
+  // A group's row, like a friend's: its people's avatars stacked (they open
+  // the group card, as pressing and holding the row does), the row opens new
+  // snaps or the group's chat, and swiping it right opens the chat.
+  function groupInboxRow(r) {
+    const g = r.group;
+    const find = (sel) => () => app.querySelector(`.chat-row[data-group="${CSS.escape(g.id)}"] ${sel}`);
+    const chat = () => renderGroupChat(g);
+    const sub = h('div', { class: 'sub' });
+    const label = statusLine(sub, r);
+    const open = h('button', { class: 'row', type: 'button', 'aria-label': `${g.name}, ${label}`,
+      onclick: () => (r.snapIds.length ? openSnaps(null, r.snapIds, g) : chat()) },
+    h('span', { class: 'main' }, h('div', { class: 'name' }, g.name), sub));
+    const row = h('div', { class: 'chat-row', 'data-group': g.id },
+      h('div', { class: 'row-reveal', 'aria-hidden': 'true' }, icon('chat'), 'Chat'),
+      h('div', { class: 'row-slide' },
+        h('button', { class: 'row-avatar', type: 'button', 'aria-label': `${g.name} details`,
+          onclick: () => openGroupCard(g, find('.row-avatar')) }, groupAvatar(g.members)),
+        open,
+        h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Chat in ' + g.name, onclick: chat }, icon('chat'))));
+    row.openChat = chat;
+    row.openCard = () => openGroupCard(g, find('.row'));
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openGroupCard(g, find(e.target.closest('.row-avatar') ? '.row-avatar' : '.row'));
+    });
+    return row;
+  }
+
   async function renderInbox() {
-    const list = h('div', { class: 'scroll' }, h('p', { class: 'hint' }, 'Loading…'));
-    const screen = h('section', { class: 'screen', 'aria-label': 'Chats' }, header('Chat', meButton(), addButton()), list, nav('chat'));
+    const list = h('div', { class: 'scroll has-fab' }, h('p', { class: 'hint' }, 'Loading…'));
+    // the one thing to start from here: a chat with a friend, or a group
+    const fab = h('button', { class: 'fab', type: 'button', 'aria-label': 'New chat', onclick: renderNewChat }, icon('chat-new', 28));
+    const screen = h('section', { class: 'screen', 'aria-label': 'Chats' }, header('Chat', meButton(), addButton()), list, fab, nav('chat'));
     tabGestures(screen, 'chat');
     pullToRefresh(screen, list);
     show(screen);
@@ -1868,7 +1936,7 @@
           h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn small', onclick: () => go('friends') }, 'Add friends'))));
         return;
       }
-      list.replaceChildren(...rows.map(inboxRow));
+      list.replaceChildren(...rows.map((r) => (r.group ? groupInboxRow(r) : inboxRow(r))));
     };
     state.refresh = load;
     state.onTyping = (id) => list.querySelector(`.chat-row[data-friend="${CSS.escape(id)}"]`)?.setStatus();
@@ -1932,13 +2000,78 @@
     openSheet({ labelledby: 'card-name', head, body, back });
   }
 
+  // ---------- group card (S19) ----------
+  // A group's people, and Leave group, which asks first. From the Chat list
+  // it has Send a chat too; from the group's own chat (`inThread`) it doesn't.
+  function openGroupCard(group, back, { inThread = false } = {}) {
+    if (state.sheet) return;
+    const name = group.name;
+    const actions = h('div', { class: 'card-actions' });
+    const showActions = () => actions.replaceChildren(...[
+      inThread ? null : h('button', { class: 'btn block', type: 'button', onclick: () => { closeSheet({ restore: false }); renderGroupChat(group); } },
+        icon('chat', 20), 'Send a chat'),
+      h('button', { class: 'btn danger block', type: 'button', onclick: askLeave }, 'Leave group'),
+    ].filter(Boolean));
+    function askLeave() {
+      const cancel = h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+        showActions();
+        actions.querySelector('.danger')?.focus();
+      } }, 'Cancel');
+      actions.replaceChildren(
+        h('div', { class: 'card-confirm' }, h('strong', {}, `Leave ${name}?`),
+          h('p', {}, "You won't see its chats or snaps any more. The others will see that you left.")),
+        h('div', { class: 'card-confirm-actions' }, cancel,
+          h('button', { class: 'btn danger outline', type: 'button', onclick: leave }, 'Leave')));
+      cancel.focus(); // the safe choice
+    }
+    async function leave(e) {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await api(`/api/groups/${group.id}/leave`, {});
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        return;
+      }
+      closeSheet({ restore: false });
+      toast(`You left ${name}`);
+      await (inThread ? go('chat') : state.refresh?.());
+      app.querySelector('.chat-row .row, .scroll .btn')?.focus();
+    }
+    const me = state.me.id;
+    // you first, then everyone else as the group lists them
+    const people = [...group.members].sort((a, b) => Number(b.id === me) - Number(a.id === me));
+    const head = h('div', { class: 'card-top' }, groupAvatar(group.members, 64),
+      h('div', { class: 'card-who' },
+        h('h2', { id: 'card-name', class: 'card-name' }, name),
+        h('p', { class: 'card-user' }, peopleCount(group.members.length))));
+    const list = h('ul', { class: 'members', 'aria-label': 'People in ' + name }, ...people.map((u) => h('li', { class: 'row' },
+      avatar(u, '', 36),
+      h('span', { class: 'main' }, h('div', { class: 'name' }, u.id === me ? `${u.displayName} (you)` : u.displayName),
+        h('div', { class: 'sub' }, '@' + u.username)))));
+    showActions();
+    openSheet({ labelledby: 'card-name', head, body: [list, actions], back });
+  }
+
   // ---------- snap viewer (S06) ----------
   // A photo shows for its timer; a video plays once with its caption over it,
   // the ring following along, and moves on when it ends. Tap for the next;
-  // swipe down (or Escape) to close. Dragging pauses the timer.
-  async function openSnaps(friend, ids) {
+  // swipe down (or Escape) to close. Dragging pauses the timer. A group's
+  // snaps (`group`, no `friend`) can each be from someone else: the head
+  // shows who sent the one on screen, over the group's name.
+  async function openSnaps(friend, ids, group = null) {
     state.refresh = null;
     const queue = [...ids];
+    const about = group ? 'g:' + group.id : friend.id;
+    const av = h('span', { class: 'head-avatar' }, group ? groupAvatar(group.members || []) : avatar(friend));
+    const who = h('span', { class: 'who' + (group ? ' stacked' : '') }, group ? group.name : friend.displayName);
+    const fromName = (snap) => (snap.sender || friend).displayName;
+    const showSender = (snap) => {
+      if (!group || !snap.sender) return;
+      av.replaceChildren(avatar(snap.sender));
+      who.replaceChildren(h('span', {}, snap.sender.displayName), h('span', { class: 'sub' }, group.name));
+    };
     const media = h('div', { class: 'media' });
     const caption = h('p', { class: 'media-caption', hidden: true });
     const svgNS = 'http://www.w3.org/2000/svg';
@@ -1992,10 +2125,11 @@
       if (closed) return undefined; // closed while it was on its way
       viewed++;
       setUnread(state.unread - 1);
+      showSender(snap);
       caption.textContent = snap.caption || '';
       caption.hidden = !snap.caption;
       if (snap.video) {
-        const v = h('video', { class: snap.mirror ? 'mirror' : null, playsInline: true, 'aria-label': 'Snap from ' + friend.displayName });
+        const v = h('video', { class: snap.mirror ? 'mirror' : null, playsInline: true, 'aria-label': 'Snap from ' + fromName(snap) });
         clip = { el: v, url: URL.createObjectURL(dataUrlToBlob(snap.video)) };
         v.src = clip.url;
         media.replaceChildren(v);
@@ -2013,7 +2147,7 @@
         if (!paused) playClip(v);
         return undefined;
       }
-      media.replaceChildren(h('img', { alt: 'Snap from ' + friend.displayName, src: snap.image, draggable: 'false' }));
+      media.replaceChildren(h('img', { alt: 'Snap from ' + fromName(snap), src: snap.image, draggable: 'false' }));
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
       if (snap.duration) {
         clock = countdown(snap.duration * 1000, ring, next);
@@ -2023,14 +2157,14 @@
     };
     const screen = h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, media, caption,
       h('button', { class: 'tap', type: 'button', 'aria-label': 'Next', onclick: next }),
-      h('div', { class: 'head' }, avatar(friend), h('span', { class: 'who' }, friend.displayName), svg,
+      h('div', { class: 'head' }, av, who, svg,
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: close }, icon('close'))));
     viewerGestures(screen, { from: 'chat', close, pause, resume });
     show(screen);
     state.onEscape = close;
     state.onLeave = () => { closed = true; stopMedia(); }; // left for another screen (a banner tapped)
-    dismissBannerFor(friend.id, ['snap']);
-    closeNotes(['snap:' + friend.id]);
+    dismissBannerFor(about, ['snap']);
+    closeNotes(['snap:' + about]);
     next();
   }
 
@@ -2109,6 +2243,153 @@
     state.onLeave = () => document.removeEventListener('visibilitychange', onVisible);
     state.refresh = refresh;
     await load();
+  }
+
+  // ---------- group chat (S19) ----------
+  // Like a chat with a friend. Messages from the others come in runs under
+  // the sender's name and avatar; yours say Sent, read by whom so far, or
+  // Read once everyone has. A line says when someone left. Group details,
+  // top right, lists who is in it and has Leave group.
+  async function renderGroupChat(group) {
+    const key = 'g:' + group.id;
+    let current = { members: [], ...group }; // the group as last loaded
+    const thread = h('div', { class: 'thread', 'aria-live': 'polite' });
+    const nearBottom = () => thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
+    const input = h('input', { placeholder: 'Send a chat', 'aria-label': 'Message', maxlength: '2000', autofocus: true });
+    const form = h('form', { class: 'composer', onsubmit: async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      try { await api(`/api/groups/${group.id}/chat`, { text }); await load(); } catch (e2) { toast(e2.message); input.value = text; }
+    } }, input, h('button', { class: 'btn small', type: 'submit' }, 'Send'));
+    const back = backButton('Back', () => go('chat'));
+    const details = h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Group details',
+      onclick: () => openGroupCard(current, () => app.querySelector('.bar [aria-label="Group details"]'), { inThread: true }) }, icon('group'));
+    show(h('section', { class: 'screen', 'aria-label': 'Chat in ' + group.name }, header(group.name, back, details), thread, form));
+    state.chatWith = key;
+    dismissBannerFor(key, ['chat', 'group']);
+    closeNotes(['chat:' + key]);
+
+    // who has read your message, out of everyone else in the group now
+    const readLine = (m, others) => {
+      const readers = others.filter((u) => m.readBy.includes(u.id));
+      if (!readers.length) return ' · sent';
+      if (readers.length === others.length) return ' · read';
+      return ' · read by ' + (readers.length > 2 ? readers.length : readers.map((u) => u.displayName).join(' and '));
+    };
+    async function load() {
+      let data;
+      try { data = await api(`/api/groups/${group.id}/chat`); } catch (e) {
+        thread.replaceChildren(h('p', { class: 'error' }, e.status === 404 ? "You're not in this group any more." : e.message));
+        return;
+      }
+      current = data.group;
+      const people = new Map(data.people.map((u) => [u.id, u]));
+      const others = current.members.filter((u) => u.id !== state.me.id);
+      const someone = (id) => people.get(id) || { id, username: id, displayName: 'Someone', avatar: null };
+      const atBottom = nearBottom();
+      const items = [h('p', { class: 'hint' }, 'Chats disappear 24 hours after everyone has read them. Tap one to keep it.')];
+      let run = null; // the others' messages in a row from one person, under their name
+      for (const m of data.messages) {
+        if (m.event === 'left') {
+          items.push(h('p', { class: 'thread-note' }, `${someone(m.from).displayName} left the group.`));
+          run = null;
+          continue;
+        }
+        const mine = m.from === state.me.id;
+        const sender = someone(m.from);
+        const bubble = h('button', {
+          class: 'msg' + (mine ? ' mine' : '') + (m.saved ? ' saved' : ''), type: 'button',
+          'aria-label': (m.saved ? 'Kept message' : 'Message') + (mine ? '' : ' from ' + sender.displayName) + ': ' + m.text
+            + '. Tap to ' + (m.saved ? 'stop keeping' : 'keep'),
+          onclick: async () => { try { await api(`/api/messages/${m.id}/save`, {}); load(); } catch (e) { toast(e.message); } },
+        }, m.text, h('small', {}, ago(m.createdAt) + (m.saved ? ' · kept' : '') + (mine ? readLine(m, others) : '')));
+        if (mine) { items.push(bubble); run = null; continue; }
+        if (run?.from !== m.from) {
+          run = { from: m.from, col: h('div', { class: 'msg-col' }, h('span', { class: 'msg-sender' }, sender.displayName)) };
+          items.push(h('div', { class: 'msg-run' }, avatar(sender, '', 28), run.col));
+        }
+        run.col.append(bubble);
+      }
+      if (!data.messages.length) items.push(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to everyone in ' + current.name + '.'));
+      thread.replaceChildren(...items);
+      if (atBottom || !thread.dataset.loaded) thread.scrollTop = thread.scrollHeight;
+      thread.dataset.loaded = '1';
+      if (state.unread) syncUnread(); // opening the chat read what was new in it
+    }
+    // as with a friend's chat: what comes in while Poof is out of sight waits, unread
+    let stale = false;
+    const refresh = () => {
+      if (document.hidden) { stale = true; return undefined; }
+      stale = false;
+      return load();
+    };
+    const onVisible = () => { if (stale && !document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    state.onLeave = () => document.removeEventListener('visibilitychange', onVisible);
+    state.refresh = refresh;
+    await load();
+  }
+
+  // ---------- new chat (S18) ----------
+  // Pick friends. One opens your chat with them; two or more, or a name,
+  // start a group (up to GROUP_MAX people with you) and open its chat.
+  const GROUP_MAX = 32; // the server's limit too
+  async function renderNewChat() {
+    state.refresh = null;
+    const picked = new Set();
+    let friends = [];
+    const isGroup = () => picked.size > 1 || !!name.value.trim();
+    function update() {
+      const names = friends.filter((f) => picked.has(f.id)).map((f) => f.displayName);
+      who.textContent = names.length ? names.join(', ') : 'Pick friends to chat with';
+      startBtn.textContent = isGroup() ? 'Start group' : 'Chat';
+      startBtn.disabled = !picked.size;
+    }
+    async function start() {
+      const chosen = friends.filter((f) => picked.has(f.id));
+      if (!chosen.length) return;
+      if (!isGroup()) { renderChat(chosen[0]); return; }
+      startBtn.disabled = true;
+      try {
+        renderGroupChat(await api('/api/groups', { name: name.value.trim(), members: chosen.map((f) => f.id) }));
+      } catch (e) {
+        toast(e.message);
+        startBtn.disabled = false;
+      }
+    }
+    const name = h('input', { id: 'group-name', maxlength: '40', placeholder: 'Optional', autocomplete: 'off',
+      'aria-describedby': 'group-name-note', oninput: update });
+    const who = h('span', { class: 'who' }, 'Pick friends to chat with');
+    const startBtn = h('button', { class: 'btn small', type: 'button', disabled: true, onclick: start }, 'Chat');
+    const rows = h('div', {}, h('p', { class: 'hint' }, 'Loading friends…'));
+    const list = h('div', { class: 'scroll pick-list' },
+      h('div', { class: 'field' }, h('label', { for: 'group-name' }, 'Group name'), name,
+        h('p', { class: 'note', id: 'group-name-note' }, 'Pick two or more friends, or give it a name, to start a group.')),
+      rows);
+    show(h('section', { class: 'screen', 'aria-label': 'New chat' }, header('New chat', backButton('Back', () => go('chat'))), list,
+      h('div', { class: 'send-bar' }, who, startBtn)));
+
+    let data;
+    try { data = await api('/api/friends'); } catch (e) { rows.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
+    friends = data.friends;
+    if (!friends.length) {
+      rows.replaceChildren(h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'No friends yet'),
+        'Add someone by username, then start a chat with them here.',
+        h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn ghost small', onclick: () => go('friends') }, 'Add friends'))));
+      return;
+    }
+    rows.replaceChildren(h('h2', { class: 'section-title' }, 'Friends'), ...friends.map((f) => {
+      const row = h('button', { class: 'row', type: 'button', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
+        if (!picked.has(f.id) && picked.size + 1 >= GROUP_MAX) { toast(`Groups can have up to ${GROUP_MAX} people.`); return; }
+        picked.has(f.id) ? picked.delete(f.id) : picked.add(f.id);
+        row.setAttribute('aria-checked', String(picked.has(f.id)));
+        update();
+      } }, avatar(f), h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), h('div', { class: 'sub' }, '@' + f.username)),
+      h('span', { class: 'check' }, icon('check', 16)));
+      return row;
+    }));
   }
 
   // ---------- stories (S08) ----------
@@ -2576,7 +2857,7 @@
   // with Poof out of sight and Notifications on (Profile), snaps and chats
   // raise a system notification instead.
   const bannerRegion = document.getElementById('banner');
-  let banner = null; // the banner showing: { el, who, kind, timer, holds, back, done }
+  let banner = null; // the banner showing: { el, key, about, kind, timer, holds, back, done }
   const notes = new Map(); // system notifications showing: key -> Notification
 
   // whole characters, so an emoji is never cut in half
@@ -2592,6 +2873,24 @@
     const who = ev.sender;
     if (!who?.id) return null;
     const name = who.displayName;
+    // in a group: the group's name on top, the sender's avatar and name below
+    const g = typeof ev.group === 'object' ? ev.group : null;
+    if (g) {
+      const about = 'g:' + g.id;
+      const base = { about, who, title: g.name };
+      if (ev.type === 'snap') {
+        return { ...base, key: 'snap:' + about, kind: 'snap', line: 'New snap from ' + name, said: `New snap from ${name} in ${g.name}`,
+          open: () => openGroupSnapsFrom(g) };
+      }
+      if (ev.type === 'message') {
+        return { ...base, key: 'chat:' + about, kind: 'chat', line: `${name}: ${previewText(ev.preview)}`, lead: 'New chat: ',
+          said: `New chat from ${name} in ${g.name}`, open: () => openGroupChatFrom(g) };
+      }
+      if (ev.type === 'group' && ev.kind === 'added') {
+        return { ...base, key: 'group:' + about, kind: 'group', line: name + ' added you', open: () => openGroupChatFrom(g) };
+      }
+      return null; // someone leaving only refreshes what is on screen
+    }
     if (ev.type === 'snap') {
       return { key: 'snap:' + who.id, who, kind: 'snap', line: 'New snap', said: `New snap from ${name}`, open: () => openSnapsFrom(who) };
     }
@@ -2635,13 +2934,25 @@
     leaveScreen();
     let rows;
     try { rows = await api('/api/inbox'); } catch (e) { toast(e.message); go('chat'); return; }
-    const row = rows.find((r) => r.friend.id === who.id);
+    const row = rows.find((r) => r.friend?.id === who.id);
     if (row?.snapIds.length) openSnaps(row.friend, row.snapIds);
     else go('chat'); // opened already, somewhere else
   }
+  function openGroupChatFrom(g) {
+    leaveScreen();
+    renderGroupChat(g);
+  }
+  async function openGroupSnapsFrom(g) {
+    leaveScreen();
+    let rows;
+    try { rows = await api('/api/inbox'); } catch (e) { toast(e.message); go('chat'); return; }
+    const row = rows.find((r) => r.group?.id === g.id);
+    if (row?.snapIds.length) openSnaps(null, row.snapIds, row.group);
+    else go('chat'); // opened already, or no longer in the group
+  }
 
-  // The banner: the Puff mark on the friend's avatar, their name, and the
-  // news. Tap it to open that. Swipe it up, or press Escape on it, to put it
+  // The banner: the Puff mark on the friend's avatar, their name (or the
+  // group's), and the news. Tap it to open that. Swipe it up, or press Escape on it, to put it
   // away; else it goes by itself after BANNER_MS, though not while a finger
   // is on it or it has keyboard focus. One at a time: the newest wins.
   function showBanner(n) {
@@ -2654,12 +2965,12 @@
       onclick: () => { dismissBanner({ animate: false, restore: false }); n.open(); } },
     h('span', { class: 'banner-who' }, avatar(n.who, '', 40), mark),
     h('span', { class: 'banner-text' },
-      h('strong', { class: 'banner-name' }, n.who.displayName),
+      h('strong', { class: 'banner-name' }, n.title || n.who.displayName),
       h('span', { class: 'banner-line' },
-        n.kind === 'friend' ? null : h('span', { class: 'status-icon fill', 'aria-hidden': 'true' }),
+        n.kind === 'snap' || n.kind === 'chat' ? h('span', { class: 'status-icon fill', 'aria-hidden': 'true' }) : null,
         n.lead ? h('span', { class: 'sr-only' }, n.lead) : null,
         h('span', { class: 'banner-say' }, n.line))));
-    const b = { el: card, key: n.key, who: n.who, kind: n.kind, timer: null, holds: new Set(), back: old?.back || null, done: false };
+    const b = { el: card, key: n.key, about: n.about || n.who.id, kind: n.kind, timer: null, holds: new Set(), back: old?.back || null, done: false };
     const run = () => {
       clearTimeout(b.timer);
       if (!b.done && !b.holds.size) b.timer = setTimeout(() => { if (banner === b) dismissBanner(); }, BANNER_MS);
@@ -2719,9 +3030,10 @@
       b.el.style.opacity = '0';
     }, () => b.el.remove());
   }
-  // a friend's chat or snaps are open: their banner about that has done its job
-  function dismissBannerFor(friendId, kinds) {
-    if (banner && banner.who.id === friendId && kinds.includes(banner.kind)) dismissBanner({ animate: false, restore: false });
+  // a friend's (or a group's, 'g:' + its id) chat or snaps are open: their
+  // banner about that has done its job
+  function dismissBannerFor(about, kinds) {
+    if (banner && banner.about === about && kinds.includes(banner.kind)) dismissBanner({ animate: false, restore: false });
   }
 
   // ---------- system notifications ----------
@@ -2808,9 +3120,10 @@
       const ev = JSON.parse(e.data);
       // typing only changes who shows as typing; nothing needs reloading
       if (ev.type === 'typing') { setTyping(ev.from, true); return; }
-      if (ev.type === 'message') setTyping(ev.from, false);
+      if (ev.type === 'message' && !ev.group) setTyping(ev.from, false);
       // a message into the chat on screen is read there and then: no banner, nothing unread
-      const seen = ev.type === 'message' && ev.from === state.chatWith && !document.hidden;
+      const into = ev.group ? 'g:' + ev.group.id : ev.from;
+      const seen = ev.type === 'message' && into === state.chatWith && !document.hidden;
       if ((ev.type === 'snap' || ev.type === 'message') && !seen) setUnread(state.unread + 1);
       if (!seen) notify(ev);
       if (state.refresh) state.refresh();

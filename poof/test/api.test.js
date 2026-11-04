@@ -700,3 +700,244 @@ test('video stories: listed as video, served with the right type and byte ranges
     assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 0, 'video files go with their stories');
   } finally { await s.close(); }
 });
+
+// Ava with two friends, Ben and Cal (who are not friends with each other),
+// and Zed, who knows none of them
+async function trio(base) {
+  const { a, b, aId, bId } = await friends(base);
+  const c = client(base);
+  const z = client(base);
+  const cId = (await c.post('/api/signup', { username: 'cal', password: 'password3', displayName: 'Cal' })).data.id;
+  const zId = (await z.post('/api/signup', { username: 'zed', password: 'password4', displayName: 'Zed' })).data.id;
+  await a.post('/api/friends/request', { username: 'cal' });
+  await c.post('/api/friends/accept', { userId: aId });
+  return { a, b, c, z, aId, bId, cId, zId };
+}
+
+test('groups: made from friends only, up to 32 people, named, listed for members and announced', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, z, aId, bId, cId, zId } = await trio(s.base);
+    const toBen = await listen(b);
+    try {
+      const added = toBen.until('group');
+      const made = await a.post('/api/groups', { name: '  Weekend\n plans  ', members: [bId, cId, bId, aId] });
+      assert.equal(made.status, 200);
+      const g = made.data;
+      assert.equal(g.name, 'Weekend plans', 'spaces tidied');
+      assert.deepEqual(g.members.map((u) => u.username), ['ava', 'ben', 'cal'], 'the creator first, each once');
+      assert.deepEqual(Object.keys(g.members[0]).sort(), ['avatar', 'displayName', 'id', 'username'], 'public fields only');
+      assert.equal(g.createdBy, aId);
+      assert.deepEqual(await added, { type: 'group', kind: 'added', group: { id: g.id, name: 'Weekend plans' }, from: aId,
+        sender: { id: aId, username: 'ava', displayName: 'Ava', avatar: null } });
+    } finally { await toBen.close(); }
+
+    // members see it, whether or not they are friends with each other; Zed does not
+    assert.deepEqual((await b.get('/api/groups')).data.map((x) => x.name), ['Weekend plans']);
+    assert.deepEqual((await c.get('/api/groups')).data.map((x) => x.name), ['Weekend plans']);
+    assert.deepEqual((await z.get('/api/groups')).data, []);
+    const row = (await c.get('/api/inbox')).data.find((r) => r.group);
+    assert.deepEqual([row.group.name, row.status, row.unread, row.snapIds], ['Weekend plans', 'tap-to-chat', 0, []]);
+
+    // no name: named for its people
+    assert.equal((await a.post('/api/groups', { members: [bId, cId] })).data.name, 'Ava, Ben and Cal');
+    assert.equal((await a.post('/api/groups', { name: { not: 'text' }, members: [bId] })).data.name, 'Ava and Ben');
+    assert.equal((await a.post('/api/groups', { name: 'x'.repeat(60), members: [bId] })).data.name, 'x'.repeat(40), 'names are capped');
+
+    // friends only, at least one, never a stranger or someone only asked
+    for (const [members, status] of [[[], 400], [[aId], 400], [undefined, 400], [[zId], 403], [[bId, zId], 403], [['nobody'], 403]]) {
+      assert.equal((await a.post('/api/groups', { name: 'x', members })).status, status, JSON.stringify(members));
+    }
+    await a.post('/api/friends/request', { username: 'zed' });
+    assert.equal((await a.post('/api/groups', { members: [zId] })).status, 403, 'a request is not a friendship');
+    assert.equal((await b.post('/api/groups', { members: [cId] })).status, 403, 'only the creator\'s friends: Ben and Cal are not friends');
+
+    // up to 32 people with the creator
+    const db = s.app.store.db;
+    const many = Array.from({ length: 32 }, (_, i) => {
+      const u = { id: 'f' + i, username: 'friend' + i, displayName: 'Friend ' + i, salt: 'x', hash: 'x', createdAt: 0 };
+      db.users.push(u);
+      db.friendships.push({ id: 'fs' + i, a: aId, b: u.id, requester: aId, status: 'accepted', createdAt: 0 });
+      return u.id;
+    });
+    assert.equal((await a.post('/api/groups', { name: 'Big', members: many.slice(0, 31) })).data.members.length, 32);
+    const tooMany = await a.post('/api/groups', { name: 'Too big', members: many });
+    assert.deepEqual([tooMany.status, tooMany.data.error], [400, 'Groups can have up to 32 people.']);
+    assert.equal((await client(s.base).get('/api/groups')).status, 401, 'needs a session');
+  } finally { await s.close(); }
+});
+
+test('group chat: members only; gone 24h after everyone else has read it; kept messages stay', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, z, aId, bId, cId } = await trio(s.base);
+    const g = (await a.post('/api/groups', { name: 'Trio', members: [bId, cId] })).data;
+    const toCal = await listen(c);
+    let hello;
+    let keep;
+    try {
+      const said = toCal.until('message');
+      hello = (await a.post(`/api/groups/${g.id}/chat`, { text: '  hello   all ' })).data;
+      assert.equal(hello.text, 'hello   all');
+      assert.deepEqual(await said, { type: 'message', from: aId, sender: { id: aId, username: 'ava', displayName: 'Ava', avatar: null },
+        preview: 'hello all', group: { id: g.id, name: 'Trio' } });
+      keep = (await b.post(`/api/groups/${g.id}/chat`, { text: 'keep this' })).data;
+    } finally { await toCal.close(); }
+    assert.equal((await a.post(`/api/groups/${g.id}/chat`, { text: '   ' })).status, 400);
+
+    // not a member: as if there were no such group
+    assert.equal((await z.get(`/api/groups/${g.id}/chat`)).status, 404);
+    assert.equal((await z.post(`/api/groups/${g.id}/chat`, { text: 'let me in' })).status, 404);
+    assert.equal((await z.post(`/api/messages/${hello.id}/save`)).status, 404);
+    assert.equal((await a.get('/api/groups/nope/chat')).status, 404);
+    assert.equal((await client(s.base).get(`/api/groups/${g.id}/chat`)).status, 401);
+
+    // Cal has both unread; Ben has Ava's; reading marks it read for the reader only
+    const calRow = () => c.get('/api/inbox').then((r) => r.data.find((x) => x.group));
+    const avaRow = () => a.get('/api/inbox').then((r) => r.data.find((x) => x.group));
+    assert.deepEqual([(await calRow()).status, (await calRow()).unread], ['new-chat', 2]);
+    const thread = (await b.get(`/api/groups/${g.id}/chat`)).data;
+    assert.deepEqual(thread.messages.map((m) => [m.text, m.from]), [['hello   all', aId], ['keep this', bId]]);
+    assert.deepEqual(thread.people.map((u) => u.username).sort(), ['ava', 'ben', 'cal']);
+    assert.deepEqual(thread.messages[0].readBy, [bId]);
+    assert.deepEqual([(await avaRow()).status, (await avaRow()).unread], ['new-chat', 1], 'Ben\'s is new to Ava');
+    assert.equal((await calRow()).unread, 2, 'still unread for Cal');
+
+    // a day on with Cal not having read: nothing goes
+    s.clock.t += DAY + 1000;
+    s.app.expire();
+    assert.equal((await b.get(`/api/groups/${g.id}/chat`)).data.messages.length, 2);
+    // Ava keeps Ben's message (for everyone), then Cal reads
+    const kept = await a.post(`/api/messages/${keep.id}/save`);
+    assert.deepEqual(kept.data, { saved: true });
+    await c.get(`/api/groups/${g.id}/chat`);
+    assert.equal((await calRow()).status, 'chat-received');
+    s.clock.t += DAY - 2000;
+    s.app.expire();
+    assert.equal((await a.get(`/api/groups/${g.id}/chat`)).data.messages.length, 2, 'not yet 24h since the last of them read it');
+    s.clock.t += 3000;
+    s.app.expire();
+    const after = (await c.get(`/api/groups/${g.id}/chat`)).data.messages;
+    assert.deepEqual(after.map((m) => [m.text, m.saved]), [['keep this', true]], 'read by all for 24h: gone, unless kept');
+
+    // your own message: Sent until everyone has read it, then Read
+    await c.post(`/api/groups/${g.id}/chat`, { text: 'from cal' });
+    assert.equal((await calRow()).status, 'chat-delivered');
+    await a.get(`/api/groups/${g.id}/chat`);
+    assert.equal((await calRow()).status, 'chat-delivered', 'Ava read it, Ben has not');
+    await b.get(`/api/groups/${g.id}/chat`);
+    assert.equal((await calRow()).status, 'chat-opened');
+    assert.ok(aId && cId);
+  } finally { await s.close(); }
+});
+
+test('group snaps: each member opens it once; the file goes when all have; statuses follow', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, z, aId, bId, cId } = await trio(s.base);
+    const g = (await a.post('/api/groups', { name: 'Trio', members: [bId, cId] })).data;
+    const other = (await a.post('/api/groups', { name: 'Just Ben', members: [bId] })).data;
+    const mediaDir = path.join(s.dataDir, 'media');
+    const toBen = await listen(b);
+    const toAva = await listen(a);
+    let id;
+    try {
+      const snapped = toBen.until('snap');
+      const sent = await a.post('/api/snaps', { groupIds: [g.id, g.id], image: PNG, duration: 4 });
+      assert.deepEqual(sent.data, { sent: 0, groups: 1, story: false });
+      assert.deepEqual(await snapped, { type: 'snap', from: aId, sender: { id: aId, username: 'ava', displayName: 'Ava', avatar: null },
+        group: { id: g.id, name: 'Trio' } });
+      assert.equal(fs.readdirSync(mediaDir).length, 1, 'one file for the whole group');
+      const benRow = (await b.get('/api/inbox')).data.find((r) => r.group?.id === g.id);
+      assert.equal(benRow.status, 'new-snap');
+      id = benRow.snapIds[0];
+      assert.equal((await c.get('/api/inbox')).data.find((r) => r.group?.id === g.id).snapIds[0], id, 'the same snap for Cal');
+      assert.equal((await a.get('/api/inbox')).data.find((r) => r.group?.id === g.id).status, 'delivered');
+
+      // only members other than the sender can open it
+      assert.equal((await a.post(`/api/snaps/${id}/open`)).status, 404, 'not the sender');
+      assert.equal((await z.post(`/api/snaps/${id}/open`)).status, 404, 'not a stranger');
+      const opened = toAva.until('opened');
+      const first = await b.post(`/api/snaps/${id}/open`);
+      assert.equal(first.status, 200);
+      assert.deepEqual(first.data, { image: PNG, duration: 4, sender: { id: aId, username: 'ava', displayName: 'Ava', avatar: null },
+        group: { id: g.id, name: 'Trio' } });
+      assert.deepEqual(await opened, { type: 'opened', by: bId, group: g.id });
+    } finally { await toBen.close(); await toAva.close(); }
+    assert.equal((await b.post(`/api/snaps/${id}/open`)).status, 410, 'once for Ben');
+    assert.equal(fs.readdirSync(mediaDir).length, 1, 'kept for Cal');
+    assert.equal((await b.get('/api/inbox')).data.find((r) => r.group?.id === g.id).status, 'received');
+    assert.equal((await a.get('/api/inbox')).data.find((r) => r.group?.id === g.id).status, 'delivered', 'not everyone has opened it');
+    assert.equal((await c.post(`/api/snaps/${id}/open`)).data.image, PNG);
+    assert.equal((await c.post(`/api/snaps/${id}/open`)).status, 410, 'once for Cal');
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'gone once everyone has opened it');
+    assert.equal((await a.get('/api/inbox')).data.find((r) => r.group?.id === g.id).status, 'opened');
+
+    // only groups you are in; friends, groups and the story together
+    assert.equal((await c.post('/api/snaps', { groupIds: [other.id], image: PNG })).status, 404, 'Cal is not in Just Ben');
+    assert.equal((await z.post('/api/snaps', { groupIds: [g.id], image: PNG })).status, 404);
+    assert.equal((await a.post('/api/snaps', { groupIds: ['nope'], image: PNG })).status, 404);
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'nothing stored from refused snaps');
+    const all = await a.post('/api/snaps', { to: [bId], groupIds: [g.id, other.id], story: true, video: WEBM, caption: 'hi all', duration: 2 });
+    assert.deepEqual(all.data, { sent: 1, groups: 2, story: true });
+    const vid = (await c.get('/api/inbox')).data.find((r) => r.group?.id === g.id).snapIds[0];
+    assert.deepEqual((await c.post(`/api/snaps/${vid}/open`)).data,
+      { video: WEBM, caption: 'hi all', duration: 2, mirror: false, sender: { id: aId, username: 'ava', displayName: 'Ava', avatar: null },
+        group: { id: g.id, name: 'Trio' } });
+    // unopened, a group snap goes after 30 days like any other
+    s.clock.t += 30 * DAY + 1000;
+    s.app.expire();
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'unopened files go after 30 days');
+    assert.deepEqual((await b.get('/api/inbox')).data.find((r) => r.group?.id === g.id).snapIds, []);
+    assert.ok(cId);
+  } finally { await s.close(); }
+});
+
+test('leaving a group: gone for you, said to the rest, and the last one out takes it all', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, z, aId, bId, cId } = await trio(s.base);
+    const g = (await a.post('/api/groups', { name: 'Trio', members: [bId, cId] })).data;
+    await a.post(`/api/groups/${g.id}/chat`, { text: 'before you go' });
+    await a.post('/api/snaps', { groupIds: [g.id], image: PNG });
+    const snapId = (await b.get('/api/inbox')).data.find((r) => r.group).snapIds[0];
+    await b.post(`/api/snaps/${snapId}/open`);
+    const mediaDir = path.join(s.dataDir, 'media');
+    assert.equal(fs.readdirSync(mediaDir).length, 1, 'waiting on Cal');
+    assert.equal((await z.post(`/api/groups/${g.id}/leave`)).status, 404, 'not a member');
+
+    // Cal leaves: Ava and Ben hear it, the chat says so, and the snap no longer waits on him
+    const toAva = await listen(a);
+    try {
+      const left = toAva.until('group');
+      assert.deepEqual((await c.post(`/api/groups/${g.id}/leave`)).data, { ok: true });
+      assert.deepEqual(await left, { type: 'group', kind: 'left', group: { id: g.id, name: 'Trio' }, from: cId,
+        sender: { id: cId, username: 'cal', displayName: 'Cal', avatar: null } });
+    } finally { await toAva.close(); }
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'everyone still in it has opened the snap');
+    assert.deepEqual((await c.get('/api/groups')).data, []);
+    assert.equal((await c.get('/api/inbox')).data.some((r) => r.group), false, 'not in his inbox');
+    assert.equal((await c.get(`/api/groups/${g.id}/chat`)).status, 404);
+    assert.equal((await c.post(`/api/groups/${g.id}/chat`, { text: 'back?' })).status, 404);
+    assert.equal((await c.post('/api/snaps', { groupIds: [g.id], image: PNG })).status, 404);
+    assert.equal((await c.post(`/api/groups/${g.id}/leave`)).status, 404, 'once');
+    const thread = (await a.get(`/api/groups/${g.id}/chat`)).data;
+    assert.deepEqual(thread.group.members.map((u) => u.username), ['ava', 'ben']);
+    assert.deepEqual(thread.messages.map((m) => [m.event || 'text', m.from]), [['text', aId], ['left', cId]]);
+    assert.ok(thread.people.some((u) => u.id === cId), 'who left is still named');
+    const avaRow = (await a.get('/api/inbox')).data.find((r) => r.group);
+    assert.deepEqual([avaRow.status, avaRow.unread], ['opened', 0], 'leaving is not news in the Chat list');
+    assert.equal((await a.post(`/api/messages/${thread.messages[1].id}/save`)).status, 404, 'a leaving note cannot be kept');
+
+    // the last two go: then nothing of the group is left
+    await a.post('/api/snaps', { groupIds: [g.id], image: PNG });
+    assert.equal((await a.post(`/api/groups/${g.id}/leave`)).status, 200);
+    assert.equal(fs.readdirSync(mediaDir).length, 1, 'Ben can still open it');
+    assert.equal((await b.get(`/api/groups/${g.id}/chat`)).data.group.members.length, 1, 'Ben alone, still in it');
+    assert.equal((await b.post(`/api/groups/${g.id}/leave`)).status, 200);
+    const db = s.app.store.db;
+    assert.deepEqual([db.groups.length, db.groupMessages.length, db.groupSnaps.length], [0, 0, 0]);
+    assert.equal(fs.readdirSync(mediaDir).length, 0, 'its files are gone too');
+    assert.equal((await b.get(`/api/groups/${g.id}/chat`)).status, 404);
+  } finally { await s.close(); }
+});
