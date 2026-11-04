@@ -49,13 +49,13 @@ function social(m, a, r) {
   <div class="photo" style="left:540px;top:64px;width:620px;height:500px;background-image:url(${r('wink')})"></div>
   <div style="position:absolute;left:72px;top:96px;width:450px;--h1:84px;--p:24px;--wm:34px;--wmi:52px">
     <div class="wordmark"><img alt="">Poof</div>
-    <h1 style="margin-top:40px">Snap it.<br>Send it.<br><em>Poof.</em></h1>
+    <h1 style="margin-top:40px">Shoot it.<br>Send it.<br><em>Poof.</em></h1>
     <p>Photos that vanish once they're seen.</p>
   </div>
   <div class="av" style="left:500px;top:30px">${a(0, 96)}</div>
   <div class="av" style="left:1108px;top:40px">${a(1, 80)}</div>
   <div class="av" style="left:1100px;top:470px">${a(2, 88)}</div>
-  <div class="bubble" style="left:760px;top:532px;font-size:24px">New snap from Ava 📸</div>
+  <div class="bubble" style="left:760px;top:532px;font-size:24px">New poof from Ava</div>
 `;
 }
 
@@ -68,9 +68,9 @@ function story(m, a, r) {
   <div class="av" style="left:20px;top:290px">${a(0, 150)}</div>
   <div class="av" style="left:900px;top:300px">${a(1, 140)}</div>
   <div class="av" style="left:30px;top:990px">${a(4, 130)}</div>
-  <div class="bubble" style="left:640px;top:1050px;font-size:38px">Opened ✨</div>
+  <div class="bubble" style="left:640px;top:1050px;font-size:38px">Seen</div>
   <div style="position:absolute;left:0;right:0;top:1250px;text-align:center;--h1:128px;--p:44px">
-    <h1>Snap it.<br>Send it. <em>Poof.</em></h1>
+    <h1>Shoot it.<br>Send it. <em>Poof.</em></h1>
     <p>Photos that vanish once they're seen.</p>
   </div>`;
 }

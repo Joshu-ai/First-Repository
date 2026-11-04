@@ -43,7 +43,9 @@ function client(base) {
   };
   // fetch with this client's session, for responses that are not JSON
   const raw = (p, headers = {}, opts = {}) => fetch(base + p, { headers: { cookie, ...headers }, ...opts });
-  return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), raw };
+  // this client's session token (what its cookie holds)
+  const sid = () => decodeURIComponent(cookie.slice(cookie.indexOf('=') + 1));
+  return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), raw, sid };
 }
 
 // A client's live event stream (/api/events): `events` fills as they
@@ -84,7 +86,9 @@ async function listen(c) {
     check();
   });
   const close = async () => { stop.abort(); await pump; };
-  return { events, until, close };
+  // resolves true once the server has ended the stream, false if it is still open after `ms`
+  const ended = (ms = 2000) => Promise.race([pump.then(() => true), new Promise((r) => setTimeout(() => r(false), ms))]);
+  return { events, until, close, ended };
 }
 
 async function friends(base) {
@@ -530,11 +534,11 @@ test('profile by username: friendship status from each side, needs a session', a
     assert.equal((await look(a, 'ben')).data.status, 'friends');
     assert.equal((await look(b, 'ava')).data.status, 'friends');
 
+    // nobody by that name is an answer, not an error (a link or code to no one is ordinary)
     const missing = await look(b, 'nobody');
-    assert.equal(missing.status, 404);
-    assert.equal(missing.data.error, 'No one by that username.');
+    assert.deepEqual([missing.status, missing.data], [200, { status: 'missing' }]);
     assert.equal((await look(b, '%E0%A4%A')).status, 400, 'a broken address is a bad request, not a crash');
-    assert.equal((await look(b, '%3Cscript%3E')).status, 404);
+    assert.deepEqual((await look(b, '%3Cscript%3E')).data, { status: 'missing' }, 'nothing of the name is echoed back');
   } finally { await s.close(); }
 });
 
@@ -701,6 +705,9 @@ test('video stories: listed as video, served with the right type and byte ranges
   } finally { await s.close(); }
 });
 
+// the name a GET /api/groups answer gives one group
+const groupNameIn = (res, id) => res.data.find((g) => g.id === id)?.name;
+
 // Ava with two friends, Ben and Cal (who are not friends with each other),
 // and Zed, who knows none of them
 async function trio(base) {
@@ -739,9 +746,11 @@ test('groups: made from friends only, up to 32 people, named, listed for members
     const row = (await c.get('/api/inbox')).data.find((r) => r.group);
     assert.deepEqual([row.group.name, row.status, row.unread, row.snapIds], ['Weekend plans', 'tap-to-chat', 0, []]);
 
-    // no name: named for its people
-    assert.equal((await a.post('/api/groups', { members: [bId, cId] })).data.name, 'Ava, Ben and Cal');
-    assert.equal((await a.post('/api/groups', { name: { not: 'text' }, members: [bId] })).data.name, 'Ava and Ben');
+    // no name: each member sees it named for the others in it (see the per-viewer test)
+    const unnamed = (await a.post('/api/groups', { members: [bId, cId] })).data;
+    assert.deepEqual([unnamed.name, unnamed.named], ['Ben and Cal', false]);
+    assert.equal(groupNameIn(await b.get('/api/groups'), unnamed.id), 'Ava and Cal');
+    assert.equal((await a.post('/api/groups', { name: { not: 'text' }, members: [bId] })).data.name, 'Ben');
     assert.equal((await a.post('/api/groups', { name: 'x'.repeat(60), members: [bId] })).data.name, 'x'.repeat(40), 'names are capped');
 
     // friends only, at least one, never a stranger or someone only asked
@@ -939,5 +948,172 @@ test('leaving a group: gone for you, said to the rest, and the last one out take
     assert.deepEqual([db.groups.length, db.groupMessages.length, db.groupSnaps.length], [0, 0, 0]);
     assert.equal(fs.readdirSync(mediaDir).length, 0, 'its files are gone too');
     assert.equal((await b.get(`/api/groups/${g.id}/chat`)).status, 404);
+  } finally { await s.close(); }
+});
+
+test('logging out ends the live streams that session opened; other sessions keep theirs', async () => {
+  const s = await boot();
+  try {
+    const { a, b, aId, bId } = await friends(s.base);
+    const phone = client(s.base); // Ava on another device: a session of its own
+    await phone.post('/api/login', { username: 'ava', password: 'password1' });
+    const tab = await listen(a); // say, a second tab on the computer she logs out of
+    const other = await listen(phone);
+    try {
+      assert.equal((await a.post('/api/logout')).status, 200);
+      assert.equal(await tab.ended(), true, 'the stream from the logged-out session ends');
+      const message = other.until('message');
+      await b.post('/api/chat/' + aId, { text: 'my bank PIN is 4321, delete this' });
+      assert.equal((await message).preview, 'my bank PIN is 4321, delete this', 'her other device still hears it');
+      assert.deepEqual(tab.events, [], 'nothing reached the logged-out tab');
+      // the browser tries again with the old cookie: 204 says stop
+      const again = await a.raw('/api/events');
+      assert.deepEqual([again.status, await again.text()], [204, '']);
+    } finally { await tab.close(); await other.close(); }
+
+    // a session that ends some other way: its stream is closed at the next event instead of being sent it
+    const late = await listen(phone);
+    try {
+      delete s.app.store.db.sessions[phone.sid()];
+      await b.post('/api/chat/' + aId, { text: 'still there?' });
+      assert.equal(await late.ended(), true);
+      assert.deepEqual(late.events, []);
+    } finally { await late.close(); }
+    assert.equal((await phone.get('/api/me')).status, 401);
+    assert.ok(bId);
+  } finally { await s.close(); }
+});
+
+test('/api/session says who is logged in, or null, and is never an error', async () => {
+  const s = await boot();
+  try {
+    const c = client(s.base);
+    assert.deepEqual(await c.get('/api/session'), { status: 200, data: { user: null } });
+    const me = (await c.post('/api/signup', { username: 'ava', password: 'password1', displayName: 'Ava' })).data;
+    assert.deepEqual((await c.get('/api/session')).data, { user: { id: me.id, username: 'ava', displayName: 'Ava', avatar: null } });
+    await c.post('/api/logout');
+    assert.deepEqual((await c.get('/api/session')).data, { user: null });
+  } finally { await s.close(); }
+});
+
+test('a body of JSON null or a bare value is no fields, not a crash', async () => {
+  const s = await boot();
+  try {
+    const { a, bId } = await friends(s.base);
+    for (const body of ['null', '42', '"text"']) {
+      const res = await a.raw('/api/chat/' + bId, { 'content-type': 'application/json' }, { method: 'POST', body });
+      assert.deepEqual([res.status, (await res.json()).error], [400, 'Say something.'], body);
+    }
+  } finally { await s.close(); }
+});
+
+test('one upload is stored once for every friend, group and story it goes to, and deleted when the last lets go', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, bId, cId } = await trio(s.base);
+    const mediaDir = path.join(s.dataDir, 'media');
+    const files = () => fs.readdirSync(mediaDir).length;
+    const g = (await a.post('/api/groups', { name: 'Trio', members: [bId, cId] })).data;
+    const sent = await a.post('/api/snaps', { to: [bId, cId], groupIds: [g.id], story: true, image: PNG });
+    assert.deepEqual(sent.data, { sent: 2, groups: 1, story: true });
+    assert.equal(files(), 1, 'one file for two friends, a group and the story');
+    const db = s.app.store.db;
+    assert.equal(new Set([...db.snaps, ...db.groupSnaps, ...db.stories].map((x) => x.media)).size, 1, 'all of them hold it');
+    // Ben and Cal open theirs, and the group's: each opens once, and the story still holds the file
+    for (const who of [b, c]) {
+      for (const id of (await who.get('/api/inbox')).data.flatMap((r) => r.snapIds)) {
+        assert.equal((await who.post(`/api/snaps/${id}/open`)).data.image, PNG);
+        assert.equal((await who.post(`/api/snaps/${id}/open`)).status, 410);
+      }
+    }
+    assert.equal(files(), 1, 'the story still shows it');
+    assert.equal((await b.raw(`/api/stories/${db.stories[0].id}/media`)).status, 200);
+    s.clock.t += DAY + 1000;
+    s.app.expire();
+    assert.equal(files(), 0, 'gone once nothing holds it');
+  } finally { await s.close(); }
+});
+
+test('a snap goes to at most 64 friends and groups at once', async () => {
+  const s = await boot();
+  try {
+    const { a, aId } = await friends(s.base);
+    const db = s.app.store.db;
+    const ids = Array.from({ length: LIMITS.recipients + 1 }, (_, i) => {
+      const u = { id: 'p' + i, username: 'pal' + i, displayName: 'Pal ' + i, salt: 'x', hash: 'x', createdAt: 0 };
+      db.users.push(u);
+      db.friendships.push({ id: 'pf' + i, a: aId, b: u.id, requester: aId, status: 'accepted', createdAt: 0 });
+      return u.id;
+    });
+    const groups = ids.slice(0, 40).map((id, i) => {
+      const g = { id: 'g' + i, name: 'G' + i, members: [aId, id], createdBy: aId, createdAt: 0 };
+      db.groups.push(g);
+      return g.id;
+    });
+    const over = await a.post('/api/snaps', { to: ids.slice(0, 30), groupIds: groups.slice(0, 35), image: PNG });
+    assert.deepEqual([over.status, over.data.error], [400, 'You can send a poof to up to 64 friends and groups at once.']);
+    assert.equal((await a.post('/api/snaps', { to: ids, image: PNG })).status, 400, 'friends alone count too');
+    assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 0, 'nothing stored');
+    const most = await a.post('/api/snaps', { to: ids.slice(0, 30), groupIds: groups.slice(0, 34), image: PNG });
+    assert.deepEqual(most.data, { sent: 30, groups: 34, story: false });
+    assert.equal(fs.readdirSync(path.join(s.dataDir, 'media')).length, 1);
+  } finally { await s.close(); }
+});
+
+test('groups: nobody is in more than 100, and starting them is rate limited', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, aId, bId, cId } = await trio(s.base);
+    const db = s.app.store.db;
+    const fill = (userId, n) => {
+      for (let i = 0; i < n; i++) db.groups.push({ id: `${userId}-g${i}`, name: 'G', members: [userId], createdBy: userId, createdAt: 0 });
+    };
+    fill(bId, LIMITS.groups);
+    const ben = await a.post('/api/groups', { name: 'With Ben', members: [bId, cId] });
+    assert.deepEqual([ben.status, ben.data.error], [400, 'Ben is in too many groups to be added to another.']);
+    assert.equal((await a.post('/api/groups', { name: 'Just Cal', members: [cId] })).status, 200, 'without him it can be made');
+    fill(aId, LIMITS.groups - 1);
+    const full = await a.post('/api/groups', { name: 'One more', members: [cId] });
+    assert.deepEqual([full.status, full.data.error], [400, "You're in 100 groups, the most there can be. Leave one to start another."]);
+    assert.equal(db.groups.filter((g) => g.members.includes(aId)).length, 100);
+
+    // 30 tries in 15 minutes per person, then a wait
+    for (let i = 0; i < 30; i++) assert.equal((await c.post('/api/groups', { name: 'Hi ' + i, members: [aId] })).status, 400, 'Ava is full');
+    const limited = await c.post('/api/groups', { name: 'Again', members: [aId] });
+    assert.deepEqual([limited.status, limited.data.error], [429, "You've started a lot of groups. Try again in a few minutes."]);
+    assert.equal((await b.post('/api/groups', { name: 'Mine', members: [aId] })).status, 400, 'counted per person: Ben is not held up');
+    s.clock.t += 15 * 60 * 1000 + 1;
+    assert.equal((await c.post('/api/groups', { name: 'Later', members: [aId] })).status, 400, 'the window resets (Ava is still full)');
+  } finally { await s.close(); }
+});
+
+test('an unnamed group is named for the others in it, as each member sees it now', async () => {
+  const s = await boot();
+  try {
+    const { a, b, c, aId, bId, cId } = await trio(s.base);
+    const toBen = await listen(b);
+    let g;
+    try {
+      const added = toBen.until('group');
+      g = (await a.post('/api/groups', { members: [bId, cId] })).data;
+      assert.deepEqual([g.name, g.named], ['Ben and Cal', false], 'Ava sees the others');
+      assert.deepEqual((await added).group, { id: g.id, name: 'Ava and Cal' }, 'Ben is told it as he sees it');
+      const said = toBen.until('message');
+      await c.post(`/api/groups/${g.id}/chat`, { text: 'hey' });
+      assert.equal((await said).group.name, 'Ava and Cal');
+    } finally { await toBen.close(); }
+    const nameFor = async (who) => (await who.get(`/api/groups/${g.id}/chat`)).data.group.name;
+    assert.deepEqual([await nameFor(a), await nameFor(b), await nameFor(c)], ['Ben and Cal', 'Ava and Cal', 'Ava and Ben']);
+    assert.equal((await b.get('/api/inbox')).data.find((r) => r.group).group.name, 'Ava and Cal');
+    assert.equal(s.app.store.db.groups[0].name, '', 'stored without a name');
+    // the name follows who is in it
+    await c.post(`/api/groups/${g.id}/leave`);
+    assert.deepEqual([await nameFor(a), await nameFor(b)], ['Ben', 'Ava']);
+    await b.post(`/api/groups/${g.id}/leave`);
+    assert.equal(await nameFor(a), 'Just you');
+    // a group someone named keeps its name for everyone
+    const named = (await a.post('/api/groups', { name: 'Trio', members: [bId, cId] })).data;
+    assert.deepEqual([named.name, named.named], ['Trio', true]);
+    assert.equal((await c.get(`/api/groups/${named.id}/chat`)).data.group.name, 'Trio');
   } finally { await s.close(); }
 });

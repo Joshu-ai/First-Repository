@@ -15,21 +15,37 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
 (async () => {
   fs.mkdirSync(SHOTS, { recursive: true });
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poof-e2e-'));
-  const { server } = createApp({ dataDir });
+  const { server, store } = createApp({ dataDir });
   await new Promise((r) => server.listen(0, r));
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({
     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
   });
   const errors = [];
+  // The only failed requests the run expects, each on purpose: any other
+  // console error, a failed request included, fails the test.
+  const EXPECTED_FAILS = [
+    [/^\/api\/login$/, 401], // the wrong password
+    [/^\/api\/stories$/, 401], // a tab logged out from another tab asks for its stories
+    [/^\/api\/chat\/[^/]+$/, 503], // a chat that can't be sent
+  ];
+  const expectedFail = (m) => {
+    const status = Number(/status of (\d{3})/.exec(m.text())?.[1]);
+    let where = '';
+    try { where = new URL(m.location().url).pathname; } catch {}
+    return EXPECTED_FAILS.some(([at, code]) => at.test(where) && code === status);
+  };
   const viewport = { width: 390, height: 844 };
   // `context` adds browser context options; `before` runs on the page before it
   // loads; `path` is where it starts (a profile link, say)
+  const watch = (page) => {
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (m) => m.type() === 'error' && !expectedFail(m) && errors.push(`${m.text()} (${m.location().url})`));
+    return page;
+  };
   const open = async ({ context, before, path: start = '/' } = {}) => {
     const ctx = await browser.newContext({ viewport, permissions: ['camera', 'microphone'], ...context });
-    const page = await ctx.newPage();
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && !/40[0-9]|410/.test(m.text()) && errors.push(m.text()));
+    const page = watch(await ctx.newPage());
     if (before) await before(page);
     await page.goto(base + start);
     return page;
@@ -95,7 +111,22 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     return v && v.videoWidth > 0 && v.classList.contains('mirror') === m;
   }, mirrored);
   const pressed = (page, name) => page.getByRole('button', { name, exact: true }).getAttribute('aria-pressed');
-  const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.png') });
+  // Every control on screen (the screen in front, a sheet over it, a banner)
+  // is at least 44px each way, measured as laid out, before any transform
+  const checkTargets = async (page, where) => {
+    const small = await page.evaluate(() => {
+      const roots = [document.querySelector('#app > .screen:not(.peek):not(.leaving)'), document.querySelector('#app > .sheet-layer'),
+        document.getElementById('banner')].filter(Boolean);
+      return roots.flatMap((root) => [...root.querySelectorAll('button, input:not([type="hidden"]), [role="button"], [role="switch"], a[href]')])
+        .filter((el) => el.checkVisibility({ visibilityProperty: true }) && (el.offsetWidth < 44 || el.offsetHeight < 44))
+        .map((el) => `${el.getAttribute('aria-label') || el.textContent.trim() || el.className} (${el.offsetWidth}x${el.offsetHeight})`);
+    });
+    assert.deepEqual(small, [], `${where}: controls under 44px: ${small.join(', ')}`);
+  };
+  const shot = async (page, name) => {
+    await checkTargets(page, name);
+    await page.screenshot({ path: path.join(SHOTS, name + '.png') });
+  };
   // after a reload: wait for the launch splash to fade, so screenshots are clean
   const settled = (page) => page.locator('#splash').waitFor({ state: 'detached' });
   const noToast = (page) => page.locator('#toast').waitFor({ state: 'hidden' });
@@ -166,8 +197,9 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
   const storyBar = (page, i) => page.evaluate((n) => parseFloat(document.querySelectorAll('.viewer .progress i')[n]?.style.width) || 0, i);
 
   // Controls show Poof's drawn icons (public/icons.js), never emoji or text
-  // glyphs. `expected` maps a button's accessible name to its icon name.
-  const OLD_GLYPHS = /[💬◉◎🖼⟲✎↶⤓✕➤‹🎲✓]/u;
+  // glyphs: no pictograph at all (🔥, 👋, …), nor the symbols used before.
+  // `expected` maps a button's accessible name to its icon name.
+  const OLD_GLYPHS = /[\p{Extended_Pictographic}∞◉◎⟲✎↶⤓✕➤‹✓]/u;
   const checkIcons = async (page, where, expected) => {
     const found = await page.evaluate((names) => Object.entries(names).map(([label, name]) => {
       const btn = [...document.querySelectorAll('button')]
@@ -177,10 +209,35 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
         : svg.closest('[aria-hidden="true"]') && svg.getAttribute('viewBox') === '0 0 24 24' ? 'ok' : 'icon not decorative'];
     }), expected);
     for (const [label, result] of found) assert.equal(result, 'ok', `${where}: "${label}" should show the ${expected[label]} icon`);
-    const glyphs = await page.evaluate((src) => [...document.querySelectorAll('button')]
+    const glyphs = await page.evaluate((src) => [...document.querySelectorAll('button, .row, .chat-row, .empty, .banner')]
       .filter((b) => new RegExp(src, 'u').test(b.textContent) || ['+', 'T', '+ Add'].includes(b.textContent.trim()))
       .map((b) => b.getAttribute('aria-label') || b.textContent.trim()), OLD_GLYPHS.source);
-    assert.deepEqual(glyphs, [], `${where}: buttons still use glyph icons: ${glyphs.join(', ')}`);
+    assert.deepEqual(glyphs, [], `${where}: buttons or rows still use glyph icons: ${glyphs.join(', ')}`);
+  };
+  // the colour a CSS value comes to on this page, to compare with what is drawn
+  const cssColor = (page, value) => page.evaluate((v) => {
+    const probe = document.createElement('i');
+    probe.style.color = v;
+    document.body.append(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  }, value);
+  // a request held until `release()`: to see what the app shows while it waits
+  const holdRequests = async (page, pattern, method = 'POST') => {
+    let release;
+    const held = new Promise((r) => (release = r));
+    const seen = [];
+    const going = [];
+    await page.route(pattern, (route) => {
+      if (route.request().method() !== method) return route.continue();
+      seen.push(route.request().url());
+      const go = held.then(() => route.continue());
+      going.push(go);
+      return go;
+    });
+    // let them go, and once they have, stop holding
+    return { seen, release: async () => { release(); await Promise.all(going); await page.unroute(pattern); } };
   };
 
   // Someone without an avatar gets the white Puff mark on a circle in their own
@@ -313,6 +370,10 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
         await page.getByRole('radio', { name: 'Afro' }).click();
         await page.getByRole('tab', { name: 'Extras' }).click();
         await page.getByRole('radio', { name: 'Round glasses' }).click();
+        const pick = page.getByRole('radio', { name: 'Round glasses' });
+        assert.equal(await pick.locator('.option-check svg.i-check').count(), 1, 'the pick has a check');
+        assert.equal(await pick.evaluate((el) => getComputedStyle(el).borderTopColor), await cssColor(page, 'var(--brand)'),
+          'and a brand ring: the focus colour is for focus only');
         await checkIcons(page, 'avatar maker', { Shuffle: 'shuffle' });
         await shot(page, 'S11-avatar-maker');
         await page.getByRole('button', { name: 'Looks like me' }).click();
@@ -405,12 +466,15 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
 
     // S09 add friends: search finds Ben, and there is a way to scan a Puffcode
     await ava.getByRole('button', { name: 'Add friends' }).click();
+    await ava.getByText('Find your friends').waitFor();
     await ava.getByLabel('Search users').fill('ben');
     await ava.getByRole('button', { name: 'Add', exact: true }).waitFor();
+    assert.equal(await ava.getByText('Find your friends').isVisible(), false, 'no "find your friends" beside the results');
     await checkIcons(ava, 'add friends', { Back: 'back', Add: 'plus', 'Scan Puffcode': 'scan' });
     assert.ok((await ava.getByRole('button', { name: 'Scan Puffcode' }).boundingBox()).height >= 44, 'Scan Puffcode is easy to tap');
     assert.equal(await ava.locator('.search-field svg.i-search').count(), 1, 'search field shows the search icon');
     await ava.getByLabel('Search users').fill('');
+    await ava.getByText('Find your friends').waitFor();
 
     // S12 Ben opens Ava's link (what her Puffcode holds) and sends a request from it
     await ben.goto(base + '/add/ava');
@@ -426,8 +490,18 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ben.getByText('Request sent. You will be friends once Ava accepts.').waitFor();
     // Ava sees it live (a banner says so too) and accepts; Ben's screen follows along
     await bannerOf(ava).getByText('Sent you a friend request', { exact: true }).waitFor();
+    // Accept says it is working straight away and takes no second tap
+    const accepting = await holdRequests(ava, '**/api/friends/accept');
     await ava.getByRole('button', { name: 'Accept' }).click();
+    const acceptBusy = ava.getByRole('button', { name: 'Accepting…' });
+    await acceptBusy.waitFor();
+    assert.equal(await acceptBusy.isDisabled(), true, 'Accept is busy while it is on its way');
+    await accepting.release();
     await ava.getByText('You are now friends').waitFor();
+    assert.equal(accepting.seen.length, 1, 'one request');
+    // a 2-day streak between them (as if they had sent each other poofs yesterday and today)
+    const idOf = (username) => store.db.users.find((u) => u.username === username).id;
+    store.db.streaks[[idOf('ava'), idOf('ben')].sort().join('|')] = { days: {}, count: 2, lastDay: new Date().toISOString().slice(0, 10) };
     assert.equal(await bannerOf(ava).count(), 0, 'answered, the request banner goes');
     await ben.getByText('You and Ava are friends.').waitFor();
     await ben.getByRole('button', { name: 'Send a chat' }).waitFor();
@@ -515,15 +589,31 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(flashes[0].bg, 'rgb(255, 255, 255)');
     assert.deepEqual([flashes[0].w, flashes[0].h], [viewport.width, viewport.height], 'it covers the screen');
     assert.ok(flashes[0].ms >= 140 && flashes[0].ms < 600, `it is brief (${Math.round(flashes[0].ms)}ms)`);
+    // what you aimed is what you send: the photo is the viewfinder's frame, the
+    // screen's shape, and fills the editor edge to edge
+    const frame = await ava.evaluate(() => {
+      const c = document.querySelector('.stage canvas');
+      const r = c.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, aspect: c.width / c.height, screen: innerWidth / innerHeight };
+    });
+    assert.ok(Math.abs(frame.x) <= 1 && Math.abs(frame.y) <= 1 && Math.abs(frame.w - viewport.width) <= 1
+      && Math.abs(frame.h - viewport.height) <= 1, `the photo fills the editor (${JSON.stringify(frame)})`);
+    assert.ok(Math.abs(frame.aspect - frame.screen) < 0.005, `cut to the screen's shape (${frame.aspect} for ${frame.screen})`);
     await ava.getByRole('button', { name: 'Add caption' }).click();
     await ava.getByRole('textbox', { name: 'Caption' }).fill('hello from the test');
     // draw a stroke
     await ava.getByRole('button', { name: 'Draw' }).click();
     const box = await ava.locator('.stage canvas').nth(1).boundingBox();
-    await ava.mouse.move(box.x + 40, box.y + 60);
+    await ava.mouse.move(box.x + 40, box.y + 66); // in the top bar, below Discard
     await ava.mouse.down();
-    await ava.mouse.move(box.x + 200, box.y + 160, { steps: 8 });
+    await ava.mouse.move(box.x + 200, box.y + 200, { steps: 8 });
     await ava.mouse.up();
+    // it is drawn, though it starts under the top bar: the bar lets it through
+    assert.equal(await ava.locator('.stage canvas').nth(1).evaluate((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
+      return false;
+    }), true, 'the stroke is on the drawing layer');
     await ava.getByRole('button', { name: 'Timer' }).click(); // 5s -> 10s
     await ava.getByRole('button', { name: 'Timer' }).getByText('10s').waitFor();
     await checkIcons(ava, 'editor', {
@@ -536,18 +626,24 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.getByRole('button', { name: 'Send to', exact: true }).click();
     await ava.getByRole('checkbox', { name: /Ben/ }).click();
     await checkPlaceholder(ava.getByRole('checkbox', { name: /Ben/ }).locator('.avatar'), 'Ben in send to', 44);
+    // their streak: the count and Poof's streak mark, read out in words
+    const sendStreak = ava.getByRole('checkbox', { name: /Ben/ }).locator('.streak');
+    assert.deepEqual(await sendStreak.evaluate((el) => [el.textContent, el.getAttribute('role'), el.getAttribute('aria-label'),
+      el.querySelectorAll('svg.i-streak').length]), ['2', 'img', '2-day streak', 1]);
     await ava.getByRole('checkbox', { name: /My Story/ }).click();
     await checkIcons(ava, 'send to', { 'Back to editing': 'back', Send: 'send' });
     assert.equal(await ava.locator('.row[aria-checked="true"] .check svg.i-check').count(), 2, 'picked rows show a drawn check');
     await shot(ava, 'S04-send-to');
     await ava.getByRole('button', { name: 'Send', exact: true }).click();
-    await ava.getByText('Delivered').waitFor();
+    await ava.getByText('Sent', { exact: true }).waitFor();
     await checkIcons(ava, 'inbox', { 'Chat with Ben': 'chat', 'Add friends': 'puff-plus' });
+    assert.equal(await ava.locator('.chat-row[data-friend] .row .streak svg.i-streak').count(), 1, 'the streak mark on the Chat list');
+    assert.equal(await ava.locator('.chat-row[data-friend] .status-icon svg.i-mark-sent').count(), 1, 'sent: Puff\'s trail');
     await shot(ava, 'S05-inbox-sender');
 
     // S16 press and hold Ben's row: his friend card rises from the bottom,
     // and letting go does not also open the row
-    const benRow = ava.getByRole('button', { name: 'Ben, Delivered' });
+    const benRow = ava.getByRole('button', { name: 'Ben, Sent, 2-day streak' });
     const rowBox = await benRow.boundingBox();
     await ava.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
     await ava.mouse.down();
@@ -558,7 +654,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await ava.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]'))), true, 'focus moves into the card');
     await card.getByRole('heading', { name: 'Ben' }).waitFor();
     await card.getByText('@ben', { exact: true }).waitFor();
-    await card.getByText('No streak yet').waitFor();
+    await card.getByText('2-day streak', { exact: true }).waitFor();
     await card.getByRole('img', { name: 'Puffcode for @ben' }).waitFor();
     await checkPlaceholder(card.locator('.card-top .avatar'), 'Ben on his friend card', 64);
     for (const name of ['Send a chat', 'Remove friend', 'Close']) {
@@ -582,7 +678,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     // Escape closes it and focus goes back to the row
     await ava.keyboard.press('Escape');
     await card.waitFor({ state: 'detached' });
-    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Ben, Delivered');
+    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Ben, Sent, 2-day streak');
     // from the keyboard: Ben's avatar is a button that opens the card; Close shuts it
     await ava.getByRole('button', { name: "Ben's friend card" }).focus();
     await ava.keyboard.press('Enter');
@@ -750,12 +846,19 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
 
     // S05 Ben sees a new snap live, S06 opens it once
     await ben.getByRole('button', { name: 'Back' }).click();
-    await ben.getByText('New snap', { exact: true }).waitFor();
+    await ben.getByText('New poof', { exact: true }).waitFor();
+    // news in the colour of what it is, Poof's solid cloud beside it, and the row bold
+    const avaRow = ben.locator('.chat-row[data-friend]');
+    assert.equal(await avaRow.locator('.sub').evaluate((el) => getComputedStyle(el).color), await cssColor(ben, 'var(--snap)'),
+      'New poof in the poof colour');
+    assert.notEqual(await cssColor(ben, 'var(--snap)'), await cssColor(ben, 'var(--text-dim)'));
+    assert.equal(await avaRow.locator('.status-icon svg.i-mark-poof').count(), 1);
+    assert.equal(await avaRow.locator('.name').evaluate((el) => getComputedStyle(el).fontWeight), '800', 'unread: bold');
     assert.equal(await ben.getByRole('button', { name: "Ava's friend card" }).locator('.avatar.has-art').count(), 1, 'Ben sees Ava\'s avatar art');
     await ben.locator('.puff-pop').waitFor({ state: 'detached' }); // "You are now friends" can still be fading out
     await shot(ben, 'S05-inbox');
-    await ben.getByRole('button', { name: /Ava, New snap/ }).click();
-    const img = ben.getByRole('img', { name: 'Snap from Ava' });
+    await ben.getByRole('button', { name: /Ava, New poof/ }).click();
+    const img = ben.getByRole('img', { name: 'Photo from Ava' });
     await img.waitFor();
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await checkIcons(ben, 'snap viewer', { Close: 'close' });
@@ -767,7 +870,9 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.ok(await img.isVisible(), 'the snap is still open');
     await ben.getByRole('button', { name: 'Next' }).click(); // tap: on to the next, and after the last it closes
     await ben.getByText('Received').waitFor();
-    await ava.getByText('Opened', { exact: true }).waitFor(); // live update to the sender
+    assert.equal(await avaRow.locator('.status-icon svg.i-mark-poof-open').count(), 1, 'opened: the cloud outlined');
+    assert.equal(await avaRow.locator('.name').evaluate((el) => getComputedStyle(el).fontWeight), '600', 'read: not bold');
+    await ava.getByText('Seen', { exact: true }).waitFor(); // live update to the sender
 
     // S14 video snaps: hold the shutter and it records, a ring filling round
     // it while everything else steps back; let go and the video editor opens
@@ -833,7 +938,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(avaClip.body.mirror, true);
     assert.ok(avaClip.body.duration >= 1 && avaClip.body.duration <= 10, `its length (${avaClip.body.duration}s)`);
     assert.ok(!('image' in avaClip.body));
-    await ava.getByText('Delivered').waitFor();
+    await ava.getByText('Sent', { exact: true }).waitFor();
 
     // S15 Ben opens it from its banner (S17): a <video> plays with its sound,
     // the caption over it; when it ends the viewer moves on (here, it closes)
@@ -841,14 +946,14 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     const snapBanner = bannerOf(ben);
     await snapBanner.waitFor();
     assert.equal(await snapBanner.locator('.banner-name').textContent(), 'Ava');
-    assert.equal(await snapBanner.locator('.banner-say').textContent(), 'New snap');
-    await ben.locator('.chat-row').getByText('New snap', { exact: true }).waitFor();
+    assert.equal(await snapBanner.locator('.banner-say').textContent(), 'New poof');
+    await ben.locator('.chat-row').getByText('New poof', { exact: true }).waitFor();
     await snapBanner.click();
     await playing(ben, '.viewer video');
     assert.equal(await bannerOf(ben).count(), 0, 'the banner went as the snap opened');
     await ben.waitForFunction(() => document.querySelector('.viewer video')?.webkitAudioDecodedByteCount > 0); // its sound plays
     const clipEl = ben.locator('.viewer video');
-    assert.equal(await clipEl.getAttribute('aria-label'), 'Snap from Ava');
+    assert.equal(await clipEl.getAttribute('aria-label'), 'Video from Ava');
     assert.deepEqual(await clipEl.evaluate((v) => [v.muted, v.loop, v.classList.contains('mirror'), v.src.startsWith('blob:')]),
       [false, false, true, true], 'plays once, with sound, mirrored as Ava saw it');
     const capBox = await ben.locator('.media-caption').boundingBox();
@@ -856,7 +961,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.ok(capBox.y > viewport.height / 2 && capBox.y + capBox.height < viewport.height, 'the caption sits over the video');
     await shot(ben, 'S15-video-snap');
     await ben.getByText('Received').waitFor();
-    await ava.getByText('Opened', { exact: true }).waitFor();
+    await ava.getByText('Seen', { exact: true }).waitFor();
 
     // S14 from the keyboard: hold Space on the shutter. On the back camera
     // with Flash on, its light stays on for the recording. Muted, the clip
@@ -895,9 +1000,18 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
 
     // S07 chat both ways, keep a message
     await ben.getByRole('button', { name: 'Chat with Ava' }).click();
+    await ben.getByText('Say hi to Ava.').waitFor();
+    // what Ben sends shows at once as his, saying Sending…, until it has gone
+    const sending = await holdRequests(ben, '**/api/chat/*');
     await ben.getByLabel('Message').fill('nice photo');
     await ben.getByRole('button', { name: 'Send', exact: true }).click();
-    await ben.getByText('nice photo').waitFor();
+    const onItsWay = ben.getByRole('button', { name: 'Sending: nice photo' });
+    await onItsWay.waitFor();
+    assert.equal(await onItsWay.locator('small').textContent(), 'Sending…');
+    assert.equal(await ben.getByLabel('Message').inputValue(), '', 'the box is ready for the next');
+    await sending.release();
+    await ben.getByRole('button', { name: /^Message: nice photo/ }).waitFor();
+    assert.equal(await onItsWay.count(), 0, 'the real one took its place');
     // S17 it drops in on Ava's Chat list as a banner: the Puff mark on Ben's
     // avatar, his name and what he said, in a polite live region; the tab's
     // title counts what is new. Tapping the banner opens his chat
@@ -916,6 +1030,13 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
       bannerBox.x + bannerBox.width <= viewport.width, `at the top, easy to tap, inside the screen (${JSON.stringify(bannerBox)})`);
     const unreadBadge = await ava.locator('.nav .badge').textContent();
     assert.ok(Number(unreadBadge) >= 1);
+    // the count is a dark number on pink, and nothing around it is faded
+    const badgeLook = await ava.locator('.nav .badge').evaluate((el) => {
+      const faded = [];
+      for (let n = el; n && n !== document.body; n = n.parentElement) if (getComputedStyle(n).opacity !== '1') faded.push(n.className);
+      return { color: getComputedStyle(el).color, faded };
+    });
+    assert.deepEqual(badgeLook, { color: await cssColor(ava, 'var(--on-badge)'), faded: [] });
     assert.equal(await ava.title(), `(${unreadBadge}) Poof`, 'the tab title counts what is new');
     await shot(ava, 'S17-banner');
     await chatBanner.click();
@@ -924,8 +1045,16 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await bannerOf(ava).count(), 0, 'the banner went as the chat opened');
     await ava.waitForFunction(() => document.title === 'Poof'); // read, so nothing is new
     await ava.getByRole('button', { name: /Message: nice photo/ }).click();
-    await ava.getByText(/kept/).waitFor();
-    await checkIcons(ava, 'chat', { Back: 'back', 'Snap Ben': 'camera' });
+    await ava.getByText('Kept in chat').waitFor();
+    // kept: its own mark and the word, not the focus colour
+    const kept = ava.getByRole('button', { name: /^Message: nice photo, kept/ });
+    await kept.waitFor();
+    assert.equal(await kept.locator('small svg.i-kept').count(), 1, 'the kept mark');
+    assert.match(await kept.locator('small').textContent(), /^Kept · /);
+    const keptLook = await kept.evaluate((el) => getComputedStyle(el).boxShadow);
+    assert.ok(keptLook !== 'none' && !keptLook.includes(await cssColor(ava, 'var(--accent)')), `kept is not drawn in the focus colour (${keptLook})`);
+    await checkIcons(ava, 'chat', { Back: 'back', 'Send Ben a poof': 'camera' });
+    await noToast(ava);
     await shot(ava, 'S07-chat');
 
     // S07 typing: while Ben types, Ava's open thread shows his avatar and
@@ -980,6 +1109,22 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await ava.title(), 'Poof', 'nor anything unread');
     assert.ok(Date.now() - typedAgainAt < 3500, 'gone with the message, not 4 seconds on');
     await ava.emulateMedia({ reducedMotion: 'no-preference' });
+    // S07 a chat that can't be sent stays, marked Not sent; a tap sends it again
+    await ava.route('**/api/chat/*', (route) => (route.request().method() === 'POST'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Poof is busy. Try again.' }) })
+      : route.continue()));
+    await ava.getByLabel('Message', { exact: true }).fill('free later?');
+    await ava.getByRole('button', { name: 'Send', exact: true }).click();
+    const unsent = ava.getByRole('button', { name: 'Not sent: free later?. Tap to try again' });
+    await unsent.waitFor();
+    await ava.getByText('Poof is busy. Try again.').waitFor();
+    assert.equal(await unsent.locator('small').textContent(), 'Not sent · tap to try again');
+    await shot(ava, 'S07-chat-not-sent');
+    await ava.unroute('**/api/chat/*');
+    await unsent.click();
+    await ava.getByRole('button', { name: /^Message: free later\?/ }).waitFor();
+    assert.equal(await unsent.count(), 0);
+    await ben.getByText('free later?').waitFor();
 
     // S08 stories: Ben watches, Ava sees the viewer
     await ben.getByRole('button', { name: 'Back' }).click();
@@ -1063,7 +1208,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
         body: JSON.stringify({ to: [to], image: c.toDataURL('image/png'), duration: secs }) });
       if (!r.ok) throw new Error('could not send the snap: ' + r.status);
     }, [benIdNow, SNAP_MS / 1000]);
-    await ben.getByRole('button', { name: /Ava, New snap/ }).click();
+    await ben.getByRole('button', { name: /Ava, New poof/ }).click();
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     const snapOpenAt = Date.now();
     await ava.evaluate((to) => fetch('/api/chat/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1076,7 +1221,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await ben.locator('section.screen[aria-label="Chat with Ava"]').count(), 1, 'still in the chat once the snap would have run out');
     await ava.getByRole('button', { name: 'Back' }).click();
     await ava.getByRole('button', { name: 'Stories', exact: true }).click();
-    await ava.getByText(/1 viewers/).waitFor();
+    await ava.getByText('2 posts · 1 viewer', { exact: true }).waitFor();
     // Ben's muted story: Ava's browser plays its picture and has no sound to play
     await ava.locator('.scroll .row').nth(1).click();
     await playing(ava, '.viewer video');
@@ -1102,9 +1247,24 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
         close() { this.closed = true; this.onclose?.(); }
       };
     });
+    // S10 profile, opened from Stories: Back goes back there
+    await ava.getByRole('button', { name: 'Profile' }).click();
+    await ava.getByText('Friends (1)').waitFor();
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('heading', { name: 'Stories' }).waitFor();
     // S10 profile: Ava's Puffcode, large at the top with her avatar inside it
     await ava.getByRole('button', { name: 'Profile' }).click();
     await ava.getByText('Friends (1)').waitFor();
+    // each friend is a row that opens their card (Remove friend is there, and asks first): no Remove on every row
+    const benOnProfile = ava.getByRole('button', { name: 'Ben, @ben, 2-day streak' });
+    assert.equal(await benOnProfile.locator('.streak svg.i-streak').count(), 1, 'the streak mark');
+    assert.equal(await ava.getByRole('button', { name: 'Remove', exact: true }).count(), 0, 'no Remove button on the row');
+    await benOnProfile.click();
+    const profileCard = ava.getByRole('dialog', { name: 'Ben' });
+    await profileCard.getByRole('button', { name: 'Remove friend' }).waitFor();
+    await ava.keyboard.press('Escape');
+    await profileCard.waitFor({ state: 'detached' });
+    assert.equal(await ava.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Ben, @ben, 2-day streak', 'focus back on his row');
     const avaCode = ava.getByRole('img', { name: 'Puffcode for @ava' });
     await avaCode.waitFor();
     const codeBox = await avaCode.boundingBox();
@@ -1202,6 +1362,13 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.equal(await notifySwitch.getAttribute('aria-checked'), 'false');
     assert.equal(await ava.evaluate(() => window.permissionAsks), 2);
     assert.equal(await ava.evaluate(() => window.shownNotes.length), 2, 'one a message, no more');
+    // two more tabs of Poof in Ava's browser, on the same session: one she
+    // goes on using, one she leaves alone
+    const [tabB, tabC] = [watch(await ava.context().newPage()), watch(await ava.context().newPage())];
+    for (const tab of [tabB, tabC]) {
+      await tab.goto(base);
+      await tab.getByRole('button', { name: 'Take photo' }).waitFor();
+    }
     await ava.getByRole('button', { name: 'Log out' }).click();
 
     // S01 log out lands on the welcome screen; log back in from there
@@ -1210,6 +1377,22 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     assert.ok(await ava.locator('#toast').isHidden(), 'no news from the last session on the welcome screen');
     assert.equal(await bannerOf(ava).count(), 0, 'no banner either');
     assert.equal(await ava.title(), 'Poof', 'and nothing counted in the title');
+    // S01 logged out in one tab, out in them all: the one in use finds out at
+    // its next step, the one left alone from its live stream ending. A chat to
+    // Ava now shows in neither: no banner, nothing counted
+    await tabB.getByRole('button', { name: 'Stories', exact: true }).click();
+    await tabB.getByRole('button', { name: 'Sign up' }).waitFor();
+    await tabC.getByRole('button', { name: 'Sign up' }).waitFor({ timeout: 10000 });
+    await ben.evaluate((to) => fetch('/api/chat/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'my PIN is 4321, delete this' }) }), avaUser.id);
+    await ben.waitForTimeout(800);
+    for (const tab of [tabB, tabC]) {
+      assert.equal(await bannerOf(tab).count(), 0, 'no banner in a logged-out tab');
+      assert.equal(await tab.title(), 'Poof');
+      assert.equal(await tab.getByText('4321').count(), 0);
+    }
+    await tabB.close();
+    await tabC.close();
     // a profile link opened while logged out is remembered through log in
     await ava.goto(base + '/add/ben');
     await ava.getByText('Log in or sign up to add @ben.').waitFor();
@@ -1330,6 +1513,31 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.getByRole('button', { name: 'Back' }).click();
     await ava.getByRole('heading', { name: 'Chat' }).waitFor();
     const avaId = await ava.evaluate(() => fetch('/api/me').then((r) => r.json()).then((u) => u.id));
+    // S06 a video poof on a slow connection: a tap while it is on its way
+    // waits for it (opening one uses it up), and it plays, alone
+    const clipUrl = 'data:video/webm;base64,' + fs.readFileSync(path.join(__dirname, 'fixtures', 'clip-with-sound.webm')).toString('base64');
+    await ben.evaluate(async ([to, video]) => {
+      const r = await fetch('/api/snaps', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: [to], video, duration: 0.6 }) });
+      if (!r.ok) throw new Error('could not send the video: ' + r.status);
+    }, [avaId, clipUrl]);
+    const slow = await holdRequests(ava, '**/api/snaps/*/open');
+    await ava.getByRole('button', { name: /Ben, New poof/ }).click();
+    await ava.waitForFunction(() => document.querySelector('.viewer'));
+    await ava.waitForTimeout(200);
+    assert.equal(slow.seen.length, 1);
+    await ava.getByRole('button', { name: 'Next' }).click();
+    await ava.getByRole('button', { name: 'Next' }).click();
+    assert.equal(await ava.locator('.viewer').count(), 1, 'the taps did not close it');
+    await slow.release();
+    const videosPlaying = await ava.waitForFunction(() => {
+      const v = document.querySelectorAll('.viewer video');
+      return v.length && !v[0].paused && v[0].currentTime > 0 ? v.length : 0;
+    });
+    assert.equal(await videosPlaying.jsonValue(), 1, 'one video, playing');
+    assert.equal(slow.seen.length, 1, 'opened once');
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor(); // it ended, and was the last
+    await ava.locator('.puff-pop').waitFor({ state: 'detached' });
     await ben.evaluate(async (to) => {
       const c = document.createElement('canvas');
       c.width = 270;
@@ -1348,7 +1556,7 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await lastBanner.waitFor({ state: 'detached', timeout: 8000 });
     const bannerFor = Date.now() - bannerAt;
     assert.ok(bannerFor >= 3600 && bannerFor < 6000, `the banner stayed about 4 seconds (${bannerFor}ms)`);
-    await ava.getByRole('button', { name: /Ben, New snap/ }).click();
+    await ava.getByRole('button', { name: /Ben, New poof/ }).click();
     await ava.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     await drag(ava, [195, 300], [195, 620], { mid: () => shot(ava, 'S06-snap-swipe-down') });
     await ava.getByRole('heading', { name: 'Chat' }).waitFor();
@@ -1426,19 +1634,19 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     const [groupPost] = await Promise.all([snapPost(ava), ava.getByRole('button', { name: 'Send', exact: true }).click()]);
     const groupSnap = JSON.parse(groupPost.postData());
     assert.deepEqual([groupSnap.to, groupSnap.groupIds.length, groupSnap.story], [[], 1, false]);
-    await ava.getByRole('button', { name: 'Weekend plans, Delivered' }).waitFor();
+    await ava.getByRole('button', { name: 'Weekend plans, Sent' }).waitFor();
     // Ben, still in the group's chat, hears it in a banner and opens it from
     // there: the viewer says who sent it, over the group's name. It opens once
     const groupSnapNote = bannerOf(ben);
-    await groupSnapNote.getByText('New snap from Ava', { exact: true }).waitFor();
+    await groupSnapNote.getByText('New poof from Ava', { exact: true }).waitFor();
     assert.equal(await groupSnapNote.locator('.banner-name').textContent(), 'Weekend plans');
     await groupSnapNote.click();
-    await ben.getByRole('img', { name: 'Snap from Ava' }).waitFor();
+    await ben.getByRole('img', { name: 'Photo from Ava' }).waitFor();
     await ben.waitForFunction(() => document.querySelector('.viewer img')?.naturalWidth > 0);
     assert.deepEqual(await ben.locator('.viewer .head .who > span').allTextContents(), ['Ava', 'Weekend plans']);
     await ben.getByRole('button', { name: 'Next' }).click();
     await ben.getByRole('button', { name: 'Weekend plans, Received' }).waitFor();
-    await ava.getByRole('button', { name: 'Weekend plans, Opened' }).waitFor();
+    await ava.getByRole('button', { name: 'Weekend plans, Seen' }).waitFor();
     await ben.locator('.puff-pop').waitFor({ state: 'detached' });
     await shot(ben, 'S19-group-row');
 
@@ -1478,6 +1686,35 @@ const SHOTS = path.join(__dirname, '..', 'replica', 'clone-screens');
     await ava.locator('.chat-row[data-group]').waitFor({ state: 'detached' });
     assert.equal(await ava.evaluate(() => document.activeElement?.closest('.chat-row')?.dataset.friend != null), true,
       'focus lands on what is left');
+
+    // S19 a group with no name is called after the others in it, as each sees
+    // it: Ben for Ava, Ava for Ben. A long name stays on one line in its header
+    const benIdLast = await ben.evaluate(() => fetch('/api/me').then((r) => r.json()).then((u) => u.id));
+    const makeGroup = (body) => ava.evaluate((b) => fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b) }).then((r) => r.json()), body);
+    const unnamed = await makeGroup({ members: [benIdLast] });
+    const long = await makeGroup({ name: 'Ava Lindqvist-Montgomery, Ben and Cal', members: [benIdLast] });
+    await ben.locator(`.chat-row[data-group="${unnamed.id}"]`).waitFor();
+    assert.equal(await ben.locator(`.chat-row[data-group="${unnamed.id}"] .name`).textContent(), 'Ava');
+    await ava.getByRole('button', { name: 'Chat', exact: true }).click();
+    const avaUnnamed = ava.locator(`.chat-row[data-group="${unnamed.id}"]`);
+    await avaUnnamed.waitFor();
+    assert.equal(await avaUnnamed.locator('.name').textContent(), 'Ben', 'not her own name');
+    assert.equal(await avaUnnamed.locator('.row').getAttribute('aria-label'), 'Ben, Say hi');
+    await ava.locator(`.chat-row[data-group="${long.id}"] .row`).click();
+    const title = ava.getByRole('heading', { name: 'Ava Lindqvist-Montgomery, Ben and Cal' });
+    await title.waitFor();
+    const fit = await title.evaluate((el) => ({ h: el.clientHeight, line: parseFloat(getComputedStyle(el).lineHeight) || 30,
+      cut: el.scrollWidth > el.clientWidth, ellipsis: getComputedStyle(el).textOverflow }));
+    assert.ok(fit.h <= 32 && fit.cut && fit.ellipsis === 'ellipsis', `one line, cut short with an ellipsis (${JSON.stringify(fit)})`);
+    await noToast(ava);
+    await shot(ava, 'S19-group-long-name');
+    for (const g of [unnamed, long]) {
+      for (const page of [ava, ben]) await page.evaluate((id) => fetch(`/api/groups/${id}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), g.id);
+    }
+    await ava.getByRole('button', { name: 'Back' }).click();
+    await ava.getByRole('heading', { name: 'Chat' }).waitFor();
+    await ava.locator('.chat-row[data-group]').waitFor({ state: 'detached' });
 
     // S16 Ava removes Ben from his friend card: it asks first, then he is gone from her chats
     await ava.getByRole('button', { name: "Ben's friend card" }).click();

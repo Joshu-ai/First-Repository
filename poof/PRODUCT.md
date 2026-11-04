@@ -13,22 +13,24 @@ that disappear once seen, plus light chat and 24-hour stories.
 ## Product Purpose
 Poof is a camera-first messaging web app. Photos open once and are gone;
 chats vanish 24 hours after they are read unless kept. Success is people
-snapping each other casually and often, without worrying about a permanent
+sending each other poofs casually and often, without worrying about a permanent
 record.
 
 ## Positioning
-Sharing without a permanent record: a snap is meant to be seen once and then
-go "poof".
+Sharing without a permanent record: a poof (a photo or video) is meant to be
+seen once and then go "poof".
 
 ## Capabilities and Constraints
-- Camera, caption and drawing editor, open-once snaps (photos, and videos
+- Camera, caption and drawing editor, open-once poofs (photos, and videos
   up to 10 seconds: hold the shutter), disappearing chat,
-  stories, friends, group chats and group snaps, streaks, personal avatars, live updates, Puffcodes
+  stories, friends, group chats and group poofs, streaks, personal avatars, live updates, Puffcodes
   (scannable profile codes) and `/add/<username>` profile links.
 - Zero-dependency Node server and plain HTML/CSS/JS client.
 - Everything visual (mascot, avatars, icon, marketing art) is drawn in code
   as SVG so it stays sharp at any size.
-- Clean room: no Snapchat names, ghost, yellow, assets or copy.
+- Clean room: no Snapchat names, ghost, yellow, assets or copy. What you send is a
+  "poof", never their word for it; statuses, streaks and icons are drawn in
+  Poof's own marks and colours.
 
 ## Brand Commitments
 - Name: Poof (working name; trademark check still to do).

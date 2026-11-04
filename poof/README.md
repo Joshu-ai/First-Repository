@@ -1,8 +1,8 @@
 # Poof
 
 Photos that vanish once they are seen. A camera-first messaging web app:
-snap a photo, add a caption or a drawing, send it to friends, and it is gone
-after they open it. Plus disappearing chat, 24-hour stories and streaks.
+take a photo, add a caption or a drawing, send it to friends as a poof, and
+it is gone after they open it. Plus disappearing chat, 24-hour stories and streaks.
 
 Built clean-room with the [replica](https://github.com/Jakeschincariol/replica-skill)
 method; the planning files are in [`replica/`](replica/).
@@ -10,11 +10,11 @@ method; the planning files are in [`replica/`](replica/).
 ## Meet Puff
 
 Puff is the Poof mascot: a flat, bold cloud drifting off in a trail of
-little puffs, the way a snap goes "poof". It reads as a mark at 16px (the
+little puffs, the way a photo goes "poof". It reads as a mark at 16px (the
 app icon is the solid version) and has 10 expressions for the app. Drawn in
 code (`public/mascot.js`), so it stays sharp from icon to poster. Puff greets you on the login
 screen, naps on empty screens, and pops up with a "Poof!" when you send a
-snap or one disappears.
+poof or one disappears.
 
 ## Avatars
 
@@ -36,7 +36,7 @@ hue from their username, darkened just enough to keep 3:1 contrast).
 
 Puff has 10 moods too (happy, wink, sleepy, wow, love, laugh, sad, cool,
 shy, party), used around the app: party when you post a story, love when
-you make a friend, sad when a snap is already gone.
+you make a friend, sad when a poof is already gone.
 
 ## Puffcode
 
@@ -73,7 +73,9 @@ shrunk, blurred and tilted, plus the on-screen art) with OpenCV's
 
 Every control uses Poof's own drawn icons (`public/icons.js`): one 24px
 grid, a 2px round stroke, coloured by the button they sit in. No emoji or
-text symbols stand in for icons. Add friends is Puff's solid silhouette
+text symbols stand in for icons: streaks have a drawn sparkle, the no-limit
+timer a drawn loop, and the Chat list's statuses Poof's own marks (the e2e
+test fails on any pictograph in a button or row). Add friends is Puff's solid silhouette
 with a plus badge. `PoofIcons.svg(name, size)` returns the markup; the
 icons are decorative, so the button always carries the label.
 
@@ -106,7 +108,7 @@ npm start            # http://localhost:3000
 ```
 
 Open it in two browsers (or a normal and a private window), sign up two
-users, add each other and snap away. On a phone, use your computer's local IP
+users, add each other and send poofs away. On a phone, use your computer's local IP
 over HTTPS (browsers only open the camera on `https://` or `localhost`), or
 pick a photo from the gallery instead.
 
@@ -117,18 +119,18 @@ stored (default `./data`).
 
 | | |
 | --- | --- |
-| Gestures | Swipe sideways between Chat, Camera and Stories (the screen follows your finger, the tab bar stays put). Tap a snap for the next, swipe it down to close. In a story, tap the right half for the next, the left half to go back, press and hold to pause, swipe down to close. Swipe a chat row right to open the chat; press and hold it (or tap the avatar) for the friend card. Pull down on the Chat or Stories list to refresh it, Puff showing above it. Escape closes viewers and sheets |
+| Gestures | Swipe sideways between Chat, Camera and Stories (the screen follows your finger, the tab bar stays put). Tap a poof for the next, swipe it down to close. In a story, tap the right half for the next, the left half to go back, press and hold to pause, swipe down to close. Swipe a chat row right to open the chat; press and hold it (or tap the avatar) for the friend card. Pull down on the Chat or Stories list to refresh it, Puff showing above it. Escape closes viewers and sheets |
 | Camera | Opens straight to the camera. Flip or double-tap to switch cameras, tap to focus, Flash (the back camera's light where the browser allows it, a white screen on the front camera), or pick a photo |
 | Editor | Caption (drag it up or down), drawing in 7 colours with undo, timer 1/3/5/10s or no limit, save to device |
-| Video snaps | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
-| Snaps | Send to several friends, groups and/or your story. Each snap opens once, then the file is deleted on the server |
-| Groups | New chat on the Chat list: pick friends and name it to start a group of up to 32 people. Its row shows two of its people's avatars; its chat shows who said what, with their avatars; Send to lists your groups, and everyone in one opens a group snap once. The group card (tap its avatars) lists who is in it and has Leave group |
-| Chat | Inbox with New / Opened / Delivered status. Chats delete 24h after they are read; tap one to keep it. While a friend types to you, their open thread shows their avatar and moving dots with "Ben is typing…", and their row in the Chat list says Typing… |
+| Video poofs | Hold the shutter to record up to 10 seconds, a ring filling round it (or hold Space on it); a tap is still a photo. The clip loops while you add a caption and choose Mute, then Send to. It plays once for your friend, the caption over it, and is deleted. Stories play video too |
+| Poofs | A poof is a photo or video you send. Send one to up to 64 friends and groups at once, and/or your story; it is stored once however many it goes to. Each poof opens once; the file is deleted on the server when the last copy has been opened (or the story has run out) |
+| Groups | New chat on the Chat list: pick friends and name it to start a group of up to 32 people. Its row shows two of its people's avatars; its chat shows who said what, with their avatars; Send to lists your groups, and everyone in one opens a group poof once. A group with no name is called after the others in it, as each member sees it (Ben and Cal for Ava, Ava and Cal for Ben) The group card (tap its avatars) lists who is in it and has Leave group |
+| Chat | Inbox with each friend's latest news in Poof's own marks: a cloud for a poof, a bubble for a chat (solid while new, outlined once opened) and Puff's trail for one you sent (solid until it is seen or read); New poof, New chat, Sent, Seen, Read, Received or Say hi, poofs in violet and chats in teal, and unread rows in bold. Chats delete 24h after they are read; tap one to keep it (it shows the kept mark and the word Kept). What you send shows at once; one that can't be sent says Not sent and a tap tries again. While a friend types to you, their open thread shows their avatar and moving dots with "Ben is typing…", and their row in the Chat list says Typing… |
 | Stories | Post for 24 hours, tap through friends' stories, see who watched yours |
-| Friends | Search by username, requests, accept, remove, streaks for consecutive days |
+| Friends | Search by username, requests, accept, streaks for consecutive days (the count with Poof's sparkle mark). Remove a friend from their card: tap their row on Profile, or press and hold it on the Chat list |
 | Puffcode | Your scannable profile code with your avatar inside; share or save it; scan friends' codes; `/add/<username>` links |
-| Live | New snaps, chats, "opened" updates and typing arrive instantly (Server-Sent Events) |
-| Notifications | A new snap, chat or friend request drops in as a banner at the top: the Puff mark on your friend's avatar, their name, and New snap or the start of their message. Tap it to open; swipe it up to put it away; it goes by itself after 4 seconds. Turn on Notifications in Profile to get system notifications while Poof is open in the background. The tab's title counts what is new: "(2) Poof" |
+| Live | New poofs, chats, "opened" updates and typing arrive instantly (Server-Sent Events) |
+| Notifications | A new poof, chat or friend request drops in as a banner at the top: the Puff mark on your friend's avatar, their name, and New poof or the start of their message. Tap it to open; swipe it up to put it away; it goes by itself after 4 seconds. Turn on Notifications in Profile to get system notifications while Poof is open in the background. The tab's title counts what is new: "(2) Poof" |
 
 Not built: AR lenses, map, discover feed, screenshot alerts; adding people
 to a group or renaming it after it is made.
@@ -147,7 +149,7 @@ mouse, and each has a button or key that does the same.
   so lists scroll as usual. The shutter, the editor and drawing are never
   taken over. With reduced motion on, nothing slides: it follows your finger
   and then is simply there.
-- **Snaps and stories.** Tap to go on; drag down to close, with the list
+- **Poofs and stories.** Tap to go on (while a poof is still loading, a tap waits for it rather than using it up unseen); drag down to close, with the list
   behind showing through. In a story the left half goes back, the right
   half goes on, and press and hold pauses (the timer and the progress bar
   stop; holding Space on either half does it from the keyboard). Escape
@@ -167,7 +169,7 @@ mouse, and each has a button or key that does the same.
   button: both lists update live anyway, and reloading the page does the
   same.
 
-## Video snaps
+## Video poofs
 
 Hold the shutter for a moment (350ms) and it records with the browser's
 `MediaRecorder`: WebM (VP8 picture, Opus sound) where the browser can,
@@ -184,13 +186,13 @@ microphone. A front-camera video plays mirrored, the way you saw it.
 
 The server takes a video only on `POST /api/snaps` (the one route allowed a
 body up to 16 MB, for videos up to 11 MB) and checks it really is a WebM or
-MP4 by its first bytes. A video snap opens once like a photo and is deleted.
+MP4 by its first bytes. A video poof opens once like a photo and is deleted.
 Story videos are served with byte ranges, which Safari needs to play them.
 
 ## Tests
 
 ```bash
-npm test             # API: auth, friends, open-once snaps and videos, chat expiry, groups (members only, open once each, leaving), typing (live, friends only), live events with their sender, stories, streaks, security; WebM sound removal; app icons
+npm test             # API: auth, sessions (logging out ends that session's live streams), friends, open-once poofs and videos (one stored file per upload, at most 64 recipients), chat expiry, groups (members only, open once each, leaving, named per viewer, at most 100 each, rate limited), typing (live, friends only), live events with their sender, stories, streaks, security; WebM sound removal; app icons
 npm run test:e2e     # real browsers through every flow (needs Playwright + Chromium)
 npm run test:scan    # Puffcodes decode with OpenCV (needs Python with opencv-python-headless, see below)
 ```

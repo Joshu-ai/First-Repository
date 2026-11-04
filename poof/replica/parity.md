@@ -16,11 +16,11 @@ focus `pointsOfInterest`, both Chrome on Android). Elsewhere the focus ring
 still shows, the front camera's screen flash still works, and a back camera
 that cannot be lit says "This camera has no flash."
 
-Also partial: saving a snap to the device works for photos; videos can't be
+Also partial: saving a poof to the device works for photos; videos can't be
 saved yet.
 
 Gestures are in: swipe sideways between Chat, Camera and Stories (the screen
-follows the finger and snaps over or back), tap through snaps and swipe them
+follows the finger and moves over or springs back), tap through poofs and swipe them
 down to close, tap the sides of a story, hold to pause it, swipe it down to
 close, swipe a chat row right to open the chat, press and hold a row for
 the friend card (with Remove friend), and pull down on the Chat or Stories
@@ -30,7 +30,7 @@ The typing indicator is in: while a friend types, their open thread shows
 their avatar and moving dots with "<Name> is typing…", and their Chat list
 row says Typing…, until 4 seconds after they stop or their message arrives.
 
-Video snaps are in: hold the shutter to record up to 10 seconds, a caption
+Video poofs are in: hold the shutter to record up to 10 seconds, a caption
 and Mute in the video editor (Mute takes the sound out of the file itself),
 open once, and stories play video. Drawing on a video is not built.
 
@@ -39,7 +39,7 @@ your chat with them; two or more, or a name, start a group of up to 32
 people), group rows show two stacked avatars and the usual statuses, the
 group's chat puts the others' messages under their names and avatars, and
 messages go 24 hours after everyone else has read them. Send to lists your
-groups, and each member opens a group snap once. The group card lists who
+groups, and each member opens a group poof once. The group card lists who
 is in it, with Leave group; the last one out deletes it. Not built: adding
 people or renaming a group after it is made, and typing in groups.
 
@@ -52,4 +52,9 @@ Layout diff was not run: there are no reference screenshots of the original
 in `replica/screens/` (that needs your own account, by hand). The clone's
 screens are in `clone-screens/`, captured by the e2e test at 390×844.
 
-Brand sweep: no original names, domains or brand colour in the code or UI.
+Brand sweep: no original names, domains or brand colour in the UI, its copy
+or the marketing art. What you send is a "poof" (the server's messages too),
+the marketing headline is "Shoot it. Send it. Poof.", and the Chat list's
+statuses, the streak and the no-limit timer use Poof's own drawn marks and
+colours, with no emoji anywhere in the interface. Code identifiers keep the
+generic word "snap" (for example `POST /api/snaps`); users never see it.

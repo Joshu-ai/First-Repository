@@ -7,9 +7,13 @@
   // Each entry is the inner markup on the 24x24 grid. Paths are stroked;
   // anything solid sets fill="currentColor" stroke="none" itself.
   const DOT = (x, y, r = 1.25) => `<circle cx="${x}" cy="${y}" r="${r}" fill="currentColor" stroke="none"/>`;
+  // a cloud with a flat base, three puffs high; the speech bubble of `chat`; three puffs rising and growing
+  const CLOUD = 'M7 19h10.5a4.5 4.5 0 0 0 .41-8.98 5.5 5.5 0 0 0-11.38 1.01A4 4 0 0 0 7 19z';
+  const BUBBLE = 'M12 4c4.97 0 9 3.36 9 7.5S16.97 19 12 19c-1.1 0-2.16-.16-3.13-.47L4 20l1.33-3.62C3.87 15.05 3 13.36 3 11.5 3 7.36 7.03 4 12 4z';
+  const TRAIL = [[4.5, 18.5, 1.5], [10.5, 13, 2.25], [17.5, 7, 3]];
   const ICONS = {
     // an oval speech bubble with its tail low on the left
-    chat: '<path d="M12 4c4.97 0 9 3.36 9 7.5S16.97 19 12 19c-1.1 0-2.16-.16-3.13-.47L4 20l1.33-3.62C3.87 15.05 3 13.36 3 11.5 3 7.36 7.03 4 12 4z"/>',
+    chat: `<path d="${BUBBLE}"/>`,
     // the chat bubble with a plus inside: start a new chat
     'chat-new': '<path d="M12 4c4.97 0 9 3.36 9 7.5S16.97 19 12 19c-1.1 0-2.16-.16-3.13-.47L4 20l1.33-3.62C3.87 15.05 3 13.36 3 11.5 3 7.36 7.03 4 12 4z"/><path d="M12 8.5v6M9 11.5h6"/>',
     // two people, one just behind the other: a group
@@ -48,6 +52,21 @@
     'sound-off': '<path d="M3.5 9.5h3l5-4.5v14l-5-4.5h-3z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>',
     // a die: pick something at random
     shuffle: `<rect x="4" y="4" width="16" height="16" rx="3.5"/>${DOT(8.75, 8.75)}${DOT(12, 12)}${DOT(15.25, 15.25)}`,
+    // a loop with no end: a photo that shows until it is closed
+    'no-limit': '<path d="M12 12c-1.9-2.4-3.4-3.75-5.25-3.75a3.75 3.75 0 0 0 0 7.5C8.6 15.75 10.1 14.4 12 12zm0 0c1.9 2.4 3.4 3.75 5.25 3.75a3.75 3.75 0 0 0 0-7.5C15.4 8.25 13.9 9.6 12 12z"/>',
+    // a four-pointed sparkle with a glint beside it: days in a row
+    streak: `<path d="M10.5 4.5c.6 4 2.9 6.4 7 7-4.1.6-6.4 3-7 7-.6-4-2.9-6.4-7-7 4.1-.6 6.4-3 7-7z" fill="currentColor"/>${DOT(18.5, 5.5, 1.75)}`,
+    // a bookmark: a chat kept in the thread
+    kept: '<path d="M7 3.5h10a1 1 0 0 1 1 1v16l-6-4.25-6 4.25v-16a1 1 0 0 1 1-1z" fill="currentColor"/>',
+    // Chat list marks, drawn at 16px beside a row's news. A poof is a cloud
+    // and a chat a bubble, solid while new and outlined once opened; one you
+    // sent is Puff's trail of puffs drifting off, solid until it is seen.
+    'mark-poof': `<path d="${CLOUD}" fill="currentColor"/>`,
+    'mark-poof-open': `<path d="${CLOUD}"/>`,
+    'mark-chat': `<path d="${BUBBLE}" fill="currentColor"/>`,
+    'mark-chat-open': `<path d="${BUBBLE}"/>`,
+    'mark-sent': TRAIL.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="currentColor"/>`).join(''),
+    'mark-sent-open': TRAIL.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join(''),
   };
 
   let uid = 0;

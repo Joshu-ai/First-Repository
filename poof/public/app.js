@@ -3,14 +3,14 @@
   const app = document.getElementById('app');
   const toastEl = document.getElementById('toast');
   const TIMERS = [1, 3, 5, 10, 0]; // 0 = no limit
-  const COLORS = ['#ffffff', '#ff5d8f', '#ffd23f', '#3ddc97', '#3db4ff', '#7c5cff', '#111111'];
+  const COLORS = ['#ffffff', '#ff5d8f', '#ffd23f', '#3ddc97', '#3db4ff', '#6d4cff', '#111111'];
   const FLASH_KEY = 'poof.flash'; // the camera's Flash switch, remembered on this device
   const TYPING_SEND_MS = 2000; // while you type, your friend is told at most this often
   const TYPING_SHOW_MS = 4000; // and a friend shows as typing until this long passes with no more from them
   const BANNER_MS = 4000; // a notification banner goes by itself after this long
   const PREVIEW_MAX = 60; // characters of a message shown in its banner (the server sends no more)
   const NOTIFY_KEY = 'poof.notify'; // Notifications on the Profile screen, remembered on this device
-  const APP_TITLE = 'Poof'; // the tab's title; with unread snaps and chats, "(2) Poof"
+  const APP_TITLE = 'Poof'; // the tab's title; with unread poofs and chats, "(2) Poof"
 
   const state = {
     me: null,
@@ -18,6 +18,7 @@
     facing: 'user',
     flash: (() => { try { return localStorage.getItem(FLASH_KEY) === 'on'; } catch { return false; } })(),
     friendsBack: null, // the tab Add friends goes back to: wherever it was opened from
+    profileBack: null, // and the tab Profile goes back to
     stream: null,
     photo: null, // canvas with the captured image
     editor: null, // { draw canvas, caption, captionY, timer } for a photo, { kind: 'video', muted } for a video
@@ -97,13 +98,20 @@
     toastTimer = setTimeout(() => (toastEl.hidden = true), 2600);
   }
 
+  // A 401 means this browser is logged out (here, or in another tab): back
+  // to the welcome screen, which also ends everything of the last session.
   async function api(path, body) {
-    const res = await fetch(path, body === undefined ? {} : {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    });
+    let res;
+    try {
+      res = await fetch(path, body === undefined ? {} : {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+    } catch {
+      throw Object.assign(new Error("Couldn't reach Poof. Check your connection."), { status: 0 });
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      if (res.status === 401 && state.me) { state.me = null; renderWelcome(); }
+      if (res.status === 401 && state.me) renderWelcome();
       throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
     }
     return data;
@@ -139,6 +147,12 @@
       avatar(shown[1], 'stack-back', small), avatar(shown[0], 'stack-front', small));
   }
   const peopleCount = (n) => (n === 1 ? 'Just you' : `${n} people`);
+
+  // A streak: the count of days in a row and Poof's own streak mark, read
+  // out as "3-day streak". Shown from 2 days.
+  const streakWords = (n) => `${n}-day streak`;
+  const streakBadge = (n) => (n > 1
+    ? h('span', { class: 'streak', role: 'img', 'aria-label': streakWords(n) }, String(n), icon('streak', 16)) : null);
 
   // Puff, the mascot (see mascot.js). Decorative unless given a label.
   function puff(mood, size, label) {
@@ -717,7 +731,14 @@
   function renderWelcome() {
     stopCamera();
     state.me = null;
+    // nothing of the last session carries on: its live stream, who was typing, its news
+    state.events?.close();
+    state.events = null;
+    for (const timer of state.typing.values()) clearTimeout(timer);
+    state.typing.clear();
+    state.refresh = null;
     state.friendsBack = null;
+    state.profileBack = null;
     clearTimeout(toastTimer); // news from the last session is not for whoever logs in next
     toastEl.hidden = true;
     dismissBanner({ animate: false, restore: false });
@@ -916,14 +937,14 @@
     const item = (tab, label) => h('button', {
       type: 'button', 'aria-current': active === tab ? 'page' : null, 'aria-label': label,
       onclick: () => go(tab),
-    }, icon(tab, 26), label,
+    }, icon(tab, 26), h('span', { class: 'tab-label' }, label),
     tab === 'chat' && state.unread ? h('span', { class: 'badge' }, state.unread) : null);
     return h('nav', { class: 'nav' + (active === 'camera' ? '' : ' solid') },
       item('chat', 'Chat'), item('camera', 'Camera'), item('stories', 'Stories'));
   }
 
   // ---------- unread count ----------
-  // New snaps plus unread chats: on the Chat tab's badge and in the tab's
+  // New poofs plus unread chats: on the Chat tab's badge and in the tab's
   // title, "(2) Poof", so it shows from another tab too. Badges are updated
   // where they are (the tab bar is never swapped mid-swipe), peeks included.
   const countUnread = (rows) => rows.reduce((n, r) => n + r.snapIds.length + r.unread, 0);
@@ -947,6 +968,7 @@
     // Add friends opened from a main tab goes back there; from its own
     // sub-screens (scanner, someone's card) it keeps the tab it had
     if (tab === 'friends' && ['camera', 'chat', 'stories'].includes(state.tab)) state.friendsBack = state.tab;
+    if (tab === 'profile' && ['camera', 'chat', 'stories'].includes(state.tab)) state.profileBack = state.tab; // so does Profile
     state.tab = tab;
     state.refresh = null;
     if (tab !== 'camera') stopCamera();
@@ -1241,15 +1263,29 @@
     state.scan = null;
   }
 
-  function imageToCanvas(source, w, ht, mirror) {
+  // `source` (or the w x ht part of it from sx, sy) on a canvas, 1080px at most along its longer side
+  function imageToCanvas(source, w, ht, mirror, sx = 0, sy = 0) {
     const scale = Math.min(1, 1080 / Math.max(w, ht));
     const c = h('canvas');
-    c.width = Math.round(w * scale);
-    c.height = Math.round(ht * scale);
+    c.width = Math.max(1, Math.round(w * scale));
+    c.height = Math.max(1, Math.round(ht * scale));
     const ctx = c.getContext('2d');
     if (mirror) { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(source, 0, 0, c.width, c.height);
+    ctx.drawImage(source, sx, sy, w, ht, 0, 0, c.width, c.height);
     return c;
+  }
+
+  // The frame as the viewfinder shows it: the live picture fills the screen
+  // (object-fit: cover), so its middle is cut to the screen's shape. That
+  // part, and only that, is the photo: what you aimed is what you send.
+  function viewfinderFrame(video, mirror) {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const box = video.getBoundingClientRect();
+    const aim = box.width > 0 && box.height > 0 ? box.width / box.height : vw / vh;
+    const w = vw / vh > aim ? vh * aim : vw;
+    const ht = vw / vh > aim ? vh : vw / aim;
+    return imageToCanvas(video, w, ht, mirror, (vw - w) / 2, (vh - ht) / 2);
   }
 
   // Take the frame, with the flash when it is on: the back camera's light
@@ -1263,7 +1299,7 @@
     if (shooting) return undefined;
     const track = camTrack();
     const kind = state.flash ? flashKind(track) : null;
-    const take = () => imageToCanvas(video, video.videoWidth, video.videoHeight, state.facing === 'user');
+    const take = () => viewfinderFrame(video, state.facing === 'user');
     if (!kind) return openEditor(take());
     shooting = true;
     let photo = null;
@@ -1507,12 +1543,16 @@
     ed.caption = caption;
     const stage = h('div', { class: 'stage' }, base, draw, caption);
 
+    // the photo as large as fits on the stage, its drawing layer over it and
+    // the caption at its height (a photo from the camera fills the stage)
     function layout() {
-      const r = base.getBoundingClientRect();
       const sr = stage.getBoundingClientRect();
-      draw.style.width = r.width + 'px';
-      draw.style.height = r.height + 'px';
-      caption.style.top = (r.top - sr.top + ed.captionY * r.height - 20) + 'px';
+      if (!sr.width || !sr.height) return;
+      const k = Math.min(sr.width / base.width, sr.height / base.height);
+      const w = base.width * k;
+      const ht = base.height * k;
+      for (const c of [base, draw]) { c.style.width = w + 'px'; c.style.height = ht + 'px'; }
+      caption.style.top = ((sr.height - ht) / 2 + ed.captionY * ht - (caption.offsetHeight || 48) / 2) + 'px';
     }
 
     // drawing
@@ -1573,8 +1613,9 @@
       colors.hidden = !ed.drawing;
       undoBtn.hidden = !ed.drawing;
     } }, icon('pen'));
+    // each colour a full-size tap target, its dot drawn inside (styles.css .swatch)
     const colors = h('div', { class: 'colors', hidden: true }, COLORS.map((c) => h('button', {
-      class: 'swatch', style: `background:${c}`, 'aria-label': 'Colour ' + c, 'aria-pressed': String(c === ed.color),
+      class: 'swatch', style: `--swatch:${c}`, 'aria-label': 'Colour ' + c, 'aria-pressed': String(c === ed.color),
       onclick: (e) => {
         ed.color = c;
         colors.querySelectorAll('.swatch').forEach((s) => s.setAttribute('aria-pressed', 'false'));
@@ -1586,7 +1627,7 @@
       if (prev) dctx.putImageData(prev, 0, 0);
     } }, icon('undo'));
     const timerLabel = h('span', { class: 'timer-label' });
-    const showTimer = () => { timerLabel.textContent = ed.timer ? ed.timer + 's' : '∞'; };
+    const showTimer = () => { timerLabel.replaceChildren(ed.timer ? ed.timer + 's' : icon('no-limit', 16)); };
     const timerBtn = h('button', { class: 'icon-btn timer-btn', 'aria-label': 'Timer', onclick: () => {
       ed.timer = TIMERS[(TIMERS.indexOf(ed.timer) + 1) % TIMERS.length];
       showTimer();
@@ -1596,7 +1637,7 @@
       caption.hidden = false; layout(); caption.focus();
     } }, icon('text'));
 
-    const screen = h('section', { class: 'screen editor', 'aria-label': 'Edit snap' },
+    const screen = h('section', { class: 'screen editor', 'aria-label': 'Edit photo' },
       stage,
       h('div', { class: 'tools' }, textBtn, penBtn, colors, undoBtn, timerBtn),
       h('header', { class: 'bar overlay', style: 'right:auto' },
@@ -1607,6 +1648,7 @@
           'Send to', icon('send', 20))));
     screen.resume = layout; // back from Send to
     show(screen);
+    layout();
     requestAnimationFrame(layout);
     window.onresize = layout;
   }
@@ -1732,6 +1774,7 @@
   // ---------- send to (S04) ----------
   // `payload` gives the snap's media fields: {image, duration} from the photo
   // editor, {video, caption, duration, mirror} from the video editor.
+  const SEND_MAX = 64; // friends and groups one poof can go to (the server's limit too)
   async function renderSendTo(payload) {
     const media = Promise.resolve().then(payload); // ready by the time Send is tapped
     media.catch(() => {}); // reported when Send is tapped
@@ -1773,6 +1816,11 @@
     }
     try { [data, groups] = await Promise.all([api('/api/friends'), api('/api/groups')]); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
     const toggle = (row, on) => row.setAttribute('aria-checked', String(on));
+    const full = () => {
+      if (picked.size + pickedGroups.size < SEND_MAX) return false;
+      toast(`You can send a poof to up to ${SEND_MAX} friends and groups at once.`);
+      return true;
+    };
     const storyRow = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
       story = !story; toggle(storyRow, story); update();
     } }, h('span', { class: 'avatar ring', style: 'background:var(--surface-2)' }, icon('stories')),
@@ -1783,6 +1831,7 @@
     if (groups.length) list.append(h('h2', { class: 'section-title' }, 'Groups'));
     for (const g of groups) {
       const row = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
+        if (!pickedGroups.has(g.id) && full()) return;
         pickedGroups.has(g.id) ? pickedGroups.delete(g.id) : pickedGroups.add(g.id);
         toggle(row, pickedGroups.has(g.id));
         update();
@@ -1794,33 +1843,38 @@
     list.append(h('h2', { class: 'section-title' }, 'Friends'));
     if (!data.friends.length) {
       list.append(h('div', { class: 'empty' }, puff('sleepy', 110), h('strong', {}, 'No friends yet'),
-        'Add someone by username to send them snaps. You can still post to your story.',
+        'Add someone by username to send them poofs. You can still post to your story.',
         h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn ghost small', onclick: () => go('friends') }, 'Add friends'))));
     }
     for (const f of data.friends) {
       const row = h('button', { class: 'row', role: 'checkbox', 'aria-checked': 'false', onclick: () => {
+        if (!picked.has(f.id) && full()) return;
         picked.has(f.id) ? picked.delete(f.id) : picked.add(f.id);
         toggle(row, picked.has(f.id));
         update();
       } }, avatar(f), h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName),
         h('div', { class: 'sub' }, '@' + f.username)),
-      f.streak > 1 ? h('span', { class: 'streak' }, f.streak + ' 🔥') : null,
+      streakBadge(f.streak),
       h('span', { class: 'check' }, icon('check', 16)));
       list.append(row);
     }
   }
 
   // ---------- inbox (S05) ----------
+  // Each row's latest news, in Poof's own marks (icons.js): a cloud for a
+  // poof and a bubble for a chat, solid while new and outlined once opened;
+  // Puff's trail of puffs for one you sent, solid until it is seen or read.
+  // Poofs in violet, chats in teal. [colour, mark, words, new]
   const STATUS = {
-    'new-snap': ['snap-c', 'fill', 'New snap'],
-    'new-chat': ['chat-c', 'fill', 'New chat'],
-    opened: ['snap-c', 'outline', 'Opened'],
-    delivered: ['snap-c', 'arrow', 'Delivered'],
-    received: ['snap-c', 'outline', 'Received'],
-    'chat-opened': ['chat-c', 'outline', 'Read'],
-    'chat-delivered': ['chat-c', 'arrow', 'Sent'],
-    'chat-received': ['chat-c', 'outline', 'Received'],
-    'tap-to-chat': ['chat-c', 'outline', 'Tap to chat'],
+    'new-snap': ['snap-c', 'mark-poof', 'New poof', true],
+    'new-chat': ['chat-c', 'mark-chat', 'New chat', true],
+    opened: ['snap-c', 'mark-sent-open', 'Seen'],
+    delivered: ['snap-c', 'mark-sent', 'Sent'],
+    received: ['snap-c', 'mark-poof-open', 'Received'],
+    'chat-opened': ['chat-c', 'mark-sent-open', 'Read'],
+    'chat-delivered': ['chat-c', 'mark-sent', 'Sent'],
+    'chat-received': ['chat-c', 'mark-chat-open', 'Received'],
+    'tap-to-chat': ['chat-c', 'mark-chat-open', 'Say hi'],
   };
 
   // ---------- typing (S07) ----------
@@ -1838,13 +1892,15 @@
   // three dots that rise and fall in turn (they hold still with less motion)
   const typingDots = () => h('span', { class: 'typing-dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
 
-  // A Chat list row's status into `sub`: its shape and colour, how many new
-  // snaps, and how long ago. Returns the status's words, for the row's name.
+  // A Chat list row's status into `sub`: its mark and colour, how many new
+  // poofs, and how long ago; the row is marked unread while there is news.
+  // Returns the status's words, for the row's name.
   function statusLine(sub, r) {
-    const [color, shape, label] = STATUS[r.status];
+    const [color, mark, label, fresh] = STATUS[r.status];
     sub.className = 'sub ' + color;
-    sub.replaceChildren(...[h('span', { class: `status-icon ${shape}`, 'aria-hidden': 'true' }),
-      h('span', {}, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
+    sub.closest('.chat-row')?.classList.toggle('unread', Boolean(fresh));
+    sub.replaceChildren(...[h('span', { class: 'status-icon' }, icon(mark, 16)),
+      h('span', { class: 'label' }, label + (r.snapIds.length > 1 ? ` (${r.snapIds.length})` : '')),
       r.lastAt ? h('span', { class: 'when' }, '· ' + ago(r.lastAt)) : null].filter(Boolean));
     return label;
   }
@@ -1858,19 +1914,19 @@
     const find = (sel) => () => app.querySelector(`.chat-row[data-friend="${CSS.escape(f.id)}"] ${sel}`);
     const chat = () => renderChat(f);
     const sub = h('div', { class: 'sub' });
+    const streak = r.streak > 1 ? ', ' + streakWords(r.streak) : '';
     const open = h('button', { class: 'row', type: 'button', onclick: () => (r.snapIds.length ? openSnaps(f, r.snapIds) : chat()) },
       h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), sub),
-      r.streak > 1 ? h('span', { class: 'streak' }, r.streak + ' 🔥') : null);
+      streakBadge(r.streak));
     const setStatus = () => {
       if (state.typing.has(f.id)) {
         sub.className = 'sub chat-c typing-status';
         sub.replaceChildren(typingDots(), h('span', {}, 'Typing…'));
-        open.setAttribute('aria-label', `${f.displayName}, Typing…`);
+        open.setAttribute('aria-label', `${f.displayName}, Typing…${streak}`);
         return;
       }
-      open.setAttribute('aria-label', `${f.displayName}, ${statusLine(sub, r)}`);
+      open.setAttribute('aria-label', `${f.displayName}, ${statusLine(sub, r)}${streak}`);
     };
-    setStatus();
     const row = h('div', { class: 'chat-row', 'data-friend': f.id },
       h('div', { class: 'row-reveal', 'aria-hidden': 'true' }, icon('chat'), 'Chat'),
       h('div', { class: 'row-slide' },
@@ -1878,6 +1934,7 @@
           onclick: () => openFriendCard(f, r.streak, find('.row-avatar')) }, avatar(f)),
         open,
         h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Chat with ' + f.displayName, onclick: chat }, icon('chat'))));
+    setStatus();
     row.setStatus = setStatus;
     row.openChat = chat;
     row.openCard = () => openFriendCard(f, r.streak, find('.row'));
@@ -1897,8 +1954,7 @@
     const find = (sel) => () => app.querySelector(`.chat-row[data-group="${CSS.escape(g.id)}"] ${sel}`);
     const chat = () => renderGroupChat(g);
     const sub = h('div', { class: 'sub' });
-    const label = statusLine(sub, r);
-    const open = h('button', { class: 'row', type: 'button', 'aria-label': `${g.name}, ${label}`,
+    const open = h('button', { class: 'row', type: 'button',
       onclick: () => (r.snapIds.length ? openSnaps(null, r.snapIds, g) : chat()) },
     h('span', { class: 'main' }, h('div', { class: 'name' }, g.name), sub));
     const row = h('div', { class: 'chat-row', 'data-group': g.id },
@@ -1908,6 +1964,7 @@
           onclick: () => openGroupCard(g, find('.row-avatar')) }, groupAvatar(g.members)),
         open,
         h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Chat in ' + g.name, onclick: chat }, icon('chat'))));
+    open.setAttribute('aria-label', `${g.name}, ${statusLine(sub, r)}`);
     row.openChat = chat;
     row.openCard = () => openGroupCard(g, find('.row'));
     row.addEventListener('contextmenu', (e) => {
@@ -1932,7 +1989,7 @@
       setUnread(countUnread(rows));
       if (!rows.length) {
         list.replaceChildren(h('div', { class: 'empty' }, puff('sleepy', 120), h('strong', {}, 'Nobody to talk to yet'),
-          'Add friends by username, then snap them from the camera.',
+          'Add friends by username, then send them a poof from the camera.',
           h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn small', onclick: () => go('friends') }, 'Add friends'))));
         return;
       }
@@ -1961,7 +2018,7 @@
       } }, 'Cancel');
       actions.replaceChildren(
         h('div', { class: 'card-confirm' }, h('strong', {}, `Remove ${name}?`),
-          h('p', {}, `You won't be able to snap or chat with ${name} until you're friends again.`)),
+          h('p', {}, `You won't be able to send poofs or chat with ${name} until you're friends again.`)),
         h('div', { class: 'card-confirm-actions' }, cancel,
           h('button', { class: 'btn danger outline', type: 'button', onclick: remove }, 'Remove')));
       cancel.focus(); // the safe choice
@@ -2019,7 +2076,7 @@
       } }, 'Cancel');
       actions.replaceChildren(
         h('div', { class: 'card-confirm' }, h('strong', {}, `Leave ${name}?`),
-          h('p', {}, "You won't see its chats or snaps any more. The others will see that you left.")),
+          h('p', {}, "You won't see its chats or poofs any more. The others will see that you left.")),
         h('div', { class: 'card-confirm-actions' }, cancel,
           h('button', { class: 'btn danger outline', type: 'button', onclick: leave }, 'Leave')));
       cancel.focus(); // the safe choice
@@ -2092,6 +2149,7 @@
     let clip = null; // the video on screen: { el, url }
     let paused = false; // while being dragged
     let closed = false;
+    let loading = false; // a poof is on its way: a tap now must not open (and use up) another
     const stopMedia = () => {
       clock?.stop();
       clock = null;
@@ -2111,25 +2169,31 @@
     };
     const pause = () => { paused = true; clock?.pause(); clip?.el.pause(); };
     const resume = () => { paused = false; clock?.resume(); if (clip) playClip(clip.el); };
+    // On to the next poof. Opening one uses it up, so while one is on its way
+    // (a video can take a while) taps wait: each poof is shown once it arrives.
     const next = async () => {
-      if (closed) return undefined;
+      if (closed || loading) return undefined;
       stopMedia();
       const id = queue.shift();
       if (!id) return close();
+      loading = true;
       let snap;
       try { snap = await api(`/api/snaps/${id}/open`, {}); } catch (e) {
+        loading = false;
         if (closed) return undefined;
         puffPop(e.message, 'sad');
         return next();
       }
+      loading = false;
       if (closed) return undefined; // closed while it was on its way
+      stopMedia(); // nothing else plays alongside it
       viewed++;
       setUnread(state.unread - 1);
       showSender(snap);
       caption.textContent = snap.caption || '';
       caption.hidden = !snap.caption;
       if (snap.video) {
-        const v = h('video', { class: snap.mirror ? 'mirror' : null, playsInline: true, 'aria-label': 'Snap from ' + fromName(snap) });
+        const v = h('video', { class: snap.mirror ? 'mirror' : null, playsInline: true, 'aria-label': 'Video from ' + fromName(snap) });
         clip = { el: v, url: URL.createObjectURL(dataUrlToBlob(snap.video)) };
         v.src = clip.url;
         media.replaceChildren(v);
@@ -2147,7 +2211,7 @@
         if (!paused) playClip(v);
         return undefined;
       }
-      media.replaceChildren(h('img', { alt: 'Snap from ' + fromName(snap), src: snap.image, draggable: 'false' }));
+      media.replaceChildren(h('img', { alt: 'Photo from ' + fromName(snap), src: snap.image, draggable: 'false' }));
       svg.style.visibility = snap.duration ? 'visible' : 'hidden';
       if (snap.duration) {
         clock = countdown(snap.duration * 1000, ring, next);
@@ -2155,7 +2219,7 @@
       }
       return undefined;
     };
-    const screen = h('section', { class: 'screen viewer', 'aria-label': 'Snap' }, media, caption,
+    const screen = h('section', { class: 'screen viewer', 'aria-label': 'Poof' }, media, caption,
       h('button', { class: 'tap', type: 'button', 'aria-label': 'Next', onclick: next }),
       h('div', { class: 'head' }, av, who, svg,
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: close }, icon('close'))));
@@ -2166,6 +2230,62 @@
     dismissBannerFor(about, ['snap']);
     closeNotes(['snap:' + about]);
     next();
+  }
+
+  // ---------- sending a chat ----------
+  // What you send shows at once as your bubble, saying Sending…, and the real
+  // one takes its place when the chat reloads. One that can't be sent stays,
+  // marked Not sent: a tap sends it again. `post(text)` sends; `reload()`
+  // redraws the thread, and `show()` puts what is still on its way back at
+  // its end.
+  function outbox(thread, post, reload) {
+    const waiting = [];
+    const paint = (m) => {
+      const failed = m.state === 'failed';
+      m.el.className = 'msg mine pending' + (failed ? ' failed' : '');
+      m.el.setAttribute('aria-label', (failed ? 'Not sent: ' : 'Sending: ') + m.text + (failed ? '. Tap to try again' : ''));
+      m.el.replaceChildren(m.text, h('small', {}, failed ? 'Not sent · tap to try again' : 'Sending…'));
+    };
+    async function send(m) {
+      m.state = 'sending';
+      paint(m);
+      try { await post(m.text); } catch (e) {
+        m.state = 'failed';
+        paint(m);
+        toast(e.message);
+        return;
+      }
+      waiting.splice(waiting.indexOf(m), 1); // the reload draws the real one where it was
+      await reload();
+    }
+    return {
+      add(text) {
+        const m = { text, state: 'sending' };
+        m.el = h('button', { type: 'button', onclick: () => { if (m.state === 'failed') send(m); } });
+        waiting.push(m);
+        thread.querySelector(':scope > .empty')?.remove();
+        thread.append(m.el);
+        thread.scrollTop = thread.scrollHeight;
+        return send(m);
+      },
+      get size() { return waiting.length; },
+      show() { if (waiting.length) thread.append(...waiting.map((m) => m.el)); },
+    };
+  }
+
+  // A chat bubble, yours or theirs: tap it to keep it (or stop keeping it).
+  // Kept ones carry their own mark and the word Kept, and a toast says so.
+  function bubble(m, { mine, label, meta, reload }) {
+    return h('button', {
+      class: 'msg' + (mine ? ' mine' : '') + (m.saved ? ' saved' : ''), type: 'button',
+      'aria-label': label + (m.saved ? ', kept' : '') + '. Tap to ' + (m.saved ? 'stop keeping it' : 'keep it'),
+      onclick: async () => {
+        let r;
+        try { r = await api(`/api/messages/${m.id}/save`, {}); } catch (e) { toast(e.message); return; }
+        toast(r.saved ? 'Kept in chat' : 'No longer kept');
+        reload();
+      },
+    }, m.text, h('small', {}, m.saved ? [icon('kept', 12), 'Kept · '] : null, meta));
   }
 
   // ---------- chat thread (S07) ----------
@@ -2183,14 +2303,17 @@
       typingSent = api(`/api/chat/${friend.id}/typing`, {}).catch((e) => { if (e.status === 403) canType = false; });
     };
     const input = h('input', { placeholder: 'Send a chat', 'aria-label': 'Message', maxlength: '2000', autofocus: true, oninput: typed });
-    const form = h('form', { class: 'composer', onsubmit: async (e) => {
+    const outgoing = outbox(thread, async (text) => {
+      await typingSent;
+      typingAt = 0; // the next message's first keystroke says so straight away
+      await api('/api/chat/' + friend.id, { text });
+    }, () => load());
+    const form = h('form', { class: 'composer', onsubmit: (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
       input.value = '';
-      await typingSent;
-      typingAt = 0; // the next message's first keystroke says so straight away
-      try { await api('/api/chat/' + friend.id, { text }); await load(); } catch (e2) { toast(e2.message); input.value = text; }
+      outgoing.add(text);
     } }, input, h('button', { class: 'btn small', type: 'submit' }, 'Send'));
     // your friend typing to you: their avatar, moving dots and the words,
     // just above where you type, until they stop or their message arrives
@@ -2205,7 +2328,7 @@
       if (stay) thread.scrollTop = thread.scrollHeight;
     };
     const back = backButton('Back', () => go('chat'));
-    const cam = h('button', { class: 'icon-btn plain', 'aria-label': 'Snap ' + friend.displayName, onclick: () => go('camera') },
+    const cam = h('button', { class: 'icon-btn plain', 'aria-label': `Send ${friend.displayName} a poof`, onclick: () => go('camera') },
       icon('camera'));
     show(h('section', { class: 'screen', 'aria-label': 'Chat with ' + friend.displayName },
       header(friend.displayName, back, cam), thread, typing, form));
@@ -2219,13 +2342,13 @@
       try { data = await api('/api/chat/' + friend.id); } catch (e) { thread.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
       const atBottom = nearBottom();
       thread.replaceChildren(h('p', { class: 'hint' }, 'Chats disappear 24 hours after they are read. Tap one to keep it.'),
-        ...data.messages.map((m) => h('button', {
-          class: 'msg' + (m.from === state.me.id ? ' mine' : '') + (m.saved ? ' saved' : ''),
-          'aria-label': (m.saved ? 'Kept message: ' : 'Message: ') + m.text + '. Tap to ' + (m.saved ? 'stop keeping' : 'keep'),
-          onclick: async () => { try { await api(`/api/messages/${m.id}/save`, {}); load(); } catch (e) { toast(e.message); } },
-        }, m.text, h('small', {}, ago(m.createdAt) + (m.saved ? ' · kept' : '') +
-          (m.from === state.me.id ? (m.readAt ? ' · read' : ' · sent') : '')))));
-      if (!data.messages.length) thread.append(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to ' + friend.displayName + ' 👋'));
+        ...data.messages.map((m) => {
+          const mine = m.from === state.me.id;
+          return bubble(m, { mine, label: 'Message: ' + m.text, reload: load,
+            meta: ago(m.createdAt) + (mine ? (m.readAt ? ' · read' : ' · sent') : '') });
+        }));
+      if (!data.messages.length && !outgoing.size) thread.append(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to ' + friend.displayName + '.'));
+      outgoing.show();
       if (atBottom || !thread.dataset.loaded) thread.scrollTop = thread.scrollHeight;
       thread.dataset.loaded = '1';
       if (state.unread) syncUnread(); // opening the chat read what was new in it
@@ -2256,17 +2379,20 @@
     const thread = h('div', { class: 'thread', 'aria-live': 'polite' });
     const nearBottom = () => thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
     const input = h('input', { placeholder: 'Send a chat', 'aria-label': 'Message', maxlength: '2000', autofocus: true });
-    const form = h('form', { class: 'composer', onsubmit: async (e) => {
+    const outgoing = outbox(thread, (text) => api(`/api/groups/${group.id}/chat`, { text }), () => load());
+    const form = h('form', { class: 'composer', onsubmit: (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
       input.value = '';
-      try { await api(`/api/groups/${group.id}/chat`, { text }); await load(); } catch (e2) { toast(e2.message); input.value = text; }
+      outgoing.add(text);
     } }, input, h('button', { class: 'btn small', type: 'submit' }, 'Send'));
     const back = backButton('Back', () => go('chat'));
     const details = h('button', { class: 'icon-btn plain', type: 'button', 'aria-label': 'Group details',
       onclick: () => openGroupCard(current, () => app.querySelector('.bar [aria-label="Group details"]'), { inThread: true }) }, icon('group'));
-    show(h('section', { class: 'screen', 'aria-label': 'Chat in ' + group.name }, header(group.name, back, details), thread, form));
+    const bar = header(group.name, back, details);
+    const screen = h('section', { class: 'screen', 'aria-label': 'Chat in ' + group.name }, bar, thread, form);
+    show(screen);
     state.chatWith = key;
     dismissBannerFor(key, ['chat', 'group']);
     closeNotes(['chat:' + key]);
@@ -2285,6 +2411,9 @@
         return;
       }
       current = data.group;
+      // an unnamed group's name follows who is in it
+      bar.querySelector('h1').textContent = current.name;
+      screen.setAttribute('aria-label', 'Chat in ' + current.name);
       const people = new Map(data.people.map((u) => [u.id, u]));
       const others = current.members.filter((u) => u.id !== state.me.id);
       const someone = (id) => people.get(id) || { id, username: id, displayName: 'Someone', avatar: null };
@@ -2299,21 +2428,18 @@
         }
         const mine = m.from === state.me.id;
         const sender = someone(m.from);
-        const bubble = h('button', {
-          class: 'msg' + (mine ? ' mine' : '') + (m.saved ? ' saved' : ''), type: 'button',
-          'aria-label': (m.saved ? 'Kept message' : 'Message') + (mine ? '' : ' from ' + sender.displayName) + ': ' + m.text
-            + '. Tap to ' + (m.saved ? 'stop keeping' : 'keep'),
-          onclick: async () => { try { await api(`/api/messages/${m.id}/save`, {}); load(); } catch (e) { toast(e.message); } },
-        }, m.text, h('small', {}, ago(m.createdAt) + (m.saved ? ' · kept' : '') + (mine ? readLine(m, others) : '')));
-        if (mine) { items.push(bubble); run = null; continue; }
+        const el = bubble(m, { mine, label: 'Message' + (mine ? '' : ' from ' + sender.displayName) + ': ' + m.text,
+          meta: ago(m.createdAt) + (mine ? readLine(m, others) : ''), reload: load });
+        if (mine) { items.push(el); run = null; continue; }
         if (run?.from !== m.from) {
           run = { from: m.from, col: h('div', { class: 'msg-col' }, h('span', { class: 'msg-sender' }, sender.displayName)) };
           items.push(h('div', { class: 'msg-run' }, avatar(sender, '', 28), run.col));
         }
-        run.col.append(bubble);
+        run.col.append(el);
       }
-      if (!data.messages.length) items.push(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to everyone in ' + current.name + '.'));
+      if (!data.messages.length && !outgoing.size) items.push(h('div', { class: 'empty' }, puff('happy', 100), 'Say hi to everyone in ' + current.name + '.'));
       thread.replaceChildren(...items);
+      outgoing.show();
       if (atBottom || !thread.dataset.loaded) thread.scrollTop = thread.scrollHeight;
       thread.dataset.loaded = '1';
       if (state.unread) syncUnread(); // opening the chat read what was new in it
@@ -2402,12 +2528,13 @@
     const load = async () => {
       let data;
       try { data = await api('/api/stories'); } catch (e) { list.replaceChildren(h('p', { class: 'error' }, e.message)); return false; }
+      const viewers = new Set(data.mine.flatMap((s) => s.viewers.map((v) => v.id))).size;
       const mineRow = h('button', { class: 'row', onclick: () => (data.mine.length ? watch([{ user: state.me, stories: data.mine }], 0, true) : go('camera')) },
         avatar(state.me, data.mine.length ? 'ring' : ''),
         h('span', { class: 'main' }, h('div', { class: 'name' }, 'My Story'),
           h('div', { class: 'sub' }, data.mine.length
-            ? `${data.mine.length} snap${data.mine.length > 1 ? 's' : ''} · ${new Set(data.mine.flatMap((s) => s.viewers.map((v) => v.id))).size} viewers`
-            : 'Tap to add a snap')));
+            ? `${data.mine.length} ${data.mine.length === 1 ? 'post' : 'posts'} · ${viewers} ${viewers === 1 ? 'viewer' : 'viewers'}`
+            : 'Tap to add to your story')));
       const rows = data.friends.map((g, i) => {
         const seen = g.stories.every((s) => s.seen);
         return h('button', { class: 'row', onclick: () => watch(data.friends, i) },
@@ -2523,7 +2650,12 @@
   async function renderFriends() {
     const results = h('div');
     const requests = h('div');
+    // shown only with nothing typed and no requests either way
+    const empty = h('div', { class: 'empty', hidden: true }, puff('wow', 110), h('strong', {}, 'Find your friends'),
+      'Type a username to send a request.');
     let q = '';
+    let hasRequests = true; // until they have loaded
+    const paintEmpty = () => { empty.hidden = q.length >= 2 || hasRequests; };
     let debounce;
     const search = h('input', { class: 'search', type: 'search', placeholder: 'Search by username', 'aria-label': 'Search users',
       autofocus: true, autocapitalize: 'none', oninput: () => {
@@ -2534,16 +2666,27 @@
     show(h('section', { class: 'screen', 'aria-label': 'Add friends' }, header('Add friends', back),
       h('div', { class: 'scroll' }, h('div', { class: 'field search-field' }, icon('search', 20), search),
         h('button', { class: 'btn ghost block scan-btn', type: 'button', onclick: renderScanner }, icon('scan', 20), 'Scan Puffcode'),
-        results, requests)));
+        results, requests, empty)));
 
-    async function act(path, body, okText, mood) {
+    // Add and Accept: the button says what it is doing at once and takes no
+    // second tap; it comes back as it was if that doesn't work
+    async function act(btn, doing, path, body, okText, mood) {
+      const was = [...btn.childNodes];
+      btn.disabled = true;
+      btn.replaceChildren(doing);
       try {
         await api(path, body);
-        if (mood) puffPop(okText, mood); else toast(okText);
-        await Promise.all([runSearch(), loadRequests()]);
-      } catch (e) { toast(e.message); }
+      } catch (e) {
+        toast(e.message);
+        btn.disabled = false;
+        btn.replaceChildren(...was);
+        return;
+      }
+      if (mood) puffPop(okText, mood); else toast(okText);
+      await Promise.all([runSearch(), loadRequests()]);
     }
     async function runSearch() {
+      paintEmpty();
       if (q.length < 2) { results.replaceChildren(); return; }
       let users;
       try { users = await api('/api/users/search?q=' + encodeURIComponent(q)); } catch (e) { results.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
@@ -2552,8 +2695,9 @@
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username)),
           u.status === 'accepted' ? h('span', { class: 'sub' }, 'Friends')
             : u.status === 'pending' ? h('span', { class: 'sub' }, 'Requested')
-              : h('button', { class: 'btn small', onclick: () => act('/api/friends/request', { username: u.username }, 'Request sent') },
-                icon('plus', 18), 'Add')))
+              : h('button', { class: 'btn small', type: 'button',
+                onclick: (e) => act(e.currentTarget, 'Adding…', '/api/friends/request', { username: u.username }, 'Request sent') },
+              icon('plus', 18), 'Add')))
           : [h('p', { class: 'hint' }, 'No one matches "' + q + '".')]));
     }
     async function loadRequests() {
@@ -2563,16 +2707,16 @@
         data.incoming.length ? h('h2', { class: 'section-title' }, 'Added me') : null,
         ...data.incoming.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username)),
-          h('button', { class: 'btn small', onclick: () => {
+          h('button', { class: 'btn small', type: 'button', onclick: (e) => {
             dismissBannerFor(u.id, ['friend']); // their request is answered
-            act('/api/friends/accept', { userId: u.id }, 'You are now friends', 'love');
+            act(e.currentTarget, 'Accepting…', '/api/friends/accept', { userId: u.id }, 'You are now friends', 'love');
           } }, 'Accept'))),
         data.outgoing.length ? h('h2', { class: 'section-title' }, 'Waiting on') : null,
         ...data.outgoing.map((u) => h('div', { class: 'row' }, avatar(u),
           h('span', { class: 'main' }, h('div', { class: 'name' }, u.displayName), h('div', { class: 'sub' }, '@' + u.username + ' · pending')))),
-        !data.incoming.length && !data.outgoing.length && q.length < 2
-          ? h('div', { class: 'empty' }, puff('wow', 110), h('strong', {}, 'Find your friends'), 'Type a username to send a request.') : null,
       ].filter(Boolean));
+      hasRequests = data.incoming.length + data.outgoing.length > 0;
+      paintEmpty();
     }
     state.refresh = () => Promise.all([runSearch(), loadRequests()]);
     loadRequests();
@@ -2591,11 +2735,13 @@
       try {
         u = await api('/api/users/by-username/' + encodeURIComponent(username));
       } catch (e) {
-        body.replaceChildren(e.status === 404
-          ? h('div', { class: 'empty' }, puff('sad', 110), h('strong', {}, 'No one by that name'),
-            `There is nobody called @${username} on Poof. Check the code, or search by username.`,
-            h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn', type: 'button', onclick: () => go('friends') }, 'Find friends')))
-          : h('p', { class: 'error' }, e.message));
+        body.replaceChildren(h('p', { class: 'error' }, e.message));
+        return;
+      }
+      if (u.status === 'missing') {
+        body.replaceChildren(h('div', { class: 'empty' }, puff('sad', 110), h('strong', {}, 'No one by that name'),
+          `There is nobody called @${username} on Poof. Check the code, or search by username.`,
+          h('div', { style: 'margin-top:16px' }, h('button', { class: 'btn', type: 'button', onclick: () => go('friends') }, 'Find friends'))));
         return;
       }
       // adding someone who already added you accepts them
@@ -2741,6 +2887,7 @@
           onclick: () => { cfg = { ...cfg, [tab]: i }; draw(); },
         });
         if (!isColour) btn.innerHTML = A.avatarSVG({ ...cfg, [tab]: i }, 64);
+        if (cfg[tab] === i) btn.append(h('span', { class: 'option-check' }, icon('check', 14)));
         return btn;
       }));
     }
@@ -2753,7 +2900,7 @@
       } catch (e) { toast(e.message); saveBtn.disabled = false; }
     }
     const left = onboarding
-      ? h('button', { class: 'link', onclick: home }, 'Skip')
+      ? h('button', { class: 'link', type: 'button', onclick: home }, 'Skip')
       : backButton('Back', () => go('profile'));
     const shuffle = h('button', { class: 'icon-btn plain', 'aria-label': 'Shuffle', onclick: () => { cfg = A.random(); draw(); } },
       icon('shuffle'));
@@ -2814,8 +2961,14 @@
 
   async function renderProfile() {
     const body = h('div', { class: 'scroll' });
-    const back = backButton('Back', () => go('camera'));
+    const back = backButton('Back', () => go(state.profileBack || 'camera'));
     show(h('section', { class: 'screen', 'aria-label': 'Profile' }, header('Profile', back), body));
+    // a friend's row opens their card (Send a chat, and Remove friend, which asks first)
+    const friendRow = (f) => h('button', { class: 'row', type: 'button', 'data-friend': f.id, 'aria-haspopup': 'dialog',
+      'aria-label': `${f.displayName}, @${f.username}${f.streak > 1 ? ', ' + streakWords(f.streak) : ''}`,
+      onclick: () => openFriendCard(f, f.streak, () => app.querySelector(`.scroll .row[data-friend="${CSS.escape(f.id)}"]`)) },
+    avatar(f), h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), h('div', { class: 'sub' }, '@' + f.username)),
+    streakBadge(f.streak));
     const load = async () => {
       let friends;
       try { friends = await api('/api/friends'); } catch (e) { body.replaceChildren(h('p', { class: 'error' }, e.message)); return; }
@@ -2831,19 +2984,14 @@
           h('button', { class: 'btn text', type: 'button', onclick: () => go('avatar') },
             state.me.avatar ? 'Edit avatar' : 'Make your avatar')),
         h('h2', { class: 'section-title' }, `Friends (${friends.friends.length})`),
-        ...friends.friends.map((f) => h('div', { class: 'row' }, avatar(f),
-          h('span', { class: 'main' }, h('div', { class: 'name' }, f.displayName), h('div', { class: 'sub' }, '@' + f.username + (f.streak > 1 ? ` · ${f.streak} 🔥` : ''))),
-          h('button', { class: 'btn danger small', onclick: async () => {
-            if (!confirm(`Remove ${f.displayName} as a friend?`)) return;
-            try { await api('/api/friends/remove', { userId: f.id }); load(); } catch (e) { toast(e.message); }
-          } }, 'Remove'))),
+        ...friends.friends.map(friendRow),
         h('h2', { class: 'section-title' }, 'Settings'),
         notifySetting(),
         h('div', { style: 'margin-top:32px;display:flex;justify-content:center' },
-          h('button', { class: 'btn ghost', onclick: async () => {
+          h('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+            state.events?.close(); // nothing more comes in from here on
+            state.events = null;
             await api('/api/logout', {}).catch(() => {});
-            state.me = null;
-            state.events?.close();
             renderWelcome();
           } }, 'Log out')));
     };
@@ -2879,7 +3027,7 @@
       const about = 'g:' + g.id;
       const base = { about, who, title: g.name };
       if (ev.type === 'snap') {
-        return { ...base, key: 'snap:' + about, kind: 'snap', line: 'New snap from ' + name, said: `New snap from ${name} in ${g.name}`,
+        return { ...base, key: 'snap:' + about, kind: 'snap', line: 'New poof from ' + name, said: `New poof from ${name} in ${g.name}`,
           open: () => openGroupSnapsFrom(g) };
       }
       if (ev.type === 'message') {
@@ -2892,7 +3040,7 @@
       return null; // someone leaving only refreshes what is on screen
     }
     if (ev.type === 'snap') {
-      return { key: 'snap:' + who.id, who, kind: 'snap', line: 'New snap', said: `New snap from ${name}`, open: () => openSnapsFrom(who) };
+      return { key: 'snap:' + who.id, who, kind: 'snap', line: 'New poof', said: `New poof from ${name}`, open: () => openSnapsFrom(who) };
     }
     if (ev.type === 'message') {
       return { key: 'chat:' + who.id, who, kind: 'chat', line: previewText(ev.preview) || 'New chat', lead: 'New chat: ',
@@ -2967,7 +3115,7 @@
     h('span', { class: 'banner-text' },
       h('strong', { class: 'banner-name' }, n.title || n.who.displayName),
       h('span', { class: 'banner-line' },
-        n.kind === 'snap' || n.kind === 'chat' ? h('span', { class: 'status-icon fill', 'aria-hidden': 'true' }) : null,
+        n.kind === 'snap' || n.kind === 'chat' ? h('span', { class: 'status-icon' }, icon(n.kind === 'snap' ? 'mark-poof' : 'mark-chat', 16)) : null,
         n.lead ? h('span', { class: 'sr-only' }, n.lead) : null,
         h('span', { class: 'banner-say' }, n.line))));
     const b = { el: card, key: n.key, about: n.about || n.who.id, kind: n.kind, timer: null, holds: new Set(), back: old?.back || null, done: false };
@@ -3085,8 +3233,8 @@
       sw.disabled = !supported;
       note.textContent = !supported ? "This browser can't show notifications."
         : window.Notification.permission === 'denied' ? 'Blocked in this browser. Allow notifications for this site in its settings.'
-          : on ? 'New snaps and chats will show up while Poof is in the background.'
-            : 'Hear about new snaps and chats while Poof is in the background.';
+          : on ? 'New poofs and chats will show up while Poof is in the background.'
+            : 'Hear about new poofs and chats while Poof is in the background.';
     }
     async function flip() {
       if (asking || !notifySupported()) return;
@@ -3128,6 +3276,21 @@
       if (!seen) notify(ev);
       if (state.refresh) state.refresh();
     };
+    // The browser reconnects a dropped stream by itself. One it has given up
+    // on (the server says 204 once this browser is logged out, here or in
+    // another tab) means: check who is logged in, and go on from there.
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED && state.events === es) recheckSession();
+    };
+  }
+  async function recheckSession() {
+    state.events = null;
+    let user;
+    try { ({ user } = await api('/api/session')); } catch { user = undefined; }
+    if (!state.me || state.events) return; // logged out here meanwhile, or listening again
+    if (user === null) renderWelcome(); // logged out elsewhere: nothing of theirs stays on screen
+    else if (user && user.id !== state.me.id) location.reload(); // someone else has logged in on this browser
+    else setTimeout(() => { if (state.me && !state.events) listen(); }, 5000); // still in: try the stream again
   }
 
   async function start(first = 'camera') {
@@ -3138,7 +3301,7 @@
 
   (async () => {
     rememberDeepLink();
-    try { state.me = await api('/api/me'); } catch { state.me = null; }
+    try { state.me = (await api('/api/session')).user; } catch { state.me = null; }
     if (state.me) start(); else renderWelcome();
     hideSplash();
   })();
