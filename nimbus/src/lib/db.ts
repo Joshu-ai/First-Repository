@@ -15,6 +15,10 @@ export type Product = {
 export type Project = { id: number; order_id: number; user_id: number; status: string; brief: string | null; live_url: string | null; created_at: string; updated_at: string };
 export type BuilderSite = { id: number; user_id: number; name: string; template: string; doc: string; site_id: number | null; published_at: string | null; created_at: string; updated_at: string };
 export type Site = { id: number; user_id: number; slug: string; name: string; deployed_at: string | null; file_count: number; bytes: number; created_at: string };
+export type Domain = {
+  id: number; site_id: number; host: string; token: string; status: "pending" | "active";
+  checked_at: string | null; verified_at: string | null; last_error: string | null; created_at: string;
+};
 export const PROJECT_STAGES = ["intake", "design", "build", "review", "launched"] as const;
 export type Order = {
   id: number; user_id: number; product_id: number; amount_cents: number; status: "pending" | "paid" | "refunded";
@@ -126,6 +130,18 @@ function open() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS builder_sites_user ON builder_sites(user_id);
+    CREATE TABLE IF NOT EXISTS domains (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      host TEXT NOT NULL UNIQUE,                 -- e.g. "example.com" or "shop.example.com", lowercase
+      token TEXT NOT NULL,                       -- value the customer puts in the ownership TXT record
+      status TEXT NOT NULL DEFAULT 'pending',    -- pending -> active once DNS checks pass
+      checked_at TEXT,
+      verified_at TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS domains_site ON domains(site_id);
     CREATE TABLE IF NOT EXISTS form_submissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       builder_id INTEGER NOT NULL REFERENCES builder_sites(id) ON DELETE CASCADE,
@@ -300,6 +316,21 @@ export const q = {
     db().prepare("UPDATE sites SET deployed_at = datetime('now'), file_count = ?, bytes = ? WHERE id = ?").run(files, bytes, id),
   deleteSite: (id: number) => db().prepare("DELETE FROM sites WHERE id = ?").run(id),
   siteById: (id: number) => plain<Site | undefined>(db().prepare("SELECT * FROM sites WHERE id = ?").get(id)),
+  // custom domains
+  domainForSite: (siteId: number) => plain<Domain | undefined>(db().prepare("SELECT * FROM domains WHERE site_id = ? ORDER BY id LIMIT 1").get(siteId)),
+  domainByHost: (host: string) => plain<Domain | undefined>(db().prepare("SELECT * FROM domains WHERE host = ?").get(host)),
+  domainById: (id: number) => plain<Domain | undefined>(db().prepare("SELECT * FROM domains WHERE id = ?").get(id)),
+  activeDomainForSlug: (slug: string) =>
+    plain<{ host: string } | undefined>(db().prepare("SELECT d.host FROM domains d JOIN sites s ON s.id = d.site_id WHERE s.slug = ? AND d.status = 'active' ORDER BY d.id LIMIT 1").get(slug)),
+  addDomain: (siteId: number, host: string, token: string) => db().prepare("INSERT INTO domains (site_id, host, token) VALUES (?, ?, ?)").run(siteId, host, token),
+  setDomainCheck: (id: number, active: boolean, error: string | null) =>
+    db().prepare(`UPDATE domains SET checked_at = datetime('now'), last_error = ?, status = CASE WHEN ? THEN 'active' ELSE status END,
+      verified_at = CASE WHEN ? AND verified_at IS NULL THEN datetime('now') ELSE verified_at END WHERE id = ?`).run(error, active ? 1 : 0, active ? 1 : 0, id),
+  deleteDomain: (id: number) => db().prepare("DELETE FROM domains WHERE id = ?").run(id),
+  // Pending domains added in the last week that weren't checked in the last few minutes.
+  domainsToRecheck: () =>
+    plain<Domain[]>(db().prepare(`SELECT * FROM domains WHERE status = 'pending' AND created_at > datetime('now', '-7 days')
+      AND (checked_at IS NULL OR checked_at < datetime('now', '-4 minutes')) ORDER BY id LIMIT 50`).all()),
   // website builder
   builderSitesForUser: (userId: number) =>
     plain<(Omit<BuilderSite, "doc"> & { slug: string | null; submissions: number })[]>(db().prepare(`SELECT b.id, b.user_id, b.name, b.template, b.site_id, b.published_at, b.created_at, b.updated_at, s.slug AS slug,

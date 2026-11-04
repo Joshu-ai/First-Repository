@@ -5,7 +5,7 @@ import { q } from "./db";
 import { deployArchive, removeSiteFiles } from "./hosting";
 
 type S = { error?: string; ok?: string } | undefined;
-const RESERVED = new Set(["www", "app", "api", "admin", "mail", "hosted", "static", "assets"]);
+const RESERVED = new Set(["www", "app", "api", "admin", "mail", "hosted", "static", "assets", "cname", "domain", "domains"]);
 
 export async function createSite(_: S, fd: FormData): Promise<S> {
   const user = await requireUser("/dashboard/sites");

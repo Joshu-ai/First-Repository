@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
-import { siteLiveUrl } from "@/lib/hosting";
+import { siteDefaultUrl, siteLiveUrl } from "@/lib/hosting";
+import { customDomainsEnabled } from "@/lib/domains";
 import { deleteWebsite } from "@/lib/builder/actions";
 
 export const metadata = { title: "My websites" };
@@ -30,6 +31,9 @@ export default async function Websites() {
                   <div>
                     <p className="font-medium">{s.name}</p>
                     {s.slug ? <a href={siteLiveUrl(s.slug)} target="_blank" rel="noreferrer" className="text-sm text-accent underline">{siteLiveUrl(s.slug)}</a> : <p className="text-sm text-muted">Not published yet</p>}
+                    {s.slug && customDomainsEnabled() && siteLiveUrl(s.slug) === siteDefaultUrl(s.slug) && (
+                      <Link href={`/dashboard/sites#site-${s.slug}`} className="mt-1 block text-xs text-muted underline hover:text-fg">Use your own domain</Link>
+                    )}
                     <p className="mt-1 text-xs text-muted">Edited {s.updated_at}{s.published_at ? ` · published ${s.published_at}` : ""}</p>
                   </div>
                   <div className="flex items-center gap-2">

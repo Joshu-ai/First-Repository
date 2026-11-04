@@ -8,7 +8,7 @@ import { buildSiteFiles, checkDoc, docSizeOk } from "./publish";
 import { template } from "./templates";
 import { slugify, type SiteDoc } from "./types";
 
-const RESERVED = new Set(["www", "app", "api", "admin", "mail", "hosted", "static", "assets"]);
+const RESERVED = new Set(["www", "app", "api", "admin", "mail", "hosted", "static", "assets", "cname", "domain", "domains"]);
 
 async function own(id: number) {
   const user = await currentUser();

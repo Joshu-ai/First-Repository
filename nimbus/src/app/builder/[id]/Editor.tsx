@@ -8,7 +8,7 @@ import { SECTION_GROUPS, SECTIONS, spec } from "@/lib/builder/sections";
 import { FONTS, PALETTES, slugify, uid, type Page, type SiteDoc, type Tone } from "@/lib/builder/types";
 import { Fields, inputCls, labelCls, LinkField, TextInput } from "./Fields";
 
-type Props = { id: number; initial: SiteDoc; publishedSlug: string | null; liveUrl: string | null; addressSuffix: string; addressPrefix: string };
+type Props = { id: number; initial: SiteDoc; publishedSlug: string | null; liveUrl: string | null; addressSuffix: string; addressPrefix: string; customDomains: boolean };
 type Device = "desktop" | "tablet" | "phone";
 const WIDTH: Record<Device, string> = { desktop: "100%", tablet: "820px", phone: "390px" };
 const TONES: [Tone, string][] = [["light", "Light"], ["muted", "Soft"], ["dark", "Dark"], ["accent", "Accent"]];
@@ -54,7 +54,7 @@ function useHistory(initial: SiteDoc) {
   return { doc, commit, undo, redo, canUndo: h.current.past.length > 0, canRedo: h.current.future.length > 0 };
 }
 
-export default function Editor({ id, initial, publishedSlug, liveUrl: initialLive, addressSuffix, addressPrefix }: Props) {
+export default function Editor({ id, initial, publishedSlug, liveUrl: initialLive, addressSuffix, addressPrefix, customDomains }: Props) {
   const { doc, commit, undo, redo, canUndo, canRedo } = useHistory(initial);
   const [pageId, setPageId] = useState(initial.pages[0].id);
   const [selected, setSelected] = useState<string | null>(null);
@@ -322,7 +322,7 @@ export default function Editor({ id, initial, publishedSlug, liveUrl: initialLiv
       {adding && <AddSection onPick={addSection} onClose={() => setAdding(false)} />}
       {publishOpen && (
         <PublishDialog
-          id={id} doc={doc} live={live} suffix={addressSuffix} prefix={addressPrefix}
+          id={id} doc={doc} live={live} suffix={addressSuffix} prefix={addressPrefix} domains={customDomains}
           onClose={() => setPublishOpen(false)}
           onDone={(r) => { setLive({ slug: r.slug, url: r.url }); setStatus("saved"); }}
         />
@@ -442,8 +442,8 @@ function DesignPanel({ doc, commit }: { doc: SiteDoc; commit: (d: SiteDoc) => vo
   );
 }
 
-function PublishDialog({ id, doc, live, suffix, prefix, onClose, onDone }: {
-  id: number; doc: SiteDoc; live: { slug: string | null; url: string | null }; suffix: string; prefix: string;
+function PublishDialog({ id, doc, live, suffix, prefix, domains, onClose, onDone }: {
+  id: number; doc: SiteDoc; live: { slug: string | null; url: string | null }; suffix: string; prefix: string; domains: boolean;
   onClose: () => void; onDone: (r: Extract<PublishResult, { ok: true }>) => void;
 }) {
   const [slug, setSlug] = useState(live.slug ?? slugify(doc.name));
@@ -464,6 +464,7 @@ function PublishDialog({ id, doc, live, suffix, prefix, onClose, onDone }: {
             <p className="text-3xl">🎉</p>
             <h2 className="text-lg font-semibold">Your site is live</h2>
             <a href={res.url} target="_blank" rel="noreferrer" className="break-all text-accent underline">{res.url}</a>
+            {domains && <Link href={`/dashboard/sites#site-${res.slug}`} className="text-sm text-muted underline hover:text-fg">Connect your own domain</Link>}
             <button onClick={onClose} className="mt-2 rounded-md border border-line py-2 text-sm">Back to editing</button>
           </div>
         ) : (

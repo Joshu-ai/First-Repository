@@ -4,6 +4,7 @@ import { siteUrl } from "@/lib/brand";
 import { q } from "@/lib/db";
 import { hostingDomain, siteLiveUrl } from "@/lib/hosting";
 import type { SiteDoc } from "@/lib/builder/types";
+import { customDomainsEnabled } from "@/lib/domains";
 import Editor from "./Editor";
 
 export const metadata = { title: "Editor" };
@@ -23,6 +24,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
       liveUrl={site ? siteLiveUrl(site.slug) : null}
       addressPrefix={d ? "https://" : `${siteUrl().replace(/^https?:\/\//, "")}/hosted/`}
       addressSuffix={d ? `.${d}` : ""}
+      customDomains={customDomainsEnabled()}
     />
   );
 }

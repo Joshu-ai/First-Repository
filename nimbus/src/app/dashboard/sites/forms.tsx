@@ -1,6 +1,7 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createSite, deploySite } from "@/lib/hosting-actions";
+import { checkDomainNow, connectDomain } from "@/lib/domain-actions";
 
 const input = "mt-1 w-full rounded-md border border-line bg-bg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent";
 const Msg = ({ s }: { s?: { error?: string; ok?: string } }) =>
@@ -27,5 +28,43 @@ export function DeployForm({ slug }: { slug: string }) {
       <button disabled={pending} className="h-9 rounded-md bg-fg px-4 text-sm font-medium text-bg disabled:opacity-50">{pending ? "Deploying..." : "Deploy"}</button>
       <Msg s={state} />
     </form>
+  );
+}
+
+export function ConnectDomainForm({ slug }: { slug: string }) {
+  const [state, action, pending] = useActionState(connectDomain, undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3">
+      <input type="hidden" name="slug" value={slug} />
+      <input name="domain" required aria-label="Your domain" placeholder="example.com" autoCapitalize="none" spellCheck={false} className={`${input} mt-0 max-w-xs`} />
+      <button disabled={pending} className="h-9 rounded-md bg-fg px-4 text-sm font-medium text-bg disabled:opacity-50">{pending ? "Adding..." : "Connect domain"}</button>
+      <Msg s={state} />
+    </form>
+  );
+}
+
+export function CheckDomainButton({ id }: { id: number }) {
+  const [state, action, pending] = useActionState(checkDomainNow, undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3">
+      <input type="hidden" name="id" value={id} />
+      <button disabled={pending} className="h-9 rounded-md bg-fg px-4 text-sm font-medium text-bg disabled:opacity-50">{pending ? "Checking..." : "Check now"}</button>
+      <Msg s={state} />
+    </form>
+  );
+}
+
+export function CopyValue({ value }: { value: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); })}
+      className="group flex max-w-full items-center gap-2 text-left font-mono text-xs"
+      title="Copy"
+    >
+      <span className="break-all">{value}</span>
+      <span className="shrink-0 rounded border border-line px-1.5 py-0.5 font-sans text-[10px] text-muted group-hover:text-fg">{done ? "Copied" : "Copy"}</span>
+    </button>
   );
 }

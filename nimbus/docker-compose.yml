@@ -1,0 +1,26 @@
+# Runs the app behind Caddy, which handles HTTPS for custom domains. See "Custom domains" in README.md.
+#   docker compose up -d --build
+services:
+  app:
+    build: .
+    env_file: .env.production
+    volumes:
+      - nimbus-data:/data
+    restart: unless-stopped
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-joshualef@duck.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+volumes:
+  nimbus-data:
+  caddy-data:
