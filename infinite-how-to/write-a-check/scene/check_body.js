@@ -75,10 +75,10 @@ function scaled(x, y, s, fn) { if (s <= 0.001) return; ctx.save(); ctx.translate
 const CW = 1000, CH = 458;
 const F = {
   date:  { x: 716, y: 113, size: 42, text: 'Nov 5, 2026', t0: ws(2, 4) - 0.05, t1: ws(2, 4) + 0.8, spot: 0 },
-  payee: { x: 166, y: 199, size: 50, text: 'Pizza Palace', t0: ws(3, 6) - 0.12, t1: ws(3, 6) + 0.66, spot: 1 },
-  amt:   { x: 812, y: 203, size: 50, text: '25.50', t0: ws(4, 5) - 0.05, t1: ws(4, 5) + 0.6, spot: 2 },
-  words: { x: 48, y: 270, size: 46, spot: 3, segs: [['Twenty-five', ws(6, 7), ws(6, 8) + 0.28], [' and ', ws(6, 9) - 0.04, ws(6, 9) + 0.1], ['50/100', ws(6, 10), we(6, 13)]] },
-  memo:  { x: 106, y: 392, size: 42, text: 'pizza night', t0: ws(9, 6) - 0.05, t1: ws(9, 6) + 0.72, spot: 4 },
+  payee: { x: 166, y: 199, size: 50, text: 'Oak Street Rentals', t0: ws(3, 7) - 0.1, t1: we(3, 10), spot: 1 },
+  amt:   { x: 812, y: 203, size: 48, text: '850.00', t0: ws(4, 5) - 0.05, t1: ws(4, 5) + 0.62, spot: 2 },
+  words: { x: 48, y: 270, size: 46, spot: 3, segs: [['Eight hundred fifty', ws(6, 7), we(6, 9)], [' and ', ws(6, 10) - 0.04, ws(6, 10) + 0.1], ['00/100', ws(6, 11), we(6, 15)]] },
+  memo:  { x: 106, y: 392, size: 42, text: 'Apt 4B rent', t0: ws(9, 7) - 0.05, t1: we(9, 10), spot: 4 },
   sign:  { x: 574, y: 392, size: 60, text: 'Jamie Lee', t0: ws(10, 5) - 0.04, t1: ws(10, 5) + 0.8, spot: 5 },
 };
 F.words.t0 = F.words.segs[0][1]; F.words.t1 = F.words.segs[2][2];
@@ -116,7 +116,7 @@ const hand = sz => `700 ${sz}px Caveat`;
 function writeText(f, p) {   // returns the pen head x (local) for progress p
   const font = hand(f.size), w = measure(f.text, font);
   if (p <= 0) return f.x;
-  ctx.save(); ctx.beginPath(); ctx.rect(f.x - 6, f.y - f.size * 1.2, w * p + 6, f.size * 1.8); ctx.clip();
+  ctx.save(); if (p < 1) { ctx.beginPath(); ctx.rect(f.x - 6, f.y - f.size * 1.2, w * p + 6 + f.size * 0.3 * p, f.size * 1.8); ctx.clip(); }
   txt(f.text, f.x, f.y, font, C.blueInk); ctx.restore();
   return f.x + w * p;
 }
@@ -134,11 +134,11 @@ function wordsProgress(t, i) {   // piecewise, word-synced
 function drawWords(p) {
   const f = F.words, s = f.segs.map(q => q[0]).join(''), font = hand(f.size), w = measure(s, font);
   if (p <= 0) return f.x;
-  ctx.save(); ctx.beginPath(); ctx.rect(f.x - 6, f.y - f.size * 1.2, w * p + 6, f.size * 1.8); ctx.clip();
+  ctx.save(); if (p < 1) { ctx.beginPath(); ctx.rect(f.x - 6, f.y - f.size * 1.2, w * p + 6 + f.size * 0.3 * p, f.size * 1.8); ctx.clip(); }
   txt(s, f.x, f.y, font, C.blueInk); ctx.restore();
   return f.x + w * p;
 }
-const wordsEnd = () => F.words.x + measure(F.words.segs.map(q => q[0]).join(''), hand(F.words.size)) + 14;
+const wordsEnd = () => F.words.x + measure(F.words.segs.map(q => q[0]).join(''), hand(F.words.size)) + 22;
 function signFlourish(p) {   // curvy underline under the signature
   if (p <= 0) return [580, 408];
   const pts = []; const N = 40;
@@ -205,6 +205,11 @@ function highlight(i, t, t0, k = 1) {
   ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.scale(lerp(.85, 1, clamp(p, 0, 1.2)), lerp(.6, 1, clamp(p, 0, 1.2)));
   ctx.globalAlpha = .55 * clamp(p, 0, 1); rr(-w / 2 - 8, -h / 2 - 6, w + 16, h + 12, 14, C.marker); ctx.restore();
 }
+function highlightLabel(t, t0) {   // marker swipe over the printed "Pay to the order of"
+  const p = M.spring(t, t0 - 0.05, 'smooth'); if (p <= 0) return;
+  ctx.save(); ctx.globalAlpha = .7; rr(32, 162, 104 * clamp(p), 52, 10, C.marker); ctx.restore();
+  txt('Pay to the', 40, 184, '800 17px Nunito', C.label); txt('order of', 40, 205, '800 17px Nunito', C.label);
+}
 function drawCheck(t, i, opts = {}) {
   drawCheckBase();
   if (opts.hl) opts.hl.forEach(([k, t0]) => highlight(k, t, t0));
@@ -266,6 +271,23 @@ function friend(x, y, sc, t) {   // the pizza chef who gets paid
   ellipse(-22, -2, 7, 9 * blink, 0, C.ink); ellipse(22, -2, 7, 9 * blink, 0, C.ink);
   ctx.beginPath(); ctx.arc(0, 18, 22, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineWidth = 5; ctx.strokeStyle = C.ink; ctx.lineCap = 'round'; ctx.stroke();
   circle(-40, 22, 9, 'rgba(255,107,90,0.35)'); circle(40, 22, 9, 'rgba(255,107,90,0.35)');
+  ctx.restore();
+}
+function landlord(x, y, sc, t) {   // who gets the rent: glasses, moustache, a house and a key
+  if (sc <= 0.001) return;
+  ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+  rr(-70, 40, 140, 120, 50, C.spot[1], C.ink, 5);
+  circle(0, 0, 66, '#FFD9B8', C.ink, 5);
+  ctx.beginPath(); ctx.arc(0, -6, 68, Math.PI * 1.08, Math.PI * 1.92); ctx.quadraticCurveTo(0, -46, -62, -30); ctx.closePath(); ctx.fillStyle = '#9A9AA6'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = C.ink; ctx.stroke();
+  const blink = ((t + 0.6) * 1.3) % 3 < 0.12 ? 0.15 : 1;
+  for (const s of [-1, 1]) { circle(s * 24, -2, 17, 'rgba(255,255,255,0.5)', C.ink, 4); ellipse(s * 24, -2, 6, 8 * blink, 0, C.ink); }
+  line(-7, -2, 7, -2, 4, C.ink);
+  ctx.beginPath(); ctx.moveTo(-26, 28); ctx.quadraticCurveTo(0, 14, 26, 28); ctx.quadraticCurveTo(0, 22, -26, 28); ctx.lineWidth = 7; ctx.strokeStyle = '#6B6B78'; ctx.lineCap = 'round'; ctx.stroke();
+  // little house
+  ctx.save(); ctx.translate(108, 70); ctx.scale(.5, .5);
+  ctx.beginPath(); ctx.moveTo(-70, -10); ctx.lineTo(0, -70); ctx.lineTo(70, -10); ctx.closePath(); ctx.fillStyle = C.red; ctx.fill(); ctx.lineWidth = 8; ctx.strokeStyle = C.ink; ctx.lineJoin = 'round'; ctx.stroke();
+  rr(-54, -12, 108, 86, 6, '#FFF4DA', C.ink, 8); rr(-14, 22, 28, 52, 4, C.spot[0], C.ink, 6);
+  ctx.restore();
   ctx.restore();
 }
 function you(x, y, sc, t) {   // the check writer
@@ -331,9 +353,15 @@ function raccoon(x, y, sc, t, mood = 'sneaky', look = -1, holding = null) {
   ctx.stroke();
   if (mood === 'grin') { ctx.beginPath(); ctx.moveTo(-26, 44); ctx.quadraticCurveTo(0, 70, 26, 44); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); }
   // paws (+ prop)
-  if (holding === 'pencil') { pencil(-72, 110, -1.1, .62); }
+  if (holding === 'pencil') { pencil(-212, -32, 2.36, .9); }
   ellipse(-70, 112, 26, 20, 0, C.coonDark, C.ink, 4); ellipse(70, 112, 26, 20, 0, C.coonDark, C.ink, 4);
   ctx.restore();
+}
+function ghost(t, s, x, y, size, t0, bonk, rot = 0) {   // raccoon's pencil scribble; pops off at the bonk
+  const a = M.spring(t, t0, 'snap'); if (a <= 0.01) return;
+  const off = t > bonk ? M.spring(t, bonk, 'smooth') : 0, wob = t < bonk ? 2.5 * Math.sin(t * 30) : 0;
+  ctx.save(); ctx.globalAlpha = clamp(a) * (1 - clamp(off * 1.4)); ctx.translate(x + 60 * off, y - 90 * off + wob); ctx.rotate(rot + 0.8 * off);
+  txt(s, 0, 0, `700 ${size}px Caveat`, '#C8423C', 'center'); ctx.restore();
 }
 function sticker(x, y, rot, s, label, bg, fg = C.ink, font = '700 40px Fredoka') {
   if (s <= 0.001) return;
@@ -380,6 +408,7 @@ function minimap(t, t0, cur) {
   circle(cx, cy, 10 + 6 * M.pulse(t, 1, 5), null, C.spot[cur], 4);
 }
 // caption chunks: <= 4 words, break after punctuation
+const qz = x => (Math.round(x * 30 - 0.5) + 0.5) / 30;   // discrete switches sit at mid-frame, outside the blur window
 const CHUNKS = (() => {
   const out = [];
   TM.lines.forEach((L, li) => {
@@ -390,7 +419,7 @@ const CHUNKS = (() => {
       if (last || cur.length >= 4 || /[,.:?!]$/.test(w.w) && cur.length >= 2 || len > 17) { out.push(cur); cur = []; }
     });
   });
-  return out.map((ws_, k, arr) => ({ words: ws_, t0: ws_[0].start - 0.05, t1: k + 1 < arr.length ? arr[k + 1][0].start - 0.05 : window.DUR + 1 }));
+  return out.map((ws_, k, arr) => ({ words: ws_, on: ws_.map(w => qz(w.start - 0.03)), t0: qz(ws_[0].start - 0.05), t1: k + 1 < arr.length ? qz(arr[k + 1][0].start - 0.05) : window.DUR + 1 }));
 })();
 function captions(t) {
   const ch = CHUNKS.find(c => t >= c.t0 && t < c.t1); if (!ch) return;
@@ -398,9 +427,9 @@ function captions(t) {
   const ww = ch.words.map(w => measure(w.w, font)); const total = ww.reduce((a, b) => a + b, 0) + gap * (ww.length - 1);
   let x = 510 - total / 2; const p = M.spring(t, ch.t0, 'snap');
   ch.words.forEach((w, k) => {
-    const on = t >= w.start - 0.03 && (k === ch.words.length - 1 || t < ch.words[k + 1].start - 0.03);
+    const on = t >= ch.on[k] && (k === ch.words.length - 1 || t < ch.on[k + 1]);
     if (on) { const s = pop(t, w.start - 0.03, 'snap'); ctx.save(); ctx.translate(x + ww[k] / 2, y - 24); ctx.scale(s, s); rr(-ww[k] / 2 - 12, -46, ww[k] + 24, 80, 18, C.marker); ctx.restore(); }
-    ctx.save(); ctx.globalAlpha = t >= w.start - 0.03 ? 1 : 0.42;
+    ctx.save(); ctx.globalAlpha = t >= ch.on[k] ? 1 : 0.42;
     ctx.font = font; ctx.lineWidth = 12; ctx.strokeStyle = C.paper; ctx.lineJoin = 'round'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.strokeText(w.w, x, y + 18 * (1 - p)); txt(w.w, x, y + 18 * (1 - p), font, C.ink);
     ctx.restore(); x += ww[k] + gap;
@@ -415,15 +444,16 @@ function camFor(i, t) {
   switch (i) {
     case 0: return mk(FULL, { ...FULL, s: .9 }, t0);
     case 2: return mk(Z(500, 229, .9), Z(812, 122, 2.0), ws(2, 2) - 0.25, 'heavy');
-    case 3: return mk(Z(336, 196, 1.48), Z(336, 196, 1.58), t0);
+    case 3: return mk(Z(326, 196, 1.36), Z(326, 196, 1.44), t0);
     case 4: return mk(Z(842, 188, 2.3), Z(842, 188, 2.48), t0);
-    case 5: return mk(Z(800, 196, 1.85), Z(800, 196, 1.95), t0);
-    case 6: return mk(Z(420, 250, 1.02), Z(420, 250, 1.08), t0);
-    case 7: return mk(Z(450, 255, 1.0), Z(450, 255, 1.05), t0);
-    case 9: return mk(Z(262, 358, 1.95), Z(262, 358, 2.05), t0);
+    case 5: return mk(Z(740, 232, 1.42), Z(740, 232, 1.5), t0);
+    case 6: return mk(Z(482, 250, 0.92), Z(482, 250, 0.97), t0);
+    case 7: return mk(Z(482, 255, 0.92), Z(482, 255, 0.96), t0);
+    case 9: return mk(Z(252, 366, 1.7), Z(252, 366, 1.78), t0);
     case 10: return mk(Z(744, 360, 1.85), Z(744, 360, 1.95), t0);
     case 13: return mk(Z(440, 400, 1.18, 720), Z(440, 400, 1.24, 720), t0);
     case 14: return mk({ ...FULL, sy: 800 }, { ...FULL, s: .9, sy: 800 }, t0);
+    case 15: return mk({ ...FULL, s: .93, sy: 800 }, { ...FULL, s: .96, sy: 800 }, t0);
     case 16: return mk({ ...FULL, s: .82 }, FULL, t0, 'smooth');
     default: return FULL;
   }
@@ -432,7 +462,7 @@ function kickCam(t, i) { return 1 + (i > 0 ? 0.022 * M.kick(t, st(i), 1, 'bouncy
 
 // ---------- shots ----------
 const WIN = { x: 62, y: 478, w: 896, h: 566, r: 44 };
-const zoomed = i => ![0, 14, 16].includes(i);
+const zoomed = i => ![0, 14, 15, 16].includes(i);
 function checkShot(t, i, opts = {}) {
   const cam = camFor(i, t), k = kickCam(t, i), win = zoomed(i);
   if (win) { ctx.save(); ctx.shadowColor = 'rgba(60,40,20,0.22)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12; rr(WIN.x, WIN.y, WIN.w, WIN.h, WIN.r, '#FBF6EC'); ctx.restore();
@@ -450,7 +480,10 @@ function checkShot(t, i, opts = {}) {
   return cam;
 }
 const SHOT = [];
-SHOT[0] = t => {   // title + finished check, pen finishing the signature flourish (frame 1 = mid-action)
+const SNEAK = { x: 200, y0: 604, y1: 574, s: .62 };
+function peeker(y, tt, mood = 'sneaky') { raccoon(SNEAK.x, y, SNEAK.s, tt, mood, Math.sin(tt * 1.6)); }
+SHOT[0] = t => {   // title + finished check, pen finishing the flourish, raccoon peeking over the check (frame 1 = mid-action)
+  peeker(lerp(SNEAK.y0, SNEAK.y1, M.spring(t, 0, 'soft')), t);
   checkShot(t, 0, { flourish: clamp(0.3 + t / 0.8), rest: [910, 404] });
   txt('How to write', 510, 400, '700 104px Fredoka', C.ink, 'center');
   txt('a check', 510, 508, '700 104px Fredoka', C.ink, 'center');
@@ -458,20 +491,20 @@ SHOT[0] = t => {   // title + finished check, pen finishing the signature flouri
 };
 SHOT[1] = t => {   // a check is a note to your bank
   const t0 = st(1); headerPlain(t, t0, 'A check is a note to your bank');
-  you(190, 900, 1.15, t); bank(510, 780, 1.2 * pop(t, t0, 'smooth')); friend(830, 900, 1.15 * pop(t, ws(1, 13), 'bouncy'), t);
+  you(190, 900, 1.15, t); bank(510, 780, 1.2 * pop(t, t0, 'smooth')); landlord(830, 900, 1.15 * pop(t, ws(1, 10), 'bouncy'), t);
   // the check flies from you into the bank, then coins fly out to the friend
   const fly = M.spring(t, ws(1, 6) - 0.2, 'smooth'), fx = lerp(330, 500, fly), fy = lerp(1000, 670, fly) - 110 * Math.sin(Math.PI * clamp(fly));
   if (fly < 0.97) miniCheck(fx, fy, lerp(250, 120, clamp(fly)), lerp(-0.12, 0.1, clamp(fly)));
   for (let k = 0; k < 4; k++) {
-    const c = M.spring(t, ws(1, 11) + k * 0.12, 'smooth'); if (c <= 0) continue;
+    const c = M.spring(t, ws(1, 9) + k * 0.12, 'smooth'); if (c <= 0) continue;
     const x = lerp(580, 800 - k * 34, clamp(c)), y = lerp(740, 1000 - k * 8, clamp(c)) - 140 * Math.sin(Math.PI * clamp(c));
     coin(x, y, 32);
   }
-  if (t >= ws(1, 9) - 0.06) { const s = pop(t, ws(1, 9)); scaled(560, 486, s, () => { rr(-210, -54, 420, 92, 28, '#fff', C.ink, 4); ctx.beginPath(); ctx.moveTo(-40, 36); ctx.lineTo(-10, 70); ctx.lineTo(10, 36); ctx.fillStyle = '#fff'; ctx.fill(); txt('"Please pay them!"', 0, 8, '700 40px Caveat', C.blueInk, 'center'); }); }
-  txt('You', 190, 760, '700 46px Fredoka', C.inkSoft, 'center'); if (t > ws(1, 13) - 0.06) { ctx.save(); ctx.globalAlpha = clamp(pop(t, ws(1, 13))); txt('Them', 830, 690, '700 46px Fredoka', C.inkSoft, 'center'); ctx.restore(); }
+  if (t >= ws(1, 8) - 0.06) { const s = pop(t, ws(1, 8)); scaled(560, 486, s, () => { rr(-210, -54, 420, 92, 28, '#fff', C.ink, 4); ctx.beginPath(); ctx.moveTo(-40, 36); ctx.lineTo(-10, 70); ctx.lineTo(10, 36); ctx.fillStyle = '#fff'; ctx.fill(); txt('"Please pay them!"', 0, 8, '700 40px Caveat', C.blueInk, 'center'); }); }
+  txt('You', 190, 760, '700 46px Fredoka', C.inkSoft, 'center'); if (t > ws(1, 10) - 0.06) { ctx.save(); ctx.globalAlpha = clamp(pop(t, ws(1, 10))); txt('Landlord', 830, 690, '700 46px Fredoka', C.inkSoft, 'center'); ctx.restore(); }
 };
 SHOT[2] = t => { checkShot(t, 2, { hl: [[0, ws(2, 2)]], rest: [740, 116] }); header(t, st(2), 0, "Today's date"); minimap(t, st(2), 0); };
-SHOT[3] = t => { checkShot(t, 3, { hl: [[1, ws(3, 2)]], rest: [190, 196] }); header(t, st(3), 1, 'Who gets paid'); minimap(t, st(3), 1); };
+SHOT[3] = t => { checkShot(t, 3, { hl: [[1, ws(3, 2)]], rest: [190, 196], inCheck: () => highlightLabel(t, ws(3, 2)) }); header(t, st(3), 1, 'Who gets paid'); minimap(t, st(3), 1); };
 SHOT[4] = t => {
   checkShot(t, 4, { hl: [[2, ws(4, 3)]], rest: [930, 200], inCheck: () => {
     const q = pop(t, ws(4, 6), 'bouncy'); if (q <= 0) return;   // squeeze arrows around the $ | 2 join
@@ -482,21 +515,23 @@ SHOT[4] = t => {
   header(t, st(4), 2, 'Amount in numbers'); minimap(t, st(4), 2);
 };
 SHOT[5] = t => {   // the raccoon tries to sneak a 1 in front, and there's no room
-  checkShot(t, 5, { pen: false, rest: [930, 200] });
   const inT = ws(5, 1), bonk = ws(5, 4), outT = ws(5, 9) + 0.05;
+  checkShot(t, 5, { pen: false, rest: [930, 200], inCheck: () => ghost(t, '1', 800, 207, 58, ws(5, 3) + 0.1, bonk, -0.12) });
   const e = M.spring(t, inT - 0.1, 'bouncy') - M.spring(t, outT, 'smooth');
   const reach = M.spring(t, ws(5, 3), 'smooth') * (1 - M.spring(t, bonk + 0.25, 'snap'));
   const mood = t < bonk ? 'sneaky' : 'oops', shake = t > bonk ? 10 * M.kick(t, bonk, 1, 'bouncy') : 0;
-  if (e > 0.004) raccoon(lerp(1460, 860, clamp(e, -0.2, 1.1)) + shake - 60 * reach, 790, .92, t, mood, -1, 'pencil');
+  if (e > 0.004) raccoon(lerp(1460, 850, clamp(e, -0.2, 1.1)) + shake - 70 * reach, 880 - 60 * reach, .75, t, mood, -1, 'pencil');
   if (t > bonk) { const s = pop(t, bonk); sticker(470, 960, 0.05, s, 'No room!', '#fff', C.red, '700 50px Fredoka'); }
   header(t, st(5), 2, 'Amount in numbers'); minimap(t, st(5), 2);
 };
 SHOT[6] = t => { checkShot(t, 6, { hl: [[3, ws(6, 4)]], rest: [80, 266] }); header(t, st(6), 3, 'Amount in words'); minimap(t, st(6), 3); };
 SHOT[7] = t => {
-  checkShot(t, 7, { rest: [DASH.x1, DASH.y] });
+  checkShot(t, 7, { rest: [DASH.x1, DASH.y], inCheck: () => ghost(t, 'and 1,000', 732, 250, 42, ws(7, 8), ws(7, 10), -0.04) });
   const inT = ws(7, 7) - 0.1, bonk = ws(7, 10), outT = ws(7, 11) + 0.1;
   const e = M.spring(t, inT, 'bouncy') - M.spring(t, outT, 'smooth');
-  if (e > 0.004) raccoon(lerp(1460, 900, clamp(e, -0.2, 1.1)) + (t > bonk ? 8 * M.kick(t, bonk, 1) : 0), 850, .74, t, t < bonk ? 'sneaky' : 'oops', -1, 'pencil');
+  const reach = M.spring(t, ws(7, 8) - 0.1, 'smooth') * (1 - M.spring(t, bonk + 0.25, 'snap'));
+  if (e > 0.004) raccoon(lerp(1460, 905, clamp(e, -0.2, 1.1)) + (t > bonk ? 8 * M.kick(t, bonk, 1) : 0) - 40 * reach, 885 - 50 * reach, .66, t, t < bonk ? 'sneaky' : 'oops', -1, 'pencil');
+  if (t > bonk) sticker(430, 990, -0.04, pop(t, bonk), 'Line blocks it!', '#fff', C.red, '700 46px Fredoka');
   header(t, st(7), 3, 'Amount in words'); minimap(t, st(7), 3);
 };
 SHOT[8] = t => {   // secret: the words win (seesaw)
@@ -507,20 +542,20 @@ SHOT[8] = t => {   // secret: the words win (seesaw)
   ctx.beginPath(); ctx.moveTo(-70, 150); ctx.lineTo(0, 10); ctx.lineTo(70, 150); ctx.closePath(); ctx.fillStyle = '#FFD173'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = C.ink; ctx.lineJoin = 'round'; ctx.stroke();
   ctx.rotate(ang); rr(-420, -14, 840, 28, 14, '#C98B5A', C.ink, 5);
   // words card (left), numbers card (right) that disagree
-  const a = pop(t, st(8) + 0.04) * (1 + 0.1 * M.kick(t, ws(8, 3), 1, 'bouncy')), b = pop(t, st(8) + 0.16) * (1 + 0.1 * M.kick(t, ws(8, 6), 1, 'bouncy'));
-  scaled(-250, -100, a, () => { rr(-170, -78, 340, 156, 22, '#fff', C.ink, 5); txt('Twenty-five', 0, -14, '700 52px Caveat', C.blueInk, 'center'); txt('and 50/100', 0, 46, '700 52px Caveat', C.blueInk, 'center'); });
-  scaled(250, -100, b, () => { rr(-140, -78, 280, 156, 22, '#fff', C.ink, 5); txt('$52.50', 0, 20, '700 64px Caveat', C.blueInk, 'center'); });
+  const a = pop(t, st(8) - 0.12) * (1 + 0.1 * M.kick(t, ws(8, 3), 1, 'bouncy')), b = pop(t, st(8) - 0.02) * (1 + 0.1 * M.kick(t, ws(8, 6), 1, 'bouncy'));
+  scaled(-240, -100, a, () => { rr(-180, -78, 360, 156, 22, '#fff', C.ink, 5); txt('Eight hundred fifty', 0, -14, '700 46px Caveat', C.blueInk, 'center'); txt('and 00/100', 0, 46, '700 46px Caveat', C.blueInk, 'center'); });
+  scaled(250, -100, b, () => { rr(-140, -78, 280, 156, 22, '#fff', C.ink, 5); txt('$580.00', 0, 20, '700 62px Caveat', C.blueInk, 'center'); });
   ctx.restore();
   if (t > ws(8, 7) - 0.06) { const s = pop(t, ws(8, 7)); sticker(510, 600, 0, s, "Don't match!", '#fff', C.red, '700 48px Fredoka'); }
   if (t > ws(8, 14) - 0.1) { // crown on the words card
-    const c = pop(t, ws(8, 14)), [cx, cy] = [510 + Math.cos(ang) * -250 - Math.sin(ang) * -100, 880 + Math.sin(ang) * -250 + Math.cos(ang) * -100 - 120];
+    const c = pop(t, ws(8, 14)), [cx, cy] = [510 + Math.cos(ang) * -240 - Math.sin(ang) * -100, 880 + Math.sin(ang) * -240 + Math.cos(ang) * -100 - 120];
     scaled(cx, cy, c, () => { ctx.beginPath(); ctx.moveTo(-60, 30); ctx.lineTo(-70, -30); ctx.lineTo(-30, 0); ctx.lineTo(0, -44); ctx.lineTo(30, 0); ctx.lineTo(70, -30); ctx.lineTo(60, 30); ctx.closePath(); ctx.fillStyle = C.gold; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = C.ink; ctx.lineJoin = 'round'; ctx.stroke(); });
     sticker(300, 1000, -0.04, pop(t, ws(8, 14) + 0.12), 'Words win!', C.green, '#fff', '700 44px Fredoka');
   }
 };
 SHOT[9] = t => {
   checkShot(t, 9, { hl: [[4, ws(9, 3)]], rest: [130, 390] }); header(t, st(9), 4, 'Memo'); minimap(t, st(9), 4);
-  sticker(330, 980, -0.06, pop(t, ws(9, 13)), 'optional', '#fff', C.spot[4], '700 44px Fredoka');
+  sticker(330, 980, -0.06, pop(t, ws(9, 12)), 'optional', '#fff', C.spot[4], '700 44px Fredoka');
 };
 SHOT[10] = t => {
   checkShot(t, 10, { hl: [[5, ws(10, 3)]], rest: [600, 390] }); header(t, st(10), 5, 'Your signature'); minimap(t, st(10), 5);
@@ -532,7 +567,7 @@ SHOT[11] = t => {   // pen yes, pencil no; never sign it blank
   if (a > 0.01) {
     ctx.save(); ctx.translate(-700 * (1 - a), 0);
     headerPlain(t, t0, 'Always use a pen');
-    pen(330, 1010, t, 1, -0.22, 1.55 * pop(t, t0, 'bouncy')); pencil(690, 1010, 0.22, 1.55 * pop(t, t0 + 0.1, 'bouncy'));
+    pen(330, 1010, t, 1, -0.22, 1.55 * pop(t, t0 - 0.12, 'bouncy')); pencil(690, 1010, 0.22, 1.55 * pop(t, t0 - 0.04, 'bouncy'));
     tick(300, 560, 70, M.spring(t, ws(11, 3) - 0.1, 'smooth')); cross(730, 560, 64, M.spring(t, ws(11, 3), 'smooth'));
     ctx.restore();
   }
@@ -548,55 +583,52 @@ SHOT[12] = t => {   // ...that's like handing the raccoon your piggy bank
   const t0 = st(12); headerPlain(t, t0, 'Never sign it blank');
   const grab = ws(11, 12), run = ws(11, 16);
   const e = M.spring(t, t0 - 0.1, 'bouncy'), go = M.spring(t, run, 'soft');
-  const px = lerp(400, 1150, clamp(go, 0, 1.2)), hop = 18 * Math.abs(Math.sin(t * 14)) * clamp(go * 3);
-  piggy(px + (t < grab ? -120 * (1 - e) : 0) - 60, 900 - hop - 50 * M.spring(t, grab, 'bouncy') * (1 - go), 1.45, t);
-  raccoon(lerp(1200, 780, clamp(e)) + 640 * clamp(go, 0, 1.2), 840 - hop, 1.25, t, t < grab ? 'sneaky' : 'grin', -1);
-  for (let k = 0; k < 3; k++) { const c = M.spring(t, run + 0.1 + k * 0.1, 'smooth'); if (c > 0 && c < 1.05) coin(lerp(px - 60, px - 220 - k * 60, clamp(c)), 780 - 160 * Math.sin(Math.PI * clamp(c)) + k * 10, 24, clamp(2 - 2 * c)); }
+  const px = lerp(400, 1000, clamp(go, 0, 1.2)), hop = 18 * Math.abs(Math.sin(t * 14)) * clamp(go * 3);
+  piggy(px + (t < grab ? -120 * (1 - e) : 0) - 60, 820 - hop - 50 * M.spring(t, grab, 'bouncy') * (1 - go), 1.45, t);
+  raccoon(lerp(1200, 790, clamp(e)) + 600 * clamp(go, 0, 1.2), 760 - hop, 1.05, t, t < grab ? 'sneaky' : 'grin', -1);
+  for (let k = 0; k < 3; k++) { const c = M.spring(t, run + 0.1 + k * 0.1, 'smooth'); if (c > 0 && c < 1.05) coin(lerp(px - 60, px - 220 - k * 60, clamp(c)), 700 - 160 * Math.sin(Math.PI * clamp(c)) + k * 10, 24, clamp(2 - 2 * c)); }
   sticker(510, 600, -0.04, pop(t, ws(11, 16) + 0.1), 'Bye-bye money!', '#fff', C.red, '700 46px Fredoka');
 };
 SHOT[13] = t => {   // the bottom numbers
   const glow = [M.spring(t, ws(12, 8) - 0.1, 'smooth'), M.spring(t, ws(12, 12) - 0.1, 'smooth'), M.spring(t, ws(12, 13) + 0.2, 'smooth')];
   const cam = checkShot(t, 13, { pen: false, inCheck: () => micr(1, glow.map(g => clamp(g))) });
   headerPlain(t, st(13), 'The numbers at the bottom');
-  const labels = [["Bank's name tag", 0], ['Your account', 1], ['Check #', 2]];
-  labels.forEach(([s, k]) => {
+  const labels = [['Routing #', 0, "bank's name tag"], ['Your account #', 1], ['Check #', 2]];
+  labels.forEach(([s, k, sub]) => {
     const g = glow[k]; if (g <= 0.01) return;
     const mx = MICR[k][1] + measure(MICR[k][0], '500 25px "JetBrains Mono"') / 2, [x, y] = toScreen(cam, mx, 470);
     const yy = y + 50 + 70 * (k % 2);
     ctx.save(); ctx.globalAlpha = clamp(g); line(x, y - 6, x, yy - 40, 4, C.ink);
-    txt(s, clamp(x, 170, 860), yy, '700 40px Fredoka', C.ink, 'center'); ctx.restore();
+    txt(s, clamp(x, 170, 860), yy, '700 40px Fredoka', C.ink, 'center');
+    if (sub) txt(sub, clamp(x, 170, 860), yy + 40, '600 30px Fredoka', C.inkSoft, 'center'); ctx.restore();
   });
   const tp = M.spring(t, ws(12, 14) - 0.08, 'bouncy');   // "leave them alone" tape
   if (tp > 0) { ctx.save(); ctx.translate(510 + 700 * (1 - tp), 1000); ctx.rotate(-0.06); ctx.beginPath(); ctx.rect(-560, -40, 1120, 80); ctx.clip();
     ctx.fillStyle = C.marker; ctx.fillRect(-560, -40, 1120, 80); ctx.fillStyle = C.ink; for (let x = -560; x < 560; x += 70) { ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x + 34, 40); ctx.lineTo(x + 74, -40); ctx.lineTo(x + 40, -40); ctx.fill(); }
     rr(-200, -30, 400, 60, 14, C.marker); txt('Leave them alone', 0, 14, '700 40px Fredoka', C.ink, 'center'); ctx.restore(); }
 };
-SHOT[14] = t => {   // recap: six spots
-  const cam = checkShot(t, 14, { pen: false, screen: c => {
-    SPOT_BOX.forEach(([x, y, w, h], k) => {
-      const s = pop(t, st(14) + 0.05 + k * 0.121, 'bouncy'), wig = t > ws(13, 8) ? 0.12 * Math.sin(t * 10 + k) : 0;
-      const [sx, sy] = toScreen(c, k === 2 ? x + w / 2 : x - 4, k === 2 ? y - 12 : y + 4);
-      scaled(sx, sy, s, () => { ctx.rotate(wig); circle(0, 0, 34, C.spot[k], C.ink, 4); txt(String(k + 1), 0, 14, '700 40px Fredoka', '#fff', 'center'); });
-    });
-  } });
-  headerPlain(t, st(14), '6 spots. You did it!', C.ink, 400);
-  if (t > ws(13, 8) - 0.06) sticker(510, 548, 0.03, pop(t, ws(13, 8)), 'Which one was new?', C.marker, C.ink, '700 46px Fredoka');
-};
-SHOT[15] = t => {   // follow card
-  const t0 = st(15), p = pop(t, t0 - 0.06, 'smooth');
-  scaled(510, 760, p, () => {
-    ctx.save(); ctx.shadowColor = 'rgba(60,40,20,0.25)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12; rr(-400, -300, 800, 600, 50, '#fff'); ctx.restore();
-    rr(-400, -300, 800, 600, 50, null, C.ink, 5);
-    circle(-250, -170, 70, C.spot[2], C.ink, 5); txt('∞', -250, -140, '700 92px Fredoka', '#fff', 'center');
-    txt('Infinite How To', -150, -150, '700 62px Fredoka', C.ink);
-    txt('Grown-up stuff,', 0, 0, '700 72px Fredoka', C.ink, 'center');
-    txt("explained like you're 5", 0, 86, '700 58px Fredoka', C.spot[3], 'center');
-    const b = 1 - 0.08 * M.kick(t, ws(14, 0) + 0.15, 1, 'bouncy');
-    scaled(0, 200, b, () => { rr(-150, -46, 300, 92, 46, C.red, C.ink, 5); txt('Follow', 0, 18, '700 50px Fredoka', '#fff', 'center'); });
+function recapBadges(t, c, settled = 0) {
+  SPOT_BOX.forEach(([x, y, w, h], k) => {
+    const s = settled ? 1 : pop(t, st(14) + 0.05 + k * 0.121, 'bouncy'), wig = t > ws(13, 8) ? 0.12 * Math.sin(t * 10 + k) : 0;
+    const [sx, sy] = toScreen(c, k === 2 ? x + w / 2 : x - 4, k === 2 ? y - 12 : y + 4);
+    scaled(sx, sy, s, () => { ctx.rotate(wig); circle(0, 0, 34, C.spot[k], C.ink, 4); txt(String(k + 1), 0, 14, '700 40px Fredoka', '#fff', 'center'); });
   });
-  const rc = M.spring(t, ws(14, 4) - 0.1, 'bouncy'); if (rc > 0.004) raccoon(lerp(1400, 905, rc), 930, .72, t, 'grin', -1);
+}
+SHOT[14] = t => {   // recap: six spots
+  const cam = checkShot(t, 14, { pen: false, screen: c => recapBadges(t, c) });
+  headerPlain(t, st(14), '6 spots. You did it!', C.ink, 400);
+  if (t > ws(13, 8) - 0.06) sticker(510, 548, 0.03, pop(t, ws(13, 8)), 'Which spot was new?', C.marker, C.ink, '700 46px Fredoka');
+};
+SHOT[15] = t => {   // follow, as a sticker over the finished check (no separate card)
+  const t0 = st(15);
+  const rc = M.spring(t, t0 + 0.1, 'bouncy'); peeker(lerp(700, 552, rc), t, 'grin');
+  checkShot(t, 15, { pen: false, screen: c => recapBadges(t, c, 1) });
+  headerPlain(t, t0, "Grown-up stuff, explained like you're 5", C.ink, 400);
+  const b = pop(t, t0 - 0.06, 'bouncy') * (1 - 0.08 * M.kick(t, ws(14, 0) + 0.15, 1, 'bouncy'));
+  scaled(510, 520, b, () => { rr(-210, -46, 420, 92, 46, C.red, C.ink, 5); txt('Follow for more', 0, 17, '700 46px Fredoka', '#fff', 'center'); });
 };
 SHOT[16] = t => {   // loop back to the opening frame
+  peeker(lerp(720, SNEAK.y0, M.spring(t, st(16) + 0.6, 'smooth')), t - window.DUR);
   checkShot(t, 16, { flourish: 0, rest: [580, 408] });
   const q = M.spring(t, st(16) - 0.1, 'smooth');
   ctx.save(); ctx.globalAlpha = clamp(q * 1.3);
@@ -626,19 +658,20 @@ window.post = function (t) {
   [2, 3, 4, 6, 9, 10].forEach((i, k) => { add(st(i) - 0.04, 'pop', .5); });   // header badges
   add(ws(2, 2), 'pop', .35); add(ws(3, 2), 'pop', .35); add(ws(4, 3), 'pop', .35); add(ws(6, 4), 'pop', .35); add(ws(9, 3), 'pop', .35); add(ws(10, 3), 'pop', .35);
   add(ws(4, 6), 'tick', .5);                                          // squeeze arrows
-  add(ws(1, 6) - 0.2, 'slide', .5); add(ws(1, 9), 'pop', .45); for (let k = 0; k < 4; k++) add(ws(1, 11) + k * 0.12 + 0.25, 'tick', .55); add(ws(1, 13), 'pop', .4);
-  add(ws(5, 1) - 0.1, 'boing', .5); add(ws(5, 4), 'thud', .8); add(ws(5, 4) + 0.02, 'pop', .4); add(ws(5, 9) + 0.05, 'slide', .4);
-  add(ws(7, 7) - 0.1, 'boing', .45); add(ws(7, 10), 'thud', .7); add(ws(7, 11) + 0.1, 'slide', .35);
+  add(0.02, 'slide', .3);                                            // raccoon creeping in on frame 1
+  add(ws(1, 6) - 0.2, 'slide', .5); add(ws(1, 8), 'pop', .45); for (let k = 0; k < 4; k++) add(ws(1, 9) + k * 0.12 + 0.25, 'tick', .55); add(ws(1, 10), 'pop', .4);
+  add(ws(5, 1) - 0.1, 'boing', .5); add(ws(5, 3) + 0.05, 'scratch', .3, .35); add(ws(5, 4), 'thud', .8); add(ws(5, 4) + 0.02, 'pop', .4); add(ws(5, 9) + 0.05, 'slide', .4);
+  add(ws(7, 7) - 0.1, 'boing', .45); add(ws(7, 8), 'scratch', .3, .4); add(ws(7, 10), 'thud', .7); add(ws(7, 10) + 0.03, 'pop', .35); add(ws(7, 11) + 0.1, 'slide', .35);
   add(st(8) - 0.04, 'pop', .5); add(st(8) + 0.04, 'pop', .35); add(st(8) + 0.16, 'pop', .35); add(ws(8, 3), 'tick', .4); add(ws(8, 6), 'tick', .4); add(ws(8, 7), 'thud', .45); add(ws(8, 12) - 0.1, 'thud', .7); add(ws(8, 14), 'sparkle', .45);
-  add(ws(9, 13), 'pop', .45);
+  add(ws(9, 12), 'pop', .45);
   add(ws(10, 9) - 0.05, 'knock', .6); add(ws(10, 9), 'pop', .35);
   add(st(11), 'pop', .4); add(st(11) + 0.1, 'pop', .4); add(ws(11, 3) - 0.1, 'sparkle', .3); add(ws(11, 3), 'thud', .45);
   add(ws(11, 5) - 0.1, 'slide', .4); add(ws(11, 8) - 0.05, 'knock', .7);
   add(st(12) - 0.1, 'boing', .45); add(ws(11, 12), 'pop', .4); add(ws(11, 16), 'slide', .5); for (let k = 0; k < 3; k++) add(ws(11, 16) + 0.1 + k * 0.1, 'tick', .5);
   add(ws(12, 8) - 0.1, 'pop', .35); add(ws(12, 12) - 0.1, 'pop', .35); add(ws(12, 13) + 0.2, 'pop', .35); add(ws(12, 14) - 0.08, 'slide', .5);
   for (let k = 0; k < 6; k++) add(st(14) + 0.05 + k * 0.121, 'pop', .4); add(ws(13, 5), 'sparkle', .45); add(ws(13, 8), 'pop', .45);
-  add(st(15) - 0.06, 'pop', .45); add(ws(14, 0) + 0.15, 'knock', .35); add(ws(14, 4) - 0.1, 'slide', .35); add(ws(14, 4), 'boing', .4);
-  add(st(16) - 0.1, 'slide', .4); add(st(16) + 0.3, 'pop', .4);
+  add(st(15) + 0.0, 'pop', .45); add(ws(14, 0) + 0.15, 'knock', .35); add(st(15) + 0.05, 'slide', .35); add(st(15) + 0.2, 'boing', .4);
+  add(st(16) - 0.1, 'slide', .4); add(st(16) + 0.3, 'pop', .4); add(st(16) + 0.4, 'slide', .3);
   window.CUES = {
     chords: [[36, 48, 55, 64, 67], [43, 55, 62, 67, 71], [45, 57, 64, 67, 72], [41, 53, 60, 65, 69]],
     drums_gain: 0.5, cut_gain: 0.4, riser: false, sfx_gain: 0.55, sfx: E.sort((a, b) => a.t - b.t),

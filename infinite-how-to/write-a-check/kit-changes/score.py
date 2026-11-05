@@ -186,7 +186,7 @@ def mix(key):
     drums = pyln.normalize.loudness(drums, meter.integrated_loudness(drums), -24) * cues.get('drums_gain', 1.0)
     # event SFX layer, kept as its own bus so it can duck under the voice and stay below it
     ev = np.zeros(n)
-    for e_ in cues.get('sfx', []):
+    for e_ in (d.get('sfx') or cues.get('sfx', [])):
         fn, dflt = SFX[e_['kind']]; r_ = _jit(e_['t'], len(e_['kind']))
         put(ev, fn(int(e_.get('dur', dflt) * SR), r_), e_['t'] + .006 * r_.standard_normal(), e_.get('gain', .5))
     bed = music + drums + fx

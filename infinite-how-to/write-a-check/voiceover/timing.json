@@ -1,1276 +1,1258 @@
 {
- "duration": 62.834,
+ "duration": 62.262,
  "voice": "af_heart",
  "speed": 1.0,
  "lines": [
   {
-   "text": "Here's how to write a check, like you're five.",
+   "text": "First check? It's just six spots.",
    "start": 0.12,
-   "end": 2.14
+   "end": 1.985
   },
   {
-   "text": "A check is a note to your bank that says: please give this person my money.",
-   "start": 2.39,
-   "end": 6.381
+   "text": "A check is a note to your bank: pay this person.",
+   "start": 2.185,
+   "end": 4.826
   },
   {
    "text": "Spot one, top right: today's date.",
-   "start": 6.731,
-   "end": 8.856
+   "start": 5.126,
+   "end": 7.25
   },
   {
-   "text": "Spot two: who gets the money. Write their name.",
-   "start": 9.156,
-   "end": 11.885
+   "text": "Spot two, pay to the order of: who gets the money.",
+   "start": 7.55,
+   "end": 10.383
   },
   {
    "text": "Spot three: the amount in numbers. Squeeze it right up against the dollar sign,",
-   "start": 12.185,
-   "end": 16.772
+   "start": 10.683,
+   "end": 15.271
   },
   {
    "text": "so this sneaky raccoon can't sneak an extra number in.",
-   "start": 16.852,
-   "end": 19.925
+   "start": 15.351,
+   "end": 18.424
   },
   {
-   "text": "Spot four: the same amount, in words. Twenty five, and fifty over one hundred.",
-   "start": 20.275,
-   "end": 24.996
+   "text": "Spot four: the same amount, in words. Eight hundred fifty, and zero zero over one hundred.",
+   "start": 18.774,
+   "end": 24.359
   },
   {
    "text": "Then draw a line to the end, so nobody can add more.",
-   "start": 25.146,
-   "end": 28.03
+   "start": 24.509,
+   "end": 27.393
   },
   {
-   "text": "Secret: if the words and the numbers don't match, the bank usually trusts the words.",
-   "start": 28.38,
-   "end": 32.896
+   "text": "Secret: if the words and the numbers don't match, the bank usually trusts the words. So make them match.",
+   "start": 27.743,
+   "end": 33.521
   },
   {
-   "text": "Spot five, the memo: a little note that says what it's for. It's optional.",
-   "start": 33.296,
-   "end": 37.432
+   "text": "Spot five, the memo: what it's for, like your apartment number. It's optional.",
+   "start": 33.921,
+   "end": 38.116
   },
   {
    "text": "Spot six, the big one: sign your name. No signature, no money.",
-   "start": 37.732,
-   "end": 41.544
+   "start": 38.416,
+   "end": 42.229
   },
   {
    "text": "Always use a pen, and never sign a blank check. That's like handing the raccoon your piggy bank.",
-   "start": 41.894,
-   "end": 47.19
+   "start": 42.579,
+   "end": 47.875
   },
   {
-   "text": "The numbers at the bottom are your bank's name tag and your account number. Leave them alone.",
-   "start": 47.54,
-   "end": 52.314
+   "text": "The numbers at the bottom are your bank's routing number and your account number. Leave them alone.",
+   "start": 48.225,
+   "end": 53.024
   },
   {
-   "text": "Six spots, and you just wrote a check. Which spot didn't you know?",
-   "start": 52.664,
-   "end": 56.082
+   "text": "Six spots, and you just wrote a check. Which spot was new to you?",
+   "start": 53.374,
+   "end": 56.891
   },
   {
-   "text": "Follow for more grown-up stuff, explained like you're five.",
-   "start": 56.382,
-   "end": 59.541
+   "text": "Follow for more grown-up stuff.",
+   "start": 57.141,
+   "end": 58.743
   },
   {
-   "text": "So next time someone says, just write me a check...",
-   "start": 59.791,
-   "end": 62.384
+   "text": "So next time your landlord says, just write me a check...",
+   "start": 58.993,
+   "end": 61.812
   }
  ],
  "words": [
   {
-   "w": "Here's",
+   "w": "First",
    "start": 0.12,
-   "end": 0.42,
+   "end": 0.44,
    "line": 0
   },
   {
-   "w": "how",
-   "start": 0.42,
-   "end": 0.59,
+   "w": "check?",
+   "start": 0.44,
+   "end": 0.89,
    "line": 0
   },
   {
-   "w": "to",
-   "start": 0.59,
-   "end": 0.67,
+   "w": "It's",
+   "start": 0.89,
+   "end": 1.04,
    "line": 0
   },
   {
-   "w": "write",
-   "start": 0.67,
-   "end": 0.87,
+   "w": "just",
+   "start": 1.04,
+   "end": 1.23,
    "line": 0
   },
   {
-   "w": "a",
-   "start": 0.87,
-   "end": 0.92,
+   "w": "six",
+   "start": 1.23,
+   "end": 1.45,
    "line": 0
   },
   {
-   "w": "check,",
-   "start": 0.92,
-   "end": 1.36,
-   "line": 0
-  },
-  {
-   "w": "like",
-   "start": 1.36,
-   "end": 1.53,
-   "line": 0
-  },
-  {
-   "w": "you're",
-   "start": 1.53,
-   "end": 1.62,
-   "line": 0
-  },
-  {
-   "w": "five.",
-   "start": 1.62,
-   "end": 2.13,
+   "w": "spots.",
+   "start": 1.45,
+   "end": 1.97,
    "line": 0
   },
   {
    "w": "A",
-   "start": 2.39,
-   "end": 2.46,
+   "start": 2.185,
+   "end": 2.255,
    "line": 1
   },
   {
    "w": "check",
-   "start": 2.46,
-   "end": 2.86,
+   "start": 2.255,
+   "end": 2.615,
    "line": 1
   },
   {
    "w": "is",
-   "start": 2.86,
-   "end": 3.0,
+   "start": 2.615,
+   "end": 2.735,
    "line": 1
   },
   {
    "w": "a",
-   "start": 3.0,
-   "end": 3.03,
+   "start": 2.735,
+   "end": 2.775,
    "line": 1
   },
   {
    "w": "note",
-   "start": 3.03,
-   "end": 3.31,
+   "start": 2.775,
+   "end": 3.035,
    "line": 1
   },
   {
    "w": "to",
-   "start": 3.31,
-   "end": 3.41,
+   "start": 3.035,
+   "end": 3.135,
    "line": 1
   },
   {
    "w": "your",
-   "start": 3.41,
-   "end": 3.53,
+   "start": 3.135,
+   "end": 3.245,
    "line": 1
   },
   {
-   "w": "bank",
-   "start": 3.53,
-   "end": 3.85,
+   "w": "bank:",
+   "start": 3.245,
+   "end": 3.625,
    "line": 1
   },
   {
-   "w": "that",
-   "start": 3.85,
-   "end": 4.02,
-   "line": 1
-  },
-  {
-   "w": "says:",
-   "start": 4.02,
-   "end": 4.41,
-   "line": 1
-  },
-  {
-   "w": "please",
-   "start": 4.72,
-   "end": 5.07,
-   "line": 1
-  },
-  {
-   "w": "give",
-   "start": 5.07,
-   "end": 5.24,
+   "w": "pay",
+   "start": 3.865,
+   "end": 4.085,
    "line": 1
   },
   {
    "w": "this",
-   "start": 5.24,
-   "end": 5.4,
+   "start": 4.085,
+   "end": 4.265,
    "line": 1
   },
   {
-   "w": "person",
-   "start": 5.4,
-   "end": 5.78,
-   "line": 1
-  },
-  {
-   "w": "my",
-   "start": 5.78,
-   "end": 5.96,
-   "line": 1
-  },
-  {
-   "w": "money.",
-   "start": 5.96,
-   "end": 6.37,
+   "w": "person.",
+   "start": 4.265,
+   "end": 4.815,
    "line": 1
   },
   {
    "w": "Spot",
-   "start": 6.731,
-   "end": 7.041,
+   "start": 5.126,
+   "end": 5.436,
    "line": 2
   },
   {
    "w": "one,",
-   "start": 7.041,
-   "end": 7.331,
+   "start": 5.436,
+   "end": 5.726,
    "line": 2
   },
   {
    "w": "top",
-   "start": 7.331,
-   "end": 7.611,
+   "start": 5.726,
+   "end": 6.006,
    "line": 2
   },
   {
    "w": "right:",
-   "start": 7.611,
-   "end": 8.031,
+   "start": 6.006,
+   "end": 6.426,
    "line": 2
   },
   {
    "w": "today's",
-   "start": 8.031,
-   "end": 8.441,
+   "start": 6.426,
+   "end": 6.836,
    "line": 2
   },
   {
    "w": "date.",
-   "start": 8.441,
-   "end": 8.841,
+   "start": 6.836,
+   "end": 7.236,
    "line": 2
   },
   {
    "w": "Spot",
-   "start": 9.156,
-   "end": 9.526,
+   "start": 7.55,
+   "end": 7.95,
    "line": 3
   },
   {
-   "w": "two:",
-   "start": 9.526,
-   "end": 9.856,
+   "w": "two,",
+   "start": 7.95,
+   "end": 8.23,
+   "line": 3
+  },
+  {
+   "w": "pay",
+   "start": 8.23,
+   "end": 8.49,
+   "line": 3
+  },
+  {
+   "w": "to",
+   "start": 8.49,
+   "end": 8.61,
+   "line": 3
+  },
+  {
+   "w": "the",
+   "start": 8.61,
+   "end": 8.72,
+   "line": 3
+  },
+  {
+   "w": "order",
+   "start": 8.72,
+   "end": 9.06,
+   "line": 3
+  },
+  {
+   "w": "of:",
+   "start": 9.06,
+   "end": 9.25,
    "line": 3
   },
   {
    "w": "who",
-   "start": 9.856,
-   "end": 9.996,
+   "start": 9.47,
+   "end": 9.6,
    "line": 3
   },
   {
    "w": "gets",
-   "start": 9.996,
-   "end": 10.266,
+   "start": 9.6,
+   "end": 9.89,
    "line": 3
   },
   {
    "w": "the",
-   "start": 10.266,
-   "end": 10.346,
+   "start": 9.89,
+   "end": 9.98,
    "line": 3
   },
   {
    "w": "money.",
-   "start": 10.346,
-   "end": 10.746,
-   "line": 3
-  },
-  {
-   "w": "Write",
-   "start": 11.026,
-   "end": 11.286,
-   "line": 3
-  },
-  {
-   "w": "their",
-   "start": 11.286,
-   "end": 11.416,
-   "line": 3
-  },
-  {
-   "w": "name.",
-   "start": 11.416,
-   "end": 11.876,
+   "start": 9.98,
+   "end": 10.37,
    "line": 3
   },
   {
    "w": "Spot",
-   "start": 12.185,
-   "end": 12.555,
+   "start": 10.683,
+   "end": 11.053,
    "line": 4
   },
   {
    "w": "three:",
-   "start": 12.555,
-   "end": 13.035,
+   "start": 11.053,
+   "end": 11.533,
    "line": 4
   },
   {
    "w": "the",
-   "start": 13.035,
-   "end": 13.265,
+   "start": 11.533,
+   "end": 11.763,
    "line": 4
   },
   {
    "w": "amount",
-   "start": 13.265,
-   "end": 13.585,
+   "start": 11.763,
+   "end": 12.083,
    "line": 4
   },
   {
    "w": "in",
-   "start": 13.585,
-   "end": 13.655,
+   "start": 12.083,
+   "end": 12.153,
    "line": 4
   },
   {
    "w": "numbers.",
-   "start": 13.655,
-   "end": 14.225,
+   "start": 12.153,
+   "end": 12.723,
    "line": 4
   },
   {
    "w": "Squeeze",
-   "start": 14.605,
-   "end": 15.025,
+   "start": 13.103,
+   "end": 13.523,
    "line": 4
   },
   {
    "w": "it",
-   "start": 15.025,
-   "end": 15.135,
+   "start": 13.523,
+   "end": 13.633,
    "line": 4
   },
   {
    "w": "right",
-   "start": 15.135,
-   "end": 15.445,
+   "start": 13.633,
+   "end": 13.943,
    "line": 4
   },
   {
    "w": "up",
-   "start": 15.445,
-   "end": 15.585,
+   "start": 13.943,
+   "end": 14.083,
    "line": 4
   },
   {
    "w": "against",
-   "start": 15.585,
-   "end": 15.875,
+   "start": 14.083,
+   "end": 14.373,
    "line": 4
   },
   {
    "w": "the",
-   "start": 15.875,
-   "end": 15.965,
+   "start": 14.373,
+   "end": 14.463,
    "line": 4
   },
   {
    "w": "dollar",
-   "start": 15.965,
-   "end": 16.285,
+   "start": 14.463,
+   "end": 14.783,
    "line": 4
   },
   {
    "w": "sign,",
-   "start": 16.285,
-   "end": 16.765,
+   "start": 14.783,
+   "end": 15.263,
    "line": 4
   },
   {
    "w": "so",
-   "start": 16.852,
-   "end": 16.982,
+   "start": 15.351,
+   "end": 15.481,
    "line": 5
   },
   {
    "w": "this",
-   "start": 16.982,
-   "end": 17.222,
+   "start": 15.481,
+   "end": 15.721,
    "line": 5
   },
   {
    "w": "sneaky",
-   "start": 17.222,
-   "end": 17.602,
+   "start": 15.721,
+   "end": 16.101,
    "line": 5
   },
   {
    "w": "raccoon",
-   "start": 17.602,
-   "end": 18.172,
+   "start": 16.101,
+   "end": 16.671,
    "line": 5
   },
   {
    "w": "can't",
-   "start": 18.362,
-   "end": 18.642,
+   "start": 16.861,
+   "end": 17.141,
    "line": 5
   },
   {
    "w": "sneak",
-   "start": 18.642,
-   "end": 18.922,
+   "start": 17.141,
+   "end": 17.421,
    "line": 5
   },
   {
    "w": "an",
-   "start": 18.922,
-   "end": 18.992,
+   "start": 17.421,
+   "end": 17.491,
    "line": 5
   },
   {
    "w": "extra",
-   "start": 18.992,
-   "end": 19.382,
+   "start": 17.491,
+   "end": 17.881,
    "line": 5
   },
   {
    "w": "number",
-   "start": 19.382,
-   "end": 19.672,
+   "start": 17.881,
+   "end": 18.171,
    "line": 5
   },
   {
    "w": "in.",
-   "start": 19.672,
-   "end": 19.912,
+   "start": 18.171,
+   "end": 18.411,
    "line": 5
   },
   {
    "w": "Spot",
-   "start": 20.275,
-   "end": 20.615,
+   "start": 18.774,
+   "end": 19.074,
    "line": 6
   },
   {
    "w": "four:",
-   "start": 20.615,
-   "end": 21.015,
+   "start": 19.074,
+   "end": 19.474,
    "line": 6
   },
   {
    "w": "the",
-   "start": 21.135,
-   "end": 21.225,
+   "start": 19.574,
+   "end": 19.654,
    "line": 6
   },
   {
    "w": "same",
-   "start": 21.225,
-   "end": 21.565,
+   "start": 19.654,
+   "end": 19.984,
    "line": 6
   },
   {
    "w": "amount,",
-   "start": 21.565,
-   "end": 21.965,
+   "start": 19.984,
+   "end": 20.394,
    "line": 6
   },
   {
    "w": "in",
-   "start": 21.965,
-   "end": 22.095,
+   "start": 20.394,
+   "end": 20.534,
    "line": 6
   },
   {
    "w": "words.",
-   "start": 22.095,
-   "end": 22.535,
+   "start": 20.534,
+   "end": 20.964,
    "line": 6
   },
   {
-   "w": "Twenty",
-   "start": 22.875,
-   "end": 23.165,
+   "w": "Eight",
+   "start": 21.404,
+   "end": 21.554,
    "line": 6
   },
   {
-   "w": "five,",
-   "start": 23.165,
-   "end": 23.535,
+   "w": "hundred",
+   "start": 21.554,
+   "end": 21.834,
+   "line": 6
+  },
+  {
+   "w": "fifty,",
+   "start": 21.834,
+   "end": 22.384,
    "line": 6
   },
   {
    "w": "and",
-   "start": 23.535,
-   "end": 23.655,
+   "start": 22.414,
+   "end": 22.584,
    "line": 6
   },
   {
-   "w": "fifty",
-   "start": 23.655,
-   "end": 24.105,
+   "w": "zero",
+   "start": 22.584,
+   "end": 22.964,
+   "line": 6
+  },
+  {
+   "w": "zero",
+   "start": 22.964,
+   "end": 23.464,
    "line": 6
   },
   {
    "w": "over",
-   "start": 24.105,
-   "end": 24.315,
+   "start": 23.464,
+   "end": 23.684,
    "line": 6
   },
   {
    "w": "one",
-   "start": 24.315,
-   "end": 24.495,
+   "start": 23.684,
+   "end": 23.874,
    "line": 6
   },
   {
    "w": "hundred.",
-   "start": 24.495,
-   "end": 24.985,
+   "start": 23.874,
+   "end": 24.344,
    "line": 6
   },
   {
    "w": "Then",
-   "start": 25.146,
-   "end": 25.296,
+   "start": 24.509,
+   "end": 24.659,
    "line": 7
   },
   {
    "w": "draw",
-   "start": 25.296,
-   "end": 25.516,
+   "start": 24.659,
+   "end": 24.879,
    "line": 7
   },
   {
    "w": "a",
-   "start": 25.516,
-   "end": 25.576,
+   "start": 24.879,
+   "end": 24.939,
    "line": 7
   },
   {
    "w": "line",
-   "start": 25.576,
-   "end": 25.876,
+   "start": 24.939,
+   "end": 25.239,
    "line": 7
   },
   {
    "w": "to",
-   "start": 25.876,
-   "end": 25.976,
+   "start": 25.239,
+   "end": 25.339,
    "line": 7
   },
   {
    "w": "the",
-   "start": 25.976,
-   "end": 26.116,
+   "start": 25.339,
+   "end": 25.479,
    "line": 7
   },
   {
    "w": "end,",
-   "start": 26.116,
-   "end": 26.456,
+   "start": 25.479,
+   "end": 25.819,
    "line": 7
   },
   {
    "w": "so",
-   "start": 26.686,
-   "end": 26.826,
+   "start": 26.049,
+   "end": 26.189,
    "line": 7
   },
   {
    "w": "nobody",
-   "start": 26.826,
-   "end": 27.256,
+   "start": 26.189,
+   "end": 26.619,
    "line": 7
   },
   {
    "w": "can",
-   "start": 27.256,
-   "end": 27.406,
+   "start": 26.619,
+   "end": 26.769,
    "line": 7
   },
   {
    "w": "add",
-   "start": 27.406,
-   "end": 27.636,
+   "start": 26.769,
+   "end": 26.999,
    "line": 7
   },
   {
    "w": "more.",
-   "start": 27.636,
-   "end": 28.016,
+   "start": 26.999,
+   "end": 27.379,
    "line": 7
   },
   {
    "w": "Secret:",
-   "start": 28.38,
-   "end": 28.88,
+   "start": 27.743,
+   "end": 28.253,
    "line": 8
   },
   {
    "w": "if",
-   "start": 29.01,
-   "end": 29.14,
+   "start": 28.353,
+   "end": 28.483,
    "line": 8
   },
   {
    "w": "the",
-   "start": 29.14,
-   "end": 29.22,
+   "start": 28.483,
+   "end": 28.573,
    "line": 8
   },
   {
    "w": "words",
-   "start": 29.22,
-   "end": 29.58,
+   "start": 28.573,
+   "end": 28.923,
    "line": 8
   },
   {
    "w": "and",
-   "start": 29.58,
-   "end": 29.67,
+   "start": 28.923,
+   "end": 29.013,
    "line": 8
   },
   {
    "w": "the",
-   "start": 29.67,
-   "end": 29.73,
+   "start": 29.013,
+   "end": 29.073,
    "line": 8
   },
   {
    "w": "numbers",
-   "start": 29.73,
-   "end": 30.21,
+   "start": 29.073,
+   "end": 29.553,
    "line": 8
   },
   {
    "w": "don't",
-   "start": 30.21,
-   "end": 30.41,
+   "start": 29.553,
+   "end": 29.773,
    "line": 8
   },
   {
    "w": "match,",
-   "start": 30.41,
-   "end": 30.89,
+   "start": 29.773,
+   "end": 30.243,
    "line": 8
   },
   {
    "w": "the",
-   "start": 31.13,
-   "end": 31.23,
+   "start": 30.243,
+   "end": 30.443,
    "line": 8
   },
   {
    "w": "bank",
-   "start": 31.23,
-   "end": 31.58,
+   "start": 30.443,
+   "end": 30.773,
    "line": 8
   },
   {
    "w": "usually",
-   "start": 31.58,
-   "end": 31.94,
+   "start": 30.773,
+   "end": 31.133,
    "line": 8
   },
   {
    "w": "trusts",
-   "start": 31.94,
-   "end": 32.32,
+   "start": 31.133,
+   "end": 31.513,
    "line": 8
   },
   {
    "w": "the",
-   "start": 32.32,
-   "end": 32.41,
+   "start": 31.513,
+   "end": 31.603,
    "line": 8
   },
   {
    "w": "words.",
-   "start": 32.41,
-   "end": 32.89,
+   "start": 31.603,
+   "end": 32.063,
+   "line": 8
+  },
+  {
+   "w": "So",
+   "start": 32.443,
+   "end": 32.613,
+   "line": 8
+  },
+  {
+   "w": "make",
+   "start": 32.613,
+   "end": 32.843,
+   "line": 8
+  },
+  {
+   "w": "them",
+   "start": 32.843,
+   "end": 33.023,
+   "line": 8
+  },
+  {
+   "w": "match.",
+   "start": 33.023,
+   "end": 33.513,
    "line": 8
   },
   {
    "w": "Spot",
-   "start": 33.296,
-   "end": 33.606,
+   "start": 33.921,
+   "end": 34.291,
    "line": 9
   },
   {
    "w": "five,",
-   "start": 33.606,
-   "end": 33.976,
+   "start": 34.291,
+   "end": 34.651,
    "line": 9
   },
   {
    "w": "the",
-   "start": 33.976,
-   "end": 34.056,
+   "start": 34.651,
+   "end": 34.741,
    "line": 9
   },
   {
    "w": "memo:",
-   "start": 34.056,
-   "end": 34.466,
-   "line": 9
-  },
-  {
-   "w": "a",
-   "start": 34.866,
-   "end": 34.916,
-   "line": 9
-  },
-  {
-   "w": "little",
-   "start": 34.916,
-   "end": 35.126,
-   "line": 9
-  },
-  {
-   "w": "note",
-   "start": 35.126,
-   "end": 35.406,
-   "line": 9
-  },
-  {
-   "w": "that",
-   "start": 35.406,
-   "end": 35.566,
-   "line": 9
-  },
-  {
-   "w": "says",
-   "start": 35.566,
-   "end": 35.826,
+   "start": 34.741,
+   "end": 35.161,
    "line": 9
   },
   {
    "w": "what",
-   "start": 35.826,
-   "end": 35.956,
+   "start": 35.491,
+   "end": 35.611,
    "line": 9
   },
   {
    "w": "it's",
-   "start": 35.956,
-   "end": 36.116,
+   "start": 35.611,
+   "end": 35.771,
    "line": 9
   },
   {
-   "w": "for.",
-   "start": 36.116,
-   "end": 36.436,
+   "w": "for,",
+   "start": 35.771,
+   "end": 35.941,
+   "line": 9
+  },
+  {
+   "w": "like",
+   "start": 35.941,
+   "end": 36.161,
+   "line": 9
+  },
+  {
+   "w": "your",
+   "start": 36.161,
+   "end": 36.271,
+   "line": 9
+  },
+  {
+   "w": "apartment",
+   "start": 36.271,
+   "end": 36.681,
+   "line": 9
+  },
+  {
+   "w": "number.",
+   "start": 36.681,
+   "end": 37.051,
    "line": 9
   },
   {
    "w": "It's",
-   "start": 36.676,
-   "end": 36.846,
+   "start": 37.351,
+   "end": 37.521,
    "line": 9
   },
   {
    "w": "optional.",
-   "start": 36.846,
-   "end": 37.416,
+   "start": 37.521,
+   "end": 38.101,
    "line": 9
   },
   {
    "w": "Spot",
-   "start": 37.732,
-   "end": 38.072,
+   "start": 38.416,
+   "end": 38.756,
    "line": 10
   },
   {
    "w": "six,",
-   "start": 38.072,
-   "end": 38.382,
+   "start": 38.756,
+   "end": 39.066,
    "line": 10
   },
   {
    "w": "the",
-   "start": 38.382,
-   "end": 38.462,
+   "start": 39.066,
+   "end": 39.146,
    "line": 10
   },
   {
    "w": "big",
-   "start": 38.462,
-   "end": 38.682,
+   "start": 39.146,
+   "end": 39.366,
    "line": 10
   },
   {
    "w": "one:",
-   "start": 38.682,
-   "end": 39.002,
+   "start": 39.366,
+   "end": 39.686,
    "line": 10
   },
   {
    "w": "sign",
-   "start": 39.102,
-   "end": 39.402,
+   "start": 39.786,
+   "end": 40.086,
    "line": 10
   },
   {
    "w": "your",
-   "start": 39.402,
-   "end": 39.502,
+   "start": 40.086,
+   "end": 40.186,
    "line": 10
   },
   {
    "w": "name.",
-   "start": 39.502,
-   "end": 39.842,
+   "start": 40.186,
+   "end": 40.526,
    "line": 10
   },
   {
    "w": "No",
-   "start": 40.192,
-   "end": 40.382,
+   "start": 40.876,
+   "end": 41.066,
    "line": 10
   },
   {
    "w": "signature,",
-   "start": 40.382,
-   "end": 40.972,
+   "start": 41.066,
+   "end": 41.656,
    "line": 10
   },
   {
    "w": "no",
-   "start": 40.972,
-   "end": 41.142,
+   "start": 41.656,
+   "end": 41.826,
    "line": 10
   },
   {
    "w": "money.",
-   "start": 41.142,
-   "end": 41.532,
+   "start": 41.826,
+   "end": 42.216,
    "line": 10
   },
   {
    "w": "Always",
-   "start": 41.894,
-   "end": 42.294,
+   "start": 42.579,
+   "end": 42.979,
    "line": 11
   },
   {
    "w": "use",
-   "start": 42.294,
-   "end": 42.484,
+   "start": 42.979,
+   "end": 43.169,
    "line": 11
   },
   {
    "w": "a",
-   "start": 42.484,
-   "end": 42.524,
+   "start": 43.169,
+   "end": 43.209,
    "line": 11
   },
   {
    "w": "pen,",
-   "start": 42.524,
-   "end": 42.934,
+   "start": 43.209,
+   "end": 43.619,
    "line": 11
   },
   {
    "w": "and",
-   "start": 43.074,
-   "end": 43.274,
+   "start": 43.759,
+   "end": 43.959,
    "line": 11
   },
   {
    "w": "never",
-   "start": 43.274,
-   "end": 43.524,
+   "start": 43.959,
+   "end": 44.209,
    "line": 11
   },
   {
    "w": "sign",
-   "start": 43.524,
-   "end": 43.814,
+   "start": 44.209,
+   "end": 44.499,
    "line": 11
   },
   {
    "w": "a",
-   "start": 43.814,
-   "end": 43.854,
+   "start": 44.499,
+   "end": 44.539,
    "line": 11
   },
   {
    "w": "blank",
-   "start": 43.854,
-   "end": 44.134,
+   "start": 44.539,
+   "end": 44.819,
    "line": 11
   },
   {
    "w": "check.",
-   "start": 44.134,
-   "end": 44.594,
+   "start": 44.819,
+   "end": 45.279,
    "line": 11
   },
   {
    "w": "That's",
-   "start": 45.014,
-   "end": 45.264,
+   "start": 45.699,
+   "end": 45.949,
    "line": 11
   },
   {
    "w": "like",
-   "start": 45.264,
-   "end": 45.434,
+   "start": 45.949,
+   "end": 46.119,
    "line": 11
   },
   {
    "w": "handing",
-   "start": 45.434,
-   "end": 45.784,
+   "start": 46.119,
+   "end": 46.469,
    "line": 11
   },
   {
    "w": "the",
-   "start": 45.784,
-   "end": 45.874,
+   "start": 46.469,
+   "end": 46.559,
    "line": 11
   },
   {
    "w": "raccoon",
-   "start": 45.874,
-   "end": 46.354,
+   "start": 46.559,
+   "end": 47.039,
    "line": 11
   },
   {
    "w": "your",
-   "start": 46.354,
-   "end": 46.474,
+   "start": 47.039,
+   "end": 47.159,
    "line": 11
   },
   {
    "w": "piggy",
-   "start": 46.474,
-   "end": 46.784,
+   "start": 47.159,
+   "end": 47.469,
    "line": 11
   },
   {
    "w": "bank.",
-   "start": 46.784,
-   "end": 47.184,
+   "start": 47.469,
+   "end": 47.869,
    "line": 11
   },
   {
    "w": "The",
-   "start": 47.54,
-   "end": 47.61,
+   "start": 48.225,
+   "end": 48.295,
    "line": 12
   },
   {
    "w": "numbers",
-   "start": 47.61,
-   "end": 47.94,
+   "start": 48.295,
+   "end": 48.655,
    "line": 12
   },
   {
    "w": "at",
-   "start": 47.94,
-   "end": 48.02,
+   "start": 48.655,
+   "end": 48.725,
    "line": 12
   },
   {
    "w": "the",
-   "start": 48.02,
-   "end": 48.09,
+   "start": 48.725,
+   "end": 48.795,
    "line": 12
   },
   {
    "w": "bottom",
-   "start": 48.09,
-   "end": 48.56,
+   "start": 48.795,
+   "end": 49.285,
    "line": 12
   },
   {
    "w": "are",
-   "start": 48.56,
-   "end": 48.69,
+   "start": 49.285,
+   "end": 49.445,
    "line": 12
   },
   {
    "w": "your",
-   "start": 48.69,
-   "end": 48.84,
+   "start": 49.445,
+   "end": 49.605,
    "line": 12
   },
   {
    "w": "bank's",
-   "start": 48.84,
-   "end": 49.23,
+   "start": 49.605,
+   "end": 50.015,
    "line": 12
   },
   {
-   "w": "name",
-   "start": 49.23,
-   "end": 49.45,
+   "w": "routing",
+   "start": 50.015,
+   "end": 50.375,
    "line": 12
   },
   {
-   "w": "tag",
-   "start": 49.45,
-   "end": 50.0,
+   "w": "number",
+   "start": 50.375,
+   "end": 50.755,
    "line": 12
   },
   {
    "w": "and",
-   "start": 50.07,
-   "end": 50.21,
+   "start": 50.825,
+   "end": 50.965,
    "line": 12
   },
   {
    "w": "your",
-   "start": 50.21,
-   "end": 50.35,
+   "start": 50.965,
+   "end": 51.085,
    "line": 12
   },
   {
    "w": "account",
-   "start": 50.35,
-   "end": 50.69,
+   "start": 51.085,
+   "end": 51.435,
    "line": 12
   },
   {
    "w": "number.",
-   "start": 50.69,
-   "end": 51.03,
+   "start": 51.435,
+   "end": 51.785,
    "line": 12
   },
   {
    "w": "Leave",
-   "start": 51.48,
-   "end": 51.72,
+   "start": 52.205,
+   "end": 52.425,
    "line": 12
   },
   {
    "w": "them",
-   "start": 51.72,
-   "end": 51.83,
+   "start": 52.425,
+   "end": 52.545,
    "line": 12
   },
   {
    "w": "alone.",
-   "start": 51.83,
-   "end": 52.3,
+   "start": 52.545,
+   "end": 53.015,
    "line": 12
   },
   {
    "w": "Six",
-   "start": 52.664,
-   "end": 52.984,
+   "start": 53.374,
+   "end": 53.674,
    "line": 13
   },
   {
    "w": "spots,",
-   "start": 52.984,
-   "end": 53.444,
+   "start": 53.674,
+   "end": 54.144,
    "line": 13
   },
   {
    "w": "and",
-   "start": 53.444,
-   "end": 53.584,
+   "start": 54.144,
+   "end": 54.294,
    "line": 13
   },
   {
    "w": "you",
-   "start": 53.584,
-   "end": 53.684,
+   "start": 54.294,
+   "end": 54.384,
    "line": 13
   },
   {
    "w": "just",
-   "start": 53.684,
-   "end": 53.904,
+   "start": 54.384,
+   "end": 54.614,
    "line": 13
   },
   {
    "w": "wrote",
-   "start": 53.904,
-   "end": 54.054,
+   "start": 54.614,
+   "end": 54.764,
    "line": 13
   },
   {
    "w": "a",
-   "start": 54.054,
-   "end": 54.104,
+   "start": 54.764,
+   "end": 54.814,
    "line": 13
   },
   {
    "w": "check.",
-   "start": 54.104,
-   "end": 54.544,
+   "start": 54.814,
+   "end": 55.244,
    "line": 13
   },
   {
    "w": "Which",
-   "start": 54.854,
-   "end": 55.034,
+   "start": 55.574,
+   "end": 55.754,
    "line": 13
   },
   {
    "w": "spot",
-   "start": 55.034,
-   "end": 55.444,
+   "start": 55.754,
+   "end": 56.134,
    "line": 13
   },
   {
-   "w": "didn't",
-   "start": 55.444,
-   "end": 55.604,
+   "w": "was",
+   "start": 56.134,
+   "end": 56.294,
    "line": 13
   },
   {
-   "w": "you",
-   "start": 55.604,
-   "end": 55.724,
+   "w": "new",
+   "start": 56.294,
+   "end": 56.484,
    "line": 13
   },
   {
-   "w": "know?",
-   "start": 55.724,
-   "end": 56.074,
+   "w": "to",
+   "start": 56.484,
+   "end": 56.574,
+   "line": 13
+  },
+  {
+   "w": "you?",
+   "start": 56.574,
+   "end": 56.884,
    "line": 13
   },
   {
    "w": "Follow",
-   "start": 56.382,
-   "end": 56.762,
+   "start": 57.141,
+   "end": 57.521,
    "line": 14
   },
   {
    "w": "for",
-   "start": 56.762,
-   "end": 56.912,
+   "start": 57.521,
+   "end": 57.681,
    "line": 14
   },
   {
    "w": "more",
-   "start": 56.912,
-   "end": 57.132,
+   "start": 57.681,
+   "end": 57.861,
    "line": 14
   },
   {
    "w": "grown-up",
-   "start": 57.132,
-   "end": 57.522,
+   "start": 57.861,
+   "end": 58.241,
    "line": 14
   },
   {
-   "w": "stuff,",
-   "start": 57.522,
-   "end": 57.992,
-   "line": 14
-  },
-  {
-   "w": "explained",
-   "start": 58.242,
-   "end": 58.772,
-   "line": 14
-  },
-  {
-   "w": "like",
-   "start": 58.772,
-   "end": 58.932,
-   "line": 14
-  },
-  {
-   "w": "you're",
-   "start": 58.932,
-   "end": 59.032,
-   "line": 14
-  },
-  {
-   "w": "five.",
-   "start": 59.032,
-   "end": 59.532,
+   "w": "stuff.",
+   "start": 58.241,
+   "end": 58.731,
    "line": 14
   },
   {
    "w": "So",
-   "start": 59.791,
-   "end": 59.921,
+   "start": 58.993,
+   "end": 59.133,
    "line": 15
   },
   {
    "w": "next",
-   "start": 59.921,
-   "end": 60.201,
+   "start": 59.133,
+   "end": 59.403,
    "line": 15
   },
   {
    "w": "time",
-   "start": 60.201,
-   "end": 60.451,
+   "start": 59.403,
+   "end": 59.593,
    "line": 15
   },
   {
-   "w": "someone",
-   "start": 60.451,
-   "end": 60.741,
+   "w": "your",
+   "start": 59.593,
+   "end": 59.703,
+   "line": 15
+  },
+  {
+   "w": "landlord",
+   "start": 59.703,
+   "end": 60.143,
    "line": 15
   },
   {
    "w": "says,",
-   "start": 60.741,
-   "end": 61.121,
+   "start": 60.143,
+   "end": 60.513,
    "line": 15
   },
   {
    "w": "just",
-   "start": 61.281,
-   "end": 61.581,
+   "start": 60.703,
+   "end": 60.953,
    "line": 15
   },
   {
    "w": "write",
-   "start": 61.581,
-   "end": 61.751,
+   "start": 60.953,
+   "end": 61.143,
    "line": 15
   },
   {
    "w": "me",
-   "start": 61.751,
-   "end": 61.871,
+   "start": 61.143,
+   "end": 61.273,
    "line": 15
   },
   {
    "w": "a",
-   "start": 61.871,
-   "end": 61.901,
+   "start": 61.273,
+   "end": 61.313,
    "line": 15
   },
   {
    "w": "check...",
-   "start": 61.901,
-   "end": 62.371,
+   "start": 61.313,
+   "end": 61.803,
    "line": 15
   }
  ]

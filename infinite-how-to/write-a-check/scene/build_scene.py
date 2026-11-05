@@ -9,6 +9,8 @@ wish = [L[i]['start'] - 0.12 for i in range(1, len(L))]
 wish.append(lw(11)[10]['start'] - 0.15); wish.sort()
 fit = json.loads(subprocess.check_output(['python3', 'score.py', 'fit', ','.join(f'{x:.3f}' for x in wish), '--lo', '96', '--hi', '132'], cwd=kit))
 dur = round(tm['duration'], 3)
-head = f"'use strict';\nconst TM = {json.dumps(tm)};\nwindow.BEAT = {{ bpm: {fit['bpm']}, offset: {fit['offset']} }};\nwindow.SHOTS = {json.dumps(fit['snapped'])};\nwindow.DUR = {dur};\n"
+# snap cuts to whole frames so the scene's shot switch and the render segments agree (kit lesson, Oct 30)
+shots = [round(x * 30) / 30 for x in fit["snapped"]]
+head = f"'use strict';\nconst TM = {json.dumps(tm)};\nwindow.BEAT = {{ bpm: {fit['bpm']}, offset: {fit['offset']} }};\nwindow.SHOTS = {json.dumps(shots)};\nwindow.DUR = {dur};\n"
 open(os.path.join(kit, 'scenes', 'check_eli5.js'), 'w').write(head + open(os.path.join(here, 'check_body.js')).read())
-print(json.dumps({'bpm': fit['bpm'], 'offset': fit['offset'], 'max_shift': fit['max_shift_s'], 'shots': fit['snapped'], 'dur': dur}))
+print(json.dumps({'bpm': fit['bpm'], 'offset': fit['offset'], 'max_shift': fit['max_shift_s'], 'shots': shots, 'dur': dur}))

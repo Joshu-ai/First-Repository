@@ -1,18 +1,18 @@
 [
- {"text": "Here's how to write a check, like you're five.", "pause": 0.25},
- {"text": "A check is a note to your bank that says: please give this person my money.", "pause": 0.35},
+ {"text": "First check? It's just six spots.", "pause": 0.2},
+ {"text": "A check is a note to your bank: pay this person.", "pause": 0.3},
  {"text": "Spot one, top right: today's date.", "pause": 0.3},
- {"text": "Spot two: who gets the money. Write their name.", "pause": 0.3},
+ {"text": "Spot two, pay to the order of: who gets the money.", "pause": 0.3},
  {"text": "Spot three: the amount in numbers. Squeeze it right up against the dollar sign,", "pause": 0.08},
  {"text": "so this sneaky raccoon can't sneak an extra number in.", "pause": 0.35},
- {"text": "Spot four: the same amount, in words. Twenty five, and fifty over one hundred.", "pause": 0.15},
+ {"text": "Spot four: the same amount, in words. Eight hundred fifty, and zero zero over one hundred.", "pause": 0.15},
  {"text": "Then draw a line to the end, so nobody can add more.", "pause": 0.35},
- {"text": "Secret: if the words and the numbers don't match, the bank usually trusts the words.", "pause": 0.4},
- {"text": "Spot five, the memo: a little note that says what it's for. It's optional.", "pause": 0.3},
+ {"text": "Secret: if the words and the numbers don't match, the bank usually trusts the words. So make them match.", "pause": 0.4},
+ {"text": "Spot five, the memo: what it's for, like your apartment number. It's optional.", "pause": 0.3},
  {"text": "Spot six, the big one: sign your name. No signature, no money.", "pause": 0.35},
  {"text": "Always use a pen, and never sign a blank check. That's like handing the raccoon your piggy bank.", "pause": 0.35},
- {"text": "The numbers at the bottom are your bank's name tag and your account number. Leave them alone.", "pause": 0.35},
- {"text": "Six spots, and you just wrote a check. Which spot didn't you know?", "pause": 0.3},
- {"text": "Follow for more grown-up stuff, explained like you're five.", "pause": 0.25},
- {"text": "So next time someone says, just write me a check...", "pause": 0.0}
+ {"text": "The numbers at the bottom are your bank's routing number and your account number. Leave them alone.", "pause": 0.35},
+ {"text": "Six spots, and you just wrote a check. Which spot was new to you?", "pause": 0.25},
+ {"text": "Follow for more grown-up stuff.", "pause": 0.25},
+ {"text": "So next time your landlord says, just write me a check...", "pause": 0.0}
 ]

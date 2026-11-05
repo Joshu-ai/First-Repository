@@ -1,0 +1,11 @@
+--- render.mjs.orig	2026-11-05 14:30:23.887951811 +0000
++++ render.mjs	2026-11-05 14:30:23.891508083 +0000
+@@ -39,7 +39,7 @@
+   return { browser, page, grab };
+ }
+ const W0 = await openPage(), { page, grab } = W0;
+-const meta = await page.evaluate(() => ({ dur: window.DUR, shots: window.SHOTS || [], beat: window.BEAT || null, cues: window.CUES || {} }));
++const meta = await page.evaluate(() => ({ dur: window.DUR, shots: window.SHOTS || [], beat: window.BEAT || null, cues: window.CUES || {}, sfx: window.SFX || null }));
+ 
+ if (arg('--stills')) {
+   for (const t of arg('--stills').split(',').map(Number)) fs.writeFileSync(path.join(out, `still_${t.toFixed(2)}.jpg`), await grab(t));
