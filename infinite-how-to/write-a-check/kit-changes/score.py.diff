@@ -1,0 +1,99 @@
+--- score.py.orig	2026-11-05 14:01:46.701973412 +0000
++++ score.py	2026-11-05 14:01:46.713775615 +0000
+@@ -81,6 +81,56 @@
+     return sum(a * np.sin(2 * np.pi * f * r * t) * np.exp(-t * d) for r, a, d in [(1, 1, 2.2), (2.76, .4, 3.5), (5.4, .15, 6)])
+ 
+ 
++# ---------- event sound effects (window.SFX / cues.sfx = [{t, kind, gain, dur?}]) ----------
++def _jit(t, k=1):  # small pitch/time jitter seeded by t, so repeats never sound copied
++    r = np.random.default_rng(int(round(t * 1000)) * 7 + k); return r
++
++def sfx_pop(n, r):
++    t = np.arange(n) / SR; f0 = 760 * (1 + .08 * r.standard_normal())
++    f = f0 * (1 + .9 * np.exp(-t * 60))
++    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 38) + .15 * bandnoise(n, 2000, 7000) * np.exp(-t * 400)
++
++def sfx_scratch(n, r):
++    t = np.arange(n) / SR; rate = 9 + 3 * r.random()
++    am = .55 + .45 * np.abs(np.sin(np.pi * rate * t + r.random() * 3))
++    env = np.minimum(1, t / .03) * np.minimum(1, (n / SR - t) / .06)
++    return bandnoise(n, 1800, 7500) * am * env * .5
++
++def sfx_slide(n, r):
++    t = np.linspace(0, 1, n); y = np.zeros(n); seg = 1024
++    for s0 in range(0, n, seg):
++        lo = 500 + 900 * (s0 / n); part = bandnoise(min(seg, n - s0) + 512, lo, lo * 2.2)[512:]; y[s0:s0 + len(part)] = part
++    return y * np.sin(np.pi * t) ** 1.5 * .7
++
++def sfx_thud(n, r):
++    t = np.arange(n) / SR; f = 62 * (1 + .05 * r.standard_normal()) * (1 + .6 * np.exp(-t * 30))
++    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 9) + .2 * bandnoise(n, 60, 500) * np.exp(-t * 25)
++
++def sfx_knock(n, r):
++    t = np.arange(n) / SR; y = np.zeros(n)
++    for d in (0, .11 + .01 * r.random()):
++        tt = np.clip(t - d, 0, None); on = t >= d
++        y += on * (np.sin(2 * np.pi * 190 * tt) * np.exp(-tt * 45) + .5 * bandnoise(n, 500, 1600) * np.exp(-tt * 70))
++    return y * .8
++
++def sfx_boing(n, r):
++    t = np.arange(n) / SR; f = 260 * (1 + .06 * r.standard_normal()) * (1 + .35 * np.sin(2 * np.pi * 11 * t) * np.exp(-t * 4)) * (1 + .8 * t)
++    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 5) * .8
++
++def sfx_sparkle(n, r):
++    y = np.zeros(n)
++    for i, m in enumerate((84, 88, 91, 96)):
++        d = int((.06 * i + .01 * r.random()) * SR)
++        if d < n: y[d:] += chime(n - d, hz(m)) * .5
++    return y
++
++def sfx_tick(n, r):
++    t = np.arange(n) / SR; return bandnoise(n, 3000, 9000) * np.exp(-t * 500)
++
++SFX = {'pop': (sfx_pop, .25), 'scratch': (sfx_scratch, .8), 'slide': (sfx_slide, .3), 'thud': (sfx_thud, .6),
++       'knock': (sfx_knock, .35), 'boing': (sfx_boing, .55), 'sparkle': (sfx_sparkle, 1.6), 'tick': (sfx_tick, .05)}
++
++
+ def mix(key):
+     d = json.load(open(f'build/{key}/render.json'))
+     dur, B, cues = d['dur'], d['beat'], d.get('cues', {})
+@@ -122,17 +172,23 @@
+     music *= side
+     # accents locked to the shots
+     shots = [t for t in d['shots'] if 0 < t < dur]
++    cg = cues.get('cut_gain', 1.0)
+     for t in shots:
+-        put(fx, hit(int(1.4 * SR)), t, .55)
+-        put(fx, whoosh(int(.5 * SR)), t - .5, .18)
+-    if shots: put(fx, riser(int(bar * SR)), shots[-1] - bar, .12)
++        put(fx, hit(int(1.4 * SR)), t, .55 * cg)
++        put(fx, whoosh(int(.5 * SR)), t - .5, .18 * cg)
++    if shots and cues.get('riser', True): put(fx, riser(int(bar * SR)), shots[-1] - bar, .12 * cg)
+     for t in cues.get('chime', []): put(fx, chime(int(2 * SR)), t, .10)
+     for t in cues.get('hit', []): put(fx, hit(int(1.4 * SR)), t, .5)
+     fx = Pedalboard([Reverb(room_size=.7, wet_level=.25, dry_level=.85)])(fx.astype(np.float32)[None], SR)[0][:n]
+ 
+     meter = pyln.Meter(SR)
+     music = pyln.normalize.loudness(music, meter.integrated_loudness(music), -24)
+-    drums = pyln.normalize.loudness(drums, meter.integrated_loudness(drums), -24)
++    drums = pyln.normalize.loudness(drums, meter.integrated_loudness(drums), -24) * cues.get('drums_gain', 1.0)
++    # event SFX layer, kept as its own bus so it can duck under the voice and stay below it
++    ev = np.zeros(n)
++    for e_ in cues.get('sfx', []):
++        fn, dflt = SFX[e_['kind']]; r_ = _jit(e_['t'], len(e_['kind']))
++        put(ev, fn(int(e_.get('dur', dflt) * SR), r_), e_['t'] + .006 * r_.standard_normal(), e_.get('gain', .5))
+     bed = music + drums + fx
+     vo_path = arg('--vo')
+     if vo_path:
+@@ -140,7 +196,10 @@
+         vo = np.pad(vo, (0, max(0, n - len(vo))))[:n]
+         vo = pyln.normalize.loudness(vo, meter.integrated_loudness(vo), -16)
+         e = np.convolve(np.abs(vo), np.ones(int(.2 * SR)) / int(.2 * SR), mode='same')
+-        bed = bed * (1 - .6 * np.clip(e / (np.percentile(e, 95) + 1e-9), 0, 1)) * .55 + vo
++        duck = 1 - .6 * np.clip(e / (np.percentile(e, 95) + 1e-9), 0, 1)
++        bed = bed * duck * .55 + ev * (1 - .35 * (1 - duck)) * cues.get('sfx_gain', .5) + vo
++    else:
++        bed = bed + ev * cues.get('sfx_gain', .5)
+     fade = np.minimum(1, (dur - np.arange(n) / SR) / .25)
+     y = bed * np.clip(fade, 0, 1)
+     for _ in range(2):  # loudness to -14 LUFS (stereo), true-peak-ish ceiling at -1 dB

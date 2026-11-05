@@ -1,0 +1,1277 @@
+{
+ "duration": 62.834,
+ "voice": "af_heart",
+ "speed": 1.0,
+ "lines": [
+  {
+   "text": "Here's how to write a check, like you're five.",
+   "start": 0.12,
+   "end": 2.14
+  },
+  {
+   "text": "A check is a note to your bank that says: please give this person my money.",
+   "start": 2.39,
+   "end": 6.381
+  },
+  {
+   "text": "Spot one, top right: today's date.",
+   "start": 6.731,
+   "end": 8.856
+  },
+  {
+   "text": "Spot two: who gets the money. Write their name.",
+   "start": 9.156,
+   "end": 11.885
+  },
+  {
+   "text": "Spot three: the amount in numbers. Squeeze it right up against the dollar sign,",
+   "start": 12.185,
+   "end": 16.772
+  },
+  {
+   "text": "so this sneaky raccoon can't sneak an extra number in.",
+   "start": 16.852,
+   "end": 19.925
+  },
+  {
+   "text": "Spot four: the same amount, in words. Twenty five, and fifty over one hundred.",
+   "start": 20.275,
+   "end": 24.996
+  },
+  {
+   "text": "Then draw a line to the end, so nobody can add more.",
+   "start": 25.146,
+   "end": 28.03
+  },
+  {
+   "text": "Secret: if the words and the numbers don't match, the bank usually trusts the words.",
+   "start": 28.38,
+   "end": 32.896
+  },
+  {
+   "text": "Spot five, the memo: a little note that says what it's for. It's optional.",
+   "start": 33.296,
+   "end": 37.432
+  },
+  {
+   "text": "Spot six, the big one: sign your name. No signature, no money.",
+   "start": 37.732,
+   "end": 41.544
+  },
+  {
+   "text": "Always use a pen, and never sign a blank check. That's like handing the raccoon your piggy bank.",
+   "start": 41.894,
+   "end": 47.19
+  },
+  {
+   "text": "The numbers at the bottom are your bank's name tag and your account number. Leave them alone.",
+   "start": 47.54,
+   "end": 52.314
+  },
+  {
+   "text": "Six spots, and you just wrote a check. Which spot didn't you know?",
+   "start": 52.664,
+   "end": 56.082
+  },
+  {
+   "text": "Follow for more grown-up stuff, explained like you're five.",
+   "start": 56.382,
+   "end": 59.541
+  },
+  {
+   "text": "So next time someone says, just write me a check...",
+   "start": 59.791,
+   "end": 62.384
+  }
+ ],
+ "words": [
+  {
+   "w": "Here's",
+   "start": 0.12,
+   "end": 0.42,
+   "line": 0
+  },
+  {
+   "w": "how",
+   "start": 0.42,
+   "end": 0.59,
+   "line": 0
+  },
+  {
+   "w": "to",
+   "start": 0.59,
+   "end": 0.67,
+   "line": 0
+  },
+  {
+   "w": "write",
+   "start": 0.67,
+   "end": 0.87,
+   "line": 0
+  },
+  {
+   "w": "a",
+   "start": 0.87,
+   "end": 0.92,
+   "line": 0
+  },
+  {
+   "w": "check,",
+   "start": 0.92,
+   "end": 1.36,
+   "line": 0
+  },
+  {
+   "w": "like",
+   "start": 1.36,
+   "end": 1.53,
+   "line": 0
+  },
+  {
+   "w": "you're",
+   "start": 1.53,
+   "end": 1.62,
+   "line": 0
+  },
+  {
+   "w": "five.",
+   "start": 1.62,
+   "end": 2.13,
+   "line": 0
+  },
+  {
+   "w": "A",
+   "start": 2.39,
+   "end": 2.46,
+   "line": 1
+  },
+  {
+   "w": "check",
+   "start": 2.46,
+   "end": 2.86,
+   "line": 1
+  },
+  {
+   "w": "is",
+   "start": 2.86,
+   "end": 3.0,
+   "line": 1
+  },
+  {
+   "w": "a",
+   "start": 3.0,
+   "end": 3.03,
+   "line": 1
+  },
+  {
+   "w": "note",
+   "start": 3.03,
+   "end": 3.31,
+   "line": 1
+  },
+  {
+   "w": "to",
+   "start": 3.31,
+   "end": 3.41,
+   "line": 1
+  },
+  {
+   "w": "your",
+   "start": 3.41,
+   "end": 3.53,
+   "line": 1
+  },
+  {
+   "w": "bank",
+   "start": 3.53,
+   "end": 3.85,
+   "line": 1
+  },
+  {
+   "w": "that",
+   "start": 3.85,
+   "end": 4.02,
+   "line": 1
+  },
+  {
+   "w": "says:",
+   "start": 4.02,
+   "end": 4.41,
+   "line": 1
+  },
+  {
+   "w": "please",
+   "start": 4.72,
+   "end": 5.07,
+   "line": 1
+  },
+  {
+   "w": "give",
+   "start": 5.07,
+   "end": 5.24,
+   "line": 1
+  },
+  {
+   "w": "this",
+   "start": 5.24,
+   "end": 5.4,
+   "line": 1
+  },
+  {
+   "w": "person",
+   "start": 5.4,
+   "end": 5.78,
+   "line": 1
+  },
+  {
+   "w": "my",
+   "start": 5.78,
+   "end": 5.96,
+   "line": 1
+  },
+  {
+   "w": "money.",
+   "start": 5.96,
+   "end": 6.37,
+   "line": 1
+  },
+  {
+   "w": "Spot",
+   "start": 6.731,
+   "end": 7.041,
+   "line": 2
+  },
+  {
+   "w": "one,",
+   "start": 7.041,
+   "end": 7.331,
+   "line": 2
+  },
+  {
+   "w": "top",
+   "start": 7.331,
+   "end": 7.611,
+   "line": 2
+  },
+  {
+   "w": "right:",
+   "start": 7.611,
+   "end": 8.031,
+   "line": 2
+  },
+  {
+   "w": "today's",
+   "start": 8.031,
+   "end": 8.441,
+   "line": 2
+  },
+  {
+   "w": "date.",
+   "start": 8.441,
+   "end": 8.841,
+   "line": 2
+  },
+  {
+   "w": "Spot",
+   "start": 9.156,
+   "end": 9.526,
+   "line": 3
+  },
+  {
+   "w": "two:",
+   "start": 9.526,
+   "end": 9.856,
+   "line": 3
+  },
+  {
+   "w": "who",
+   "start": 9.856,
+   "end": 9.996,
+   "line": 3
+  },
+  {
+   "w": "gets",
+   "start": 9.996,
+   "end": 10.266,
+   "line": 3
+  },
+  {
+   "w": "the",
+   "start": 10.266,
+   "end": 10.346,
+   "line": 3
+  },
+  {
+   "w": "money.",
+   "start": 10.346,
+   "end": 10.746,
+   "line": 3
+  },
+  {
+   "w": "Write",
+   "start": 11.026,
+   "end": 11.286,
+   "line": 3
+  },
+  {
+   "w": "their",
+   "start": 11.286,
+   "end": 11.416,
+   "line": 3
+  },
+  {
+   "w": "name.",
+   "start": 11.416,
+   "end": 11.876,
+   "line": 3
+  },
+  {
+   "w": "Spot",
+   "start": 12.185,
+   "end": 12.555,
+   "line": 4
+  },
+  {
+   "w": "three:",
+   "start": 12.555,
+   "end": 13.035,
+   "line": 4
+  },
+  {
+   "w": "the",
+   "start": 13.035,
+   "end": 13.265,
+   "line": 4
+  },
+  {
+   "w": "amount",
+   "start": 13.265,
+   "end": 13.585,
+   "line": 4
+  },
+  {
+   "w": "in",
+   "start": 13.585,
+   "end": 13.655,
+   "line": 4
+  },
+  {
+   "w": "numbers.",
+   "start": 13.655,
+   "end": 14.225,
+   "line": 4
+  },
+  {
+   "w": "Squeeze",
+   "start": 14.605,
+   "end": 15.025,
+   "line": 4
+  },
+  {
+   "w": "it",
+   "start": 15.025,
+   "end": 15.135,
+   "line": 4
+  },
+  {
+   "w": "right",
+   "start": 15.135,
+   "end": 15.445,
+   "line": 4
+  },
+  {
+   "w": "up",
+   "start": 15.445,
+   "end": 15.585,
+   "line": 4
+  },
+  {
+   "w": "against",
+   "start": 15.585,
+   "end": 15.875,
+   "line": 4
+  },
+  {
+   "w": "the",
+   "start": 15.875,
+   "end": 15.965,
+   "line": 4
+  },
+  {
+   "w": "dollar",
+   "start": 15.965,
+   "end": 16.285,
+   "line": 4
+  },
+  {
+   "w": "sign,",
+   "start": 16.285,
+   "end": 16.765,
+   "line": 4
+  },
+  {
+   "w": "so",
+   "start": 16.852,
+   "end": 16.982,
+   "line": 5
+  },
+  {
+   "w": "this",
+   "start": 16.982,
+   "end": 17.222,
+   "line": 5
+  },
+  {
+   "w": "sneaky",
+   "start": 17.222,
+   "end": 17.602,
+   "line": 5
+  },
+  {
+   "w": "raccoon",
+   "start": 17.602,
+   "end": 18.172,
+   "line": 5
+  },
+  {
+   "w": "can't",
+   "start": 18.362,
+   "end": 18.642,
+   "line": 5
+  },
+  {
+   "w": "sneak",
+   "start": 18.642,
+   "end": 18.922,
+   "line": 5
+  },
+  {
+   "w": "an",
+   "start": 18.922,
+   "end": 18.992,
+   "line": 5
+  },
+  {
+   "w": "extra",
+   "start": 18.992,
+   "end": 19.382,
+   "line": 5
+  },
+  {
+   "w": "number",
+   "start": 19.382,
+   "end": 19.672,
+   "line": 5
+  },
+  {
+   "w": "in.",
+   "start": 19.672,
+   "end": 19.912,
+   "line": 5
+  },
+  {
+   "w": "Spot",
+   "start": 20.275,
+   "end": 20.615,
+   "line": 6
+  },
+  {
+   "w": "four:",
+   "start": 20.615,
+   "end": 21.015,
+   "line": 6
+  },
+  {
+   "w": "the",
+   "start": 21.135,
+   "end": 21.225,
+   "line": 6
+  },
+  {
+   "w": "same",
+   "start": 21.225,
+   "end": 21.565,
+   "line": 6
+  },
+  {
+   "w": "amount,",
+   "start": 21.565,
+   "end": 21.965,
+   "line": 6
+  },
+  {
+   "w": "in",
+   "start": 21.965,
+   "end": 22.095,
+   "line": 6
+  },
+  {
+   "w": "words.",
+   "start": 22.095,
+   "end": 22.535,
+   "line": 6
+  },
+  {
+   "w": "Twenty",
+   "start": 22.875,
+   "end": 23.165,
+   "line": 6
+  },
+  {
+   "w": "five,",
+   "start": 23.165,
+   "end": 23.535,
+   "line": 6
+  },
+  {
+   "w": "and",
+   "start": 23.535,
+   "end": 23.655,
+   "line": 6
+  },
+  {
+   "w": "fifty",
+   "start": 23.655,
+   "end": 24.105,
+   "line": 6
+  },
+  {
+   "w": "over",
+   "start": 24.105,
+   "end": 24.315,
+   "line": 6
+  },
+  {
+   "w": "one",
+   "start": 24.315,
+   "end": 24.495,
+   "line": 6
+  },
+  {
+   "w": "hundred.",
+   "start": 24.495,
+   "end": 24.985,
+   "line": 6
+  },
+  {
+   "w": "Then",
+   "start": 25.146,
+   "end": 25.296,
+   "line": 7
+  },
+  {
+   "w": "draw",
+   "start": 25.296,
+   "end": 25.516,
+   "line": 7
+  },
+  {
+   "w": "a",
+   "start": 25.516,
+   "end": 25.576,
+   "line": 7
+  },
+  {
+   "w": "line",
+   "start": 25.576,
+   "end": 25.876,
+   "line": 7
+  },
+  {
+   "w": "to",
+   "start": 25.876,
+   "end": 25.976,
+   "line": 7
+  },
+  {
+   "w": "the",
+   "start": 25.976,
+   "end": 26.116,
+   "line": 7
+  },
+  {
+   "w": "end,",
+   "start": 26.116,
+   "end": 26.456,
+   "line": 7
+  },
+  {
+   "w": "so",
+   "start": 26.686,
+   "end": 26.826,
+   "line": 7
+  },
+  {
+   "w": "nobody",
+   "start": 26.826,
+   "end": 27.256,
+   "line": 7
+  },
+  {
+   "w": "can",
+   "start": 27.256,
+   "end": 27.406,
+   "line": 7
+  },
+  {
+   "w": "add",
+   "start": 27.406,
+   "end": 27.636,
+   "line": 7
+  },
+  {
+   "w": "more.",
+   "start": 27.636,
+   "end": 28.016,
+   "line": 7
+  },
+  {
+   "w": "Secret:",
+   "start": 28.38,
+   "end": 28.88,
+   "line": 8
+  },
+  {
+   "w": "if",
+   "start": 29.01,
+   "end": 29.14,
+   "line": 8
+  },
+  {
+   "w": "the",
+   "start": 29.14,
+   "end": 29.22,
+   "line": 8
+  },
+  {
+   "w": "words",
+   "start": 29.22,
+   "end": 29.58,
+   "line": 8
+  },
+  {
+   "w": "and",
+   "start": 29.58,
+   "end": 29.67,
+   "line": 8
+  },
+  {
+   "w": "the",
+   "start": 29.67,
+   "end": 29.73,
+   "line": 8
+  },
+  {
+   "w": "numbers",
+   "start": 29.73,
+   "end": 30.21,
+   "line": 8
+  },
+  {
+   "w": "don't",
+   "start": 30.21,
+   "end": 30.41,
+   "line": 8
+  },
+  {
+   "w": "match,",
+   "start": 30.41,
+   "end": 30.89,
+   "line": 8
+  },
+  {
+   "w": "the",
+   "start": 31.13,
+   "end": 31.23,
+   "line": 8
+  },
+  {
+   "w": "bank",
+   "start": 31.23,
+   "end": 31.58,
+   "line": 8
+  },
+  {
+   "w": "usually",
+   "start": 31.58,
+   "end": 31.94,
+   "line": 8
+  },
+  {
+   "w": "trusts",
+   "start": 31.94,
+   "end": 32.32,
+   "line": 8
+  },
+  {
+   "w": "the",
+   "start": 32.32,
+   "end": 32.41,
+   "line": 8
+  },
+  {
+   "w": "words.",
+   "start": 32.41,
+   "end": 32.89,
+   "line": 8
+  },
+  {
+   "w": "Spot",
+   "start": 33.296,
+   "end": 33.606,
+   "line": 9
+  },
+  {
+   "w": "five,",
+   "start": 33.606,
+   "end": 33.976,
+   "line": 9
+  },
+  {
+   "w": "the",
+   "start": 33.976,
+   "end": 34.056,
+   "line": 9
+  },
+  {
+   "w": "memo:",
+   "start": 34.056,
+   "end": 34.466,
+   "line": 9
+  },
+  {
+   "w": "a",
+   "start": 34.866,
+   "end": 34.916,
+   "line": 9
+  },
+  {
+   "w": "little",
+   "start": 34.916,
+   "end": 35.126,
+   "line": 9
+  },
+  {
+   "w": "note",
+   "start": 35.126,
+   "end": 35.406,
+   "line": 9
+  },
+  {
+   "w": "that",
+   "start": 35.406,
+   "end": 35.566,
+   "line": 9
+  },
+  {
+   "w": "says",
+   "start": 35.566,
+   "end": 35.826,
+   "line": 9
+  },
+  {
+   "w": "what",
+   "start": 35.826,
+   "end": 35.956,
+   "line": 9
+  },
+  {
+   "w": "it's",
+   "start": 35.956,
+   "end": 36.116,
+   "line": 9
+  },
+  {
+   "w": "for.",
+   "start": 36.116,
+   "end": 36.436,
+   "line": 9
+  },
+  {
+   "w": "It's",
+   "start": 36.676,
+   "end": 36.846,
+   "line": 9
+  },
+  {
+   "w": "optional.",
+   "start": 36.846,
+   "end": 37.416,
+   "line": 9
+  },
+  {
+   "w": "Spot",
+   "start": 37.732,
+   "end": 38.072,
+   "line": 10
+  },
+  {
+   "w": "six,",
+   "start": 38.072,
+   "end": 38.382,
+   "line": 10
+  },
+  {
+   "w": "the",
+   "start": 38.382,
+   "end": 38.462,
+   "line": 10
+  },
+  {
+   "w": "big",
+   "start": 38.462,
+   "end": 38.682,
+   "line": 10
+  },
+  {
+   "w": "one:",
+   "start": 38.682,
+   "end": 39.002,
+   "line": 10
+  },
+  {
+   "w": "sign",
+   "start": 39.102,
+   "end": 39.402,
+   "line": 10
+  },
+  {
+   "w": "your",
+   "start": 39.402,
+   "end": 39.502,
+   "line": 10
+  },
+  {
+   "w": "name.",
+   "start": 39.502,
+   "end": 39.842,
+   "line": 10
+  },
+  {
+   "w": "No",
+   "start": 40.192,
+   "end": 40.382,
+   "line": 10
+  },
+  {
+   "w": "signature,",
+   "start": 40.382,
+   "end": 40.972,
+   "line": 10
+  },
+  {
+   "w": "no",
+   "start": 40.972,
+   "end": 41.142,
+   "line": 10
+  },
+  {
+   "w": "money.",
+   "start": 41.142,
+   "end": 41.532,
+   "line": 10
+  },
+  {
+   "w": "Always",
+   "start": 41.894,
+   "end": 42.294,
+   "line": 11
+  },
+  {
+   "w": "use",
+   "start": 42.294,
+   "end": 42.484,
+   "line": 11
+  },
+  {
+   "w": "a",
+   "start": 42.484,
+   "end": 42.524,
+   "line": 11
+  },
+  {
+   "w": "pen,",
+   "start": 42.524,
+   "end": 42.934,
+   "line": 11
+  },
+  {
+   "w": "and",
+   "start": 43.074,
+   "end": 43.274,
+   "line": 11
+  },
+  {
+   "w": "never",
+   "start": 43.274,
+   "end": 43.524,
+   "line": 11
+  },
+  {
+   "w": "sign",
+   "start": 43.524,
+   "end": 43.814,
+   "line": 11
+  },
+  {
+   "w": "a",
+   "start": 43.814,
+   "end": 43.854,
+   "line": 11
+  },
+  {
+   "w": "blank",
+   "start": 43.854,
+   "end": 44.134,
+   "line": 11
+  },
+  {
+   "w": "check.",
+   "start": 44.134,
+   "end": 44.594,
+   "line": 11
+  },
+  {
+   "w": "That's",
+   "start": 45.014,
+   "end": 45.264,
+   "line": 11
+  },
+  {
+   "w": "like",
+   "start": 45.264,
+   "end": 45.434,
+   "line": 11
+  },
+  {
+   "w": "handing",
+   "start": 45.434,
+   "end": 45.784,
+   "line": 11
+  },
+  {
+   "w": "the",
+   "start": 45.784,
+   "end": 45.874,
+   "line": 11
+  },
+  {
+   "w": "raccoon",
+   "start": 45.874,
+   "end": 46.354,
+   "line": 11
+  },
+  {
+   "w": "your",
+   "start": 46.354,
+   "end": 46.474,
+   "line": 11
+  },
+  {
+   "w": "piggy",
+   "start": 46.474,
+   "end": 46.784,
+   "line": 11
+  },
+  {
+   "w": "bank.",
+   "start": 46.784,
+   "end": 47.184,
+   "line": 11
+  },
+  {
+   "w": "The",
+   "start": 47.54,
+   "end": 47.61,
+   "line": 12
+  },
+  {
+   "w": "numbers",
+   "start": 47.61,
+   "end": 47.94,
+   "line": 12
+  },
+  {
+   "w": "at",
+   "start": 47.94,
+   "end": 48.02,
+   "line": 12
+  },
+  {
+   "w": "the",
+   "start": 48.02,
+   "end": 48.09,
+   "line": 12
+  },
+  {
+   "w": "bottom",
+   "start": 48.09,
+   "end": 48.56,
+   "line": 12
+  },
+  {
+   "w": "are",
+   "start": 48.56,
+   "end": 48.69,
+   "line": 12
+  },
+  {
+   "w": "your",
+   "start": 48.69,
+   "end": 48.84,
+   "line": 12
+  },
+  {
+   "w": "bank's",
+   "start": 48.84,
+   "end": 49.23,
+   "line": 12
+  },
+  {
+   "w": "name",
+   "start": 49.23,
+   "end": 49.45,
+   "line": 12
+  },
+  {
+   "w": "tag",
+   "start": 49.45,
+   "end": 50.0,
+   "line": 12
+  },
+  {
+   "w": "and",
+   "start": 50.07,
+   "end": 50.21,
+   "line": 12
+  },
+  {
+   "w": "your",
+   "start": 50.21,
+   "end": 50.35,
+   "line": 12
+  },
+  {
+   "w": "account",
+   "start": 50.35,
+   "end": 50.69,
+   "line": 12
+  },
+  {
+   "w": "number.",
+   "start": 50.69,
+   "end": 51.03,
+   "line": 12
+  },
+  {
+   "w": "Leave",
+   "start": 51.48,
+   "end": 51.72,
+   "line": 12
+  },
+  {
+   "w": "them",
+   "start": 51.72,
+   "end": 51.83,
+   "line": 12
+  },
+  {
+   "w": "alone.",
+   "start": 51.83,
+   "end": 52.3,
+   "line": 12
+  },
+  {
+   "w": "Six",
+   "start": 52.664,
+   "end": 52.984,
+   "line": 13
+  },
+  {
+   "w": "spots,",
+   "start": 52.984,
+   "end": 53.444,
+   "line": 13
+  },
+  {
+   "w": "and",
+   "start": 53.444,
+   "end": 53.584,
+   "line": 13
+  },
+  {
+   "w": "you",
+   "start": 53.584,
+   "end": 53.684,
+   "line": 13
+  },
+  {
+   "w": "just",
+   "start": 53.684,
+   "end": 53.904,
+   "line": 13
+  },
+  {
+   "w": "wrote",
+   "start": 53.904,
+   "end": 54.054,
+   "line": 13
+  },
+  {
+   "w": "a",
+   "start": 54.054,
+   "end": 54.104,
+   "line": 13
+  },
+  {
+   "w": "check.",
+   "start": 54.104,
+   "end": 54.544,
+   "line": 13
+  },
+  {
+   "w": "Which",
+   "start": 54.854,
+   "end": 55.034,
+   "line": 13
+  },
+  {
+   "w": "spot",
+   "start": 55.034,
+   "end": 55.444,
+   "line": 13
+  },
+  {
+   "w": "didn't",
+   "start": 55.444,
+   "end": 55.604,
+   "line": 13
+  },
+  {
+   "w": "you",
+   "start": 55.604,
+   "end": 55.724,
+   "line": 13
+  },
+  {
+   "w": "know?",
+   "start": 55.724,
+   "end": 56.074,
+   "line": 13
+  },
+  {
+   "w": "Follow",
+   "start": 56.382,
+   "end": 56.762,
+   "line": 14
+  },
+  {
+   "w": "for",
+   "start": 56.762,
+   "end": 56.912,
+   "line": 14
+  },
+  {
+   "w": "more",
+   "start": 56.912,
+   "end": 57.132,
+   "line": 14
+  },
+  {
+   "w": "grown-up",
+   "start": 57.132,
+   "end": 57.522,
+   "line": 14
+  },
+  {
+   "w": "stuff,",
+   "start": 57.522,
+   "end": 57.992,
+   "line": 14
+  },
+  {
+   "w": "explained",
+   "start": 58.242,
+   "end": 58.772,
+   "line": 14
+  },
+  {
+   "w": "like",
+   "start": 58.772,
+   "end": 58.932,
+   "line": 14
+  },
+  {
+   "w": "you're",
+   "start": 58.932,
+   "end": 59.032,
+   "line": 14
+  },
+  {
+   "w": "five.",
+   "start": 59.032,
+   "end": 59.532,
+   "line": 14
+  },
+  {
+   "w": "So",
+   "start": 59.791,
+   "end": 59.921,
+   "line": 15
+  },
+  {
+   "w": "next",
+   "start": 59.921,
+   "end": 60.201,
+   "line": 15
+  },
+  {
+   "w": "time",
+   "start": 60.201,
+   "end": 60.451,
+   "line": 15
+  },
+  {
+   "w": "someone",
+   "start": 60.451,
+   "end": 60.741,
+   "line": 15
+  },
+  {
+   "w": "says,",
+   "start": 60.741,
+   "end": 61.121,
+   "line": 15
+  },
+  {
+   "w": "just",
+   "start": 61.281,
+   "end": 61.581,
+   "line": 15
+  },
+  {
+   "w": "write",
+   "start": 61.581,
+   "end": 61.751,
+   "line": 15
+  },
+  {
+   "w": "me",
+   "start": 61.751,
+   "end": 61.871,
+   "line": 15
+  },
+  {
+   "w": "a",
+   "start": 61.871,
+   "end": 61.901,
+   "line": 15
+  },
+  {
+   "w": "check...",
+   "start": 61.901,
+   "end": 62.371,
+   "line": 15
+  }
+ ]
+}
